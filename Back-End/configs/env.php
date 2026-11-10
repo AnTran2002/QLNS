@@ -19,7 +19,7 @@ define('PATH_MODEL',            PATH_ROOT . 'models/');
 define('DB_HOST',     'localhost');
 define('DB_PORT',     '3306');
 define('DB_USERNAME', 'root');
-define('DB_PASSWORD', 'anrua2062002');
+define('DB_PASSWORD', '');
 define('DB_NAME',     'QLNS');
 define('DB_OPTIONS', [
     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
