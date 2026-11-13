@@ -11,7 +11,9 @@ import {
   FileText,
   HelpCircle,
   LayoutDashboard,
+  LogOut,
   Menu,
+  Scan,
   Search,
   Settings2,
   Sparkles,
@@ -46,6 +48,10 @@ import {
 } from "@/components/ui/tooltip";
 import { Avatar, EmptyState } from "@/components/shared";
 import { useWorkspace } from "@/hooks/use-workspace";
+import { useAuth } from "@/hooks/use-auth";
+import { LoginPage } from "@/features/login-page";
+import { EmployeeDashboard } from "@/features/employee-dashboard";
+import { FaceAttendanceModal } from "@/features/face-attendance-modal";
 const Dashboard = lazy(() =>
   import("@/features/dashboard").then((module) => ({
     default: module.Dashboard,
@@ -79,7 +85,7 @@ function initialCompany() {
     return "Acme Studio";
   }
 }
-function Sidebar({ page, count, company, navigate, showHelp }) {
+function Sidebar({ page, count, company, navigate, showHelp, onOpenFaceModal, onLogout, user }) {
   return (
     <div className="sidebar-inner">
       <a
@@ -131,6 +137,15 @@ function Sidebar({ page, count, company, navigate, showHelp }) {
             )}
           </button>
         ))}
+
+        {/* Nút Chấm công khuôn mặt AI trong Sidebar Admin */}
+        <button
+          onClick={onOpenFaceModal}
+          className="nav-item text-emerald-800 bg-emerald-50/80 hover:bg-emerald-100/90 border border-emerald-200/80 font-medium mt-1"
+        >
+          <Scan size={18} className="text-emerald-700" />
+          <span>Chấm công khuôn mặt</span>
+        </button>
       </nav>
       <div className="sidebar-spacer" />
       <div className="sidebar-tip">
@@ -161,12 +176,21 @@ function Sidebar({ page, count, company, navigate, showHelp }) {
           <span>Trung tâm trợ giúp</span>
           <ArrowUpRight size={14} />
         </button>
+        {onLogout && (
+          <button
+            className="nav-item text-red-600 hover:text-red-700 hover:bg-red-50"
+            onClick={onLogout}
+          >
+            <LogOut size={18} />
+            <span>Đăng xuất</span>
+          </button>
+        )}
       </div>
       <button className="sidebar-profile" onClick={() => navigate("settings")}>
-        <Avatar name="Quản trị viên" small />
+        <Avatar name={user?.full_name || "Quản trị viên"} small />
         <span>
-          <strong>Quản trị viên</strong>
-          <small>Quản lý không gian mẫu</small>
+          <strong>{user?.full_name || "Quản trị viên"}</strong>
+          <small>{user?.role === "ADMIN" ? "Quản trị hệ thống (Admin)" : "Nhân viên"}</small>
         </span>
         <ChevronDown size={14} />
       </button>
@@ -174,6 +198,8 @@ function Sidebar({ page, count, company, navigate, showHelp }) {
   );
 }
 export default function App() {
+  const { user, loading, login, logout } = useAuth();
+  const [faceModalOpen, setFaceModalOpen] = useState(false);
   const { employees, save, reset } = useWorkspace();
   const [pageKey, setPageKey] = useState(() => {
     const hash = decodeURIComponent(window.location.hash.slice(1));
@@ -256,6 +282,36 @@ export default function App() {
       toast.info("Tên tổ chức chỉ được giữ trong phiên hiện tại.");
     }
   }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#fafafa] flex items-center justify-center text-[#777] text-[13px]">
+        <div className="flex items-center gap-2.5">
+          <span className="w-4 h-4 border-2 border-[#242424] border-t-transparent rounded-full animate-spin" />
+          <span>Đang mở không gian làm việc…</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <>
+        <LoginPage onLogin={login} />
+        <Toaster theme="light" position="bottom-right" richColors closeButton />
+      </>
+    );
+  }
+
+  if (user.role === "EMPLOYEE") {
+    return (
+      <>
+        <EmployeeDashboard user={user} onLogout={logout} />
+        <Toaster theme="light" position="bottom-right" richColors closeButton />
+      </>
+    );
+  }
+
   return (
     <TooltipProvider>
       <div className="app-shell">
@@ -277,6 +333,9 @@ export default function App() {
             company={company}
             navigate={navigate}
             showHelp={() => setHelpOpen(true)}
+            onOpenFaceModal={() => setFaceModalOpen(true)}
+            onLogout={logout}
+            user={user}
           />
         </aside>
         <div className="main-shell">
@@ -312,6 +371,15 @@ export default function App() {
                   <Command size={10} />K
                 </kbd>
               </button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setFaceModalOpen(true)}
+                className="h-8 text-[12px] gap-1.5 border-emerald-300 text-emerald-800 bg-emerald-50/70 hover:bg-emerald-100"
+              >
+                <Scan size={14} className="text-emerald-700" />
+                <span className="hidden sm:inline">Chấm công khuôn mặt</span>
+              </Button>
               <span className="topbar-divider" />
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -367,14 +435,18 @@ export default function App() {
                     className="header-avatar"
                     aria-label="Tài khoản quản trị"
                   >
-                    <Avatar name="Quản trị viên" small />
+                    <Avatar name={user?.full_name || "Quản trị viên"} small />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuLabel>
-                    Quản trị viên · Phiên bản mẫu
+                    {user?.full_name || "Quản trị viên"} · {user?.role === "ADMIN" ? "Quản trị viên" : "Nhân viên"}
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setFaceModalOpen(true)}>
+                    <Scan size={14} className="text-emerald-600" />
+                    Chấm công khuôn mặt
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate("settings")}>
                     <Settings2 size={14} />
                     Cài đặt không gian
@@ -382,6 +454,11 @@ export default function App() {
                   <DropdownMenuItem onClick={() => setHelpOpen(true)}>
                     <HelpCircle size={14} />
                     Hướng dẫn sử dụng
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={logout} className="text-red-600 focus:text-red-600">
+                    <LogOut size={14} />
+                    Đăng xuất
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -471,6 +548,12 @@ export default function App() {
               setSidebarOpen(false);
               setHelpOpen(true);
             }}
+            onOpenFaceModal={() => {
+              setSidebarOpen(false);
+              setFaceModalOpen(true);
+            }}
+            onLogout={logout}
+            user={user}
           />
         </DialogContent>
       </Dialog>
@@ -633,6 +716,11 @@ export default function App() {
           </Button>
         </DialogContent>
       </Dialog>
+      <FaceAttendanceModal
+        open={faceModalOpen}
+        onOpenChange={setFaceModalOpen}
+        employees={employees}
+      />
       <Toaster
         theme="light"
         position="bottom-right"
