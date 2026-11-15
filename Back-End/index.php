@@ -1,9 +1,21 @@
 <?php
+if (!is_readable(__DIR__ . '/configs/env.php')) {
+    header('Content-Type: application/json; charset=UTF-8');
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'data'    => null,
+        'message' => 'Thiếu Back-End/configs/env.php — hãy sao chép từ configs/env.example.php',
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 require_once __DIR__ . '/configs/env.php';
 require_once __DIR__ . '/configs/helper.php';
 
+// CORS — chỉ cần khi Front-End gọi thẳng backend (khác origin). Khi đi qua proxy của Vite thì không dùng tới.
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-if ($origin === FRONTEND_ORIGIN) {
+if (defined('FRONTEND_ORIGIN') && $origin === FRONTEND_ORIGIN) {
     header("Access-Control-Allow-Origin: {$origin}");
     header('Access-Control-Allow-Credentials: true');
     header('Vary: Origin');
@@ -18,7 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 session_start();
 
-spl_autoload_register(function ($class) {    
+spl_autoload_register(function ($class) {
     $fileName = "$class.php";
 
     $fileModel              = PATH_MODEL . $fileName;
@@ -26,11 +38,19 @@ spl_autoload_register(function ($class) {
 
     if (is_readable($fileModel)) {
         require_once $fileModel;
-    } 
+    }
     else if (is_readable($fileController)) {
         require_once $fileController;
     }
 });
 
-// Điều hướng
-require_once __DIR__ . '/routes/index.php';
+// Điều hướng — mọi lỗi chưa bắt đều trả JSON thay vì trang lỗi HTML.
+try {
+    require_once __DIR__ . '/routes/index.php';
+} catch (PDOException $e) {
+    error_log($e->getMessage());
+    json_response(500, null, 'Lỗi cơ sở dữ liệu: ' . $e->getMessage());
+} catch (Throwable $e) {
+    error_log($e->getMessage());
+    json_response(500, null, 'Lỗi máy chủ: ' . $e->getMessage());
+}

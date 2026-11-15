@@ -4,13 +4,18 @@ class UserModel extends BaseModel
 {
     protected $table = 'users';
 
+    /** Các cột an toàn để trả về Front-End (không bao giờ có password). */
+    private const PUBLIC_COLUMNS = "u.id, u.employee_code, u.full_name, u.email, u.role,
+        u.department, u.position, u.status,
+        COALESCE(u.joined_at, DATE(u.created_at)) AS joined_at, u.created_at";
+
     /**
-     * Tìm user theo email hoặc mã nhân viên (employee_code)
+     * Tìm user theo email hoặc mã nhân viên (employee_code) — dùng khi đăng nhập (có password).
      */
     public function findByCodeOrEmail($identifier)
     {
-        $stmt = $this->db->prepare("SELECT * FROM {$this->table} WHERE employee_code = :id OR email = :id LIMIT 1");
-        $stmt->execute(['id' => $identifier]);
+        $stmt = $this->db->prepare("SELECT * FROM {$this->table} WHERE employee_code = :code OR email = :email LIMIT 1");
+        $stmt->execute(['code' => $identifier, 'email' => $identifier]);
         return $stmt->fetch();
     }
 
@@ -25,11 +30,11 @@ class UserModel extends BaseModel
     }
 
     /**
-     * Tìm user theo ID
+     * Tìm user theo ID (không có password)
      */
     public function findById($id)
     {
-        $stmt = $this->db->prepare("SELECT id, employee_code, full_name, email, role, created_at FROM {$this->table} WHERE id = :id LIMIT 1");
+        $stmt = $this->db->prepare("SELECT " . self::PUBLIC_COLUMNS . " FROM {$this->table} u WHERE u.id = :id LIMIT 1");
         $stmt->execute(['id' => $id]);
         return $stmt->fetch();
     }
@@ -39,8 +44,119 @@ class UserModel extends BaseModel
      */
     public function getAll()
     {
-        $stmt = $this->db->query("SELECT id, employee_code, full_name, email, role, created_at FROM {$this->table} ORDER BY id ASC");
+        $stmt = $this->db->query("SELECT " . self::PUBLIC_COLUMNS . " FROM {$this->table} u ORDER BY u.id ASC");
         return $stmt->fetchAll();
     }
-}
 
+    /**
+     * Danh sách nhân viên kèm hợp đồng mới nhất (mỗi người 1 dòng).
+     */
+    public function getAllWithContract()
+    {
+        $sql = "SELECT " . self::PUBLIC_COLUMNS . ",
+                       c.id AS contract_id, c.base_salary, c.insurance_salary, c.allowance, c.dependents_count
+                FROM {$this->table} u
+                LEFT JOIN contracts c ON c.id = (
+                    SELECT c2.id FROM contracts c2
+                    WHERE c2.user_id = u.id
+                    ORDER BY c2.created_at DESC, c2.id DESC
+                    LIMIT 1
+                )
+                ORDER BY u.id ASC";
+        return $this->db->query($sql)->fetchAll();
+    }
+
+    /**
+     * Một nhân viên kèm hợp đồng mới nhất.
+     */
+    public function findWithContract($id)
+    {
+        $sql = "SELECT " . self::PUBLIC_COLUMNS . ",
+                       c.id AS contract_id, c.base_salary, c.insurance_salary, c.allowance, c.dependents_count
+                FROM {$this->table} u
+                LEFT JOIN contracts c ON c.id = (
+                    SELECT c2.id FROM contracts c2
+                    WHERE c2.user_id = u.id
+                    ORDER BY c2.created_at DESC, c2.id DESC
+                    LIMIT 1
+                )
+                WHERE u.id = :id
+                LIMIT 1";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute(['id' => $id]);
+        return $stmt->fetch();
+    }
+
+    /**
+     * Đồng nghiệp cùng phòng ban.
+     */
+    public function findByDepartment(string $department)
+    {
+        $stmt = $this->db->prepare("SELECT " . self::PUBLIC_COLUMNS . " FROM {$this->table} u WHERE u.department = :department ORDER BY u.id ASC");
+        $stmt->execute(['department' => $department]);
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * Kiểm tra trùng mã nhân viên / email (bỏ qua chính bản ghi $exceptId khi cập nhật).
+     */
+    public function existsCodeOrEmail(string $code, string $email, ?int $exceptId = null): bool
+    {
+        $stmt = $this->db->prepare(
+            "SELECT COUNT(*) FROM {$this->table}
+             WHERE (employee_code = :code OR email = :email) AND id <> :except_id"
+        );
+        $stmt->execute(['code' => $code, 'email' => $email, 'except_id' => $exceptId ?? 0]);
+        return (int) $stmt->fetchColumn() > 0;
+    }
+
+    public function create(array $data): int
+    {
+        $stmt = $this->db->prepare(
+            "INSERT INTO {$this->table}
+                (employee_code, full_name, email, password, role, department, position, status, joined_at)
+             VALUES
+                (:employee_code, :full_name, :email, :password, :role, :department, :position, :status, :joined_at)"
+        );
+        $stmt->execute([
+            'employee_code' => $data['employee_code'],
+            'full_name'     => $data['full_name'],
+            'email'         => $data['email'],
+            'password'      => password_hash($data['password'], PASSWORD_DEFAULT),
+            'role'          => $data['role'],
+            'department'    => $data['department'],
+            'position'      => $data['position'],
+            'status'        => $data['status'],
+            'joined_at'     => $data['joined_at'],
+        ]);
+        return (int) $this->db->lastInsertId();
+    }
+
+    public function update(int $id, array $data): void
+    {
+        $stmt = $this->db->prepare(
+            "UPDATE {$this->table}
+             SET employee_code = :employee_code, full_name = :full_name, email = :email,
+                 department = :department, position = :position, status = :status, joined_at = :joined_at
+             WHERE id = :id"
+        );
+        $stmt->execute([
+            'id'            => $id,
+            'employee_code' => $data['employee_code'],
+            'full_name'     => $data['full_name'],
+            'email'         => $data['email'],
+            'department'    => $data['department'],
+            'position'      => $data['position'],
+            'status'        => $data['status'],
+            'joined_at'     => $data['joined_at'],
+        ]);
+    }
+
+    public function delete(int $id): bool
+    {
+        // contracts và payroll_items có ON DELETE CASCADE nên tự xóa theo.
+        $stmt = $this->db->prepare("DELETE FROM {$this->table} WHERE id = :id");
+        $stmt->execute(['id' => $id]);
+        return $stmt->rowCount() > 0;
+    }
+}

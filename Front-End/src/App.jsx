@@ -188,7 +188,14 @@ function Sidebar({ page, count, company, navigate, showHelp, onLogout, user }) {
 }
 export default function App() {
   const { user, loading, login, logout } = useAuth();
-  const { employees, save, reset } = useWorkspace();
+  const {
+    employees,
+    loading: employeesLoading,
+    error: employeesError,
+    reload,
+    saveEmployee: persistEmployee,
+    removeEmployee,
+  } = useWorkspace(user?.role === "ADMIN");
   const [pageKey, setPageKey] = useState(() => {
     const hash = decodeURIComponent(window.location.hash.slice(1));
     return [...navItems.map((n) => n.id), "settings"].includes(
@@ -249,18 +256,27 @@ export default function App() {
         .includes(query.trim().toLocaleLowerCase("vi")),
     )
     .slice(0, 6);
-  function saveEmployee(value) {
-    save(
-      editor?.employee
-        ? employees.map((e) => (e.id === value.id ? value : e))
-        : [...employees, value],
-    );
-    toast.success(
-      editor?.employee
-        ? "Đã cập nhật thông tin mẫu."
-        : "Đã thêm thành viên mới vào đội ngũ.",
-    );
-    setEditor(null);
+  async function saveEmployee(value) {
+    try {
+      await persistEmployee(value);
+      toast.success(
+        value.id
+          ? "Đã cập nhật thông tin nhân viên."
+          : "Đã thêm thành viên mới vào đội ngũ.",
+      );
+      setEditor(null);
+    } catch (err) {
+      toast.error(err.message);
+    }
+  }
+  async function confirmDelete() {
+    try {
+      await removeEmployee(confirm.employee.id);
+      toast.success("Đã xóa nhân viên.");
+      setConfirm(null);
+    } catch (err) {
+      toast.error(err.message);
+    }
   }
   function updateCompany(name) {
     setCompany(name);
@@ -366,11 +382,13 @@ export default function App() {
                     onClick={() => navigate("settings")}
                   >
                     <span />
-                    Dữ liệu mẫu
+                    {employeesError ? "Mất kết nối" : "Database qlns"}
                   </button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  Dữ liệu minh họa, chưa kết nối backend
+                  {employeesError
+                    ? employeesError
+                    : "Dữ liệu lấy trực tiếp từ backend PHP"}
                 </TooltipContent>
               </Tooltip>
               <DropdownMenu>
@@ -389,7 +407,7 @@ export default function App() {
                   align="end"
                   className="notification-dropdown"
                 >
-                  <DropdownMenuLabel>Ghi chú không gian mẫu</DropdownMenuLabel>
+                  <DropdownMenuLabel>Ghi chú</DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => navigate("payroll")}>
                     <Wallet size={17} />
@@ -401,8 +419,8 @@ export default function App() {
                   <DropdownMenuItem onClick={() => navigate("settings")}>
                     <FileText size={17} />
                     <div>
-                      <strong>Đang sử dụng dữ liệu mẫu</strong>
-                      <small>Xem thông tin nguồn dữ liệu tại Cài đặt.</small>
+                      <strong>Nguồn dữ liệu: database qlns</strong>
+                      <small>Xem thông tin kết nối tại Cài đặt.</small>
                     </div>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -444,7 +462,19 @@ export default function App() {
             className="main-content"
             key={pageKey}
           >
-            {page === "overview" ? (
+            {employeesError ? (
+              <div role="alert">
+                <EmptyState
+                  title="Không tải được dữ liệu nhân viên"
+                  description={employeesError}
+                  action={<Button onClick={reload}>Thử lại</Button>}
+                />
+              </div>
+            ) : employeesLoading ? (
+              <div className="dashboard-loading" role="status">
+                Đang tải dữ liệu từ máy chủ…
+              </div>
+            ) : page === "overview" ? (
               <Suspense
                 fallback={
                   <div className="dashboard-loading" role="status">
@@ -481,7 +511,11 @@ export default function App() {
               <SettingsPage
                 company={company}
                 onCompanyChange={updateCompany}
-                onReset={() => setConfirm({ type: "reset" })}
+                onReload={async () => {
+                  await reload();
+                  toast.success("Đã tải lại dữ liệu từ máy chủ.");
+                }}
+                employeeCount={employees.length}
               />
             )}
           </main>
@@ -601,36 +635,17 @@ export default function App() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {confirm?.type === "reset"
-                ? "Khôi phục dữ liệu mẫu?"
-                : "Xóa nhân viên mẫu?"}
-            </DialogTitle>
+            <DialogTitle>Xóa nhân viên?</DialogTitle>
             <DialogDescription>
-              {confirm?.type === "reset"
-                ? "Các thay đổi nhân viên và hợp đồng trên trình duyệt này sẽ được thay thế bằng 24 hồ sơ mẫu ban đầu."
-                : `Hồ sơ và thông số hợp đồng mẫu của ${confirm?.employee?.full_name} sẽ bị xóa trên trình duyệt này.`}
+              {`Hồ sơ, hợp đồng và bảng lương của ${confirm?.employee?.full_name} sẽ bị xóa vĩnh viễn khỏi database.`}
             </DialogDescription>
           </DialogHeader>
           <div className="dialog-actions">
             <Button variant="outline" onClick={() => setConfirm(null)}>
               Hủy
             </Button>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                if (confirm?.type === "reset") reset();
-                else
-                  save(employees.filter((e) => e.id !== confirm?.employee?.id));
-                toast.success(
-                  confirm?.type === "reset"
-                    ? "Đã khôi phục dữ liệu mẫu."
-                    : "Đã xóa nhân viên mẫu.",
-                );
-                setConfirm(null);
-              }}
-            >
-              Xác nhận {confirm?.type === "reset" ? "khôi phục" : "xóa"}
+            <Button variant="destructive" onClick={confirmDelete}>
+              Xác nhận xóa
             </Button>
           </div>
         </DialogContent>
@@ -677,8 +692,8 @@ export default function App() {
             </div>
           </div>
           <div className="form-note">
-            Bản mẫu giao diện. Dữ liệu được lưu trong trình duyệt; không yêu cầu
-            tài khoản và chưa kết nối API.
+            Dữ liệu nhân viên, hợp đồng và bảng lương được đọc/ghi trực tiếp
+            vào database qlns qua API backend PHP.
           </div>
           <Button onClick={() => setHelpOpen(false)}>
             Bắt đầu khám phá

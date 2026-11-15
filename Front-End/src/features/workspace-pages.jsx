@@ -126,8 +126,7 @@ export function DepartmentsPage({ employees, navigate }) {
         })}
       </div>
       <p className="page-footnote">
-        Phân nhóm phòng ban trong bản mẫu · Database qlns hiện chưa có bảng
-        phòng ban.
+        Phòng ban lấy từ cột department của bảng users trong database qlns.
       </p>
     </>
   );
@@ -164,7 +163,7 @@ export function PayrollPage({ employees }) {
                 "Tổng theo hợp đồng": e.base_salary + e.allowance,
                 "Lương BHXH": e.insurance_salary,
                 "Người phụ thuộc": e.dependents_count,
-                "Trạng thái": "Dự toán mẫu, chưa tính thuế và ngày công",
+                "Trạng thái": "Dự toán, chưa tính thuế và ngày công",
               })),
               `du-toan-luong-${period}.csv`,
             );
@@ -183,7 +182,7 @@ export function PayrollPage({ employees }) {
           <div>
             <p>Tổng lương cơ bản & phụ cấp</p>
             <strong>{money(total)}</strong>
-            <span>Thông số hiện tại · {employees.length} hợp đồng mẫu</span>
+            <span>Thông số hiện tại · {employees.length} hợp đồng</span>
           </div>
         </div>
         <div>
@@ -202,7 +201,7 @@ export function PayrollPage({ employees }) {
       <div className="info-callout">
         <FileText size={17} />
         <p>
-          <strong>Dự toán từ hợp đồng mẫu.</strong> Chưa tính công thực tế, OT,
+          <strong>Dự toán từ hợp đồng hiện hành.</strong> Chưa tính công thực tế, OT,
           thuế và lương thực nhận. Các kỳ hiển thị cùng thông số hiện tại, chưa
           có dữ liệu lịch sử.
         </p>
@@ -320,7 +319,7 @@ export function PayrollPage({ employees }) {
               </div>
             </div>
             <p className="form-note">
-              Thông tin mẫu. Tổng theo hợp đồng chưa phải lương thực nhận và
+              Tổng theo hợp đồng chưa phải lương thực nhận và
               chưa bao gồm các khoản khấu trừ.
             </p>
             <Button onClick={() => setDetail(null)}>Đóng</Button>
@@ -385,7 +384,7 @@ export function ReportsPage({ employees }) {
         </div>
         <Badge variant="outline" className="overview-badge">
           <Database size={14} />
-          Dữ liệu mẫu hiện tại
+          Dữ liệu từ database qlns
         </Badge>
       </div>
       <div className="report-hero">
@@ -452,7 +451,12 @@ export function ReportsPage({ employees }) {
     </>
   );
 }
-export function SettingsPage({ company, onCompanyChange, onReset }) {
+export function SettingsPage({
+  company,
+  onCompanyChange,
+  onReload,
+  employeeCount = 0,
+}) {
   const [name, setName] = useState(company);
   return (
     <>
@@ -507,42 +511,41 @@ export function SettingsPage({ company, onCompanyChange, onReset }) {
             <span className="source-icon">
               <Database size={24} />
             </span>
-            <Badge variant="secondary">Chế độ dữ liệu mẫu</Badge>
+            <Badge variant="secondary">MySQL · database qlns</Badge>
             <p>
-              Nhân viên, phòng ban và hợp đồng đang dùng dữ liệu mẫu lưu trên
-              trình duyệt. Chưa kết nối cơ sở dữ liệu PHP/MySQL.
+              Nhân viên và hợp đồng được đọc trực tiếp từ cơ sở dữ liệu qua API
+              PHP. Hiện có {employeeCount} nhân viên.
             </p>
             <div className="source-api">
               <Code2 size={16} />
-              <span>Adapter sẵn có: GET / PUT /api/contracts</span>
+              <span>API: /api/?action=employees</span>
             </div>
             <p className="source-api-note">
-              Backend hiện mới có route Home; cần triển khai API và xác thực
-              trước khi tích hợp dữ liệu thực.
+              Dữ liệu chỉnh sửa trong phpMyAdmin sẽ hiển thị sau khi tải lại.
             </p>
           </div>
         </Panel>
         <Panel
-          title="Khôi phục dữ liệu mẫu"
-          description="Bắt đầu lại với danh sách mẫu ban đầu"
+          title="Đồng bộ dữ liệu"
+          description="Lấy lại dữ liệu mới nhất từ backend"
           className="reset-panel"
         >
           <div>
             <p>
-              Thao tác này thay thế dữ liệu nhân sự đã chỉnh sửa trên trình
-              duyệt này.
+              Dùng khi dữ liệu vừa được thay đổi trực tiếp trong phpMyAdmin hoặc
+              bởi người dùng khác.
             </p>
-            <Button variant="outline" onClick={onReset}>
+            <Button variant="outline" onClick={onReload}>
               <RotateCcw size={14} />
-              Khôi phục dữ liệu
+              Tải lại dữ liệu
             </Button>
           </div>
         </Panel>
         <div className="settings-privacy">
           <LockKeyhole size={17} />
           <p>
-            Thông tin trong phiên bản này chỉ dùng để trải nghiệm giao diện,
-            không dùng để xử lý bảng lương thực tế.
+            Mọi thay đổi nhân sự được ghi trực tiếp vào cơ sở dữ liệu. Chỉ tài
+            khoản ADMIN mới có quyền thêm, sửa hoặc xóa.
           </p>
         </div>
       </div>

@@ -1,44 +1,28 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
-  AlertCircle,
   ArrowUpRight,
-  Briefcase,
   Building2,
   Calendar,
   CalendarCheck2,
-  CalendarDays,
-  Cake,
-  Check,
-  CheckCircle2,
   CircleDollarSign,
   Clock,
   Copy,
-  Download,
-  Edit3,
   FileSpreadsheet,
   FileText,
-  GraduationCap,
-  History,
   IdCard,
   LayoutDashboard,
   LogOut,
   Mail,
-  MapPin,
   Phone,
-  ShieldCheck,
-  Sparkles,
   Timer,
   TrendingUp,
   User,
-  UserCheck,
   Users,
   Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -54,205 +38,206 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Avatar } from "@/components/shared";
-import { money } from "@/data/workspace";
+import { dateLabel, money } from "@/data/workspace";
+import { authApi } from "@/lib/auth-api";
 
-export function EmployeeDashboard({ user, onLogout }) {
-  const [activeMenu, setActiveMenu] = useState("overview"); // 'overview' | 'profile' | 'team' | 'salary' | 'schedule' | 'attendance' | 'contract'
-  const [selectedSlip, setSelectedSlip] = useState(null);
-  const [editProfileOpen, setEditProfileOpen] = useState(false);
+const NOT_SET = "Chưa cập nhật";
+const HOURS_PER_DAY = 8;
 
-  // Dữ liệu mẫu nhân viên & hồ sơ cá nhân
-  const [personalInfo, setPersonalInfo] = useState({
-    full_name: user?.full_name || "Trần Thị Bình",
-    employee_code: user?.employee_code || "NV002",
-    email: user?.email || "binh.tran@company.vn",
-    personal_email: "binhtran.design@gmail.com",
-    phone: "0982 123 456",
-    gender: "Nữ",
-    dob: "18/06/1996",
-    marital_status: "Đã kết hôn",
-    nationality: "Việt Nam",
-    id_card: "079196028491",
-    id_card_date: "12/04/2021",
-    id_card_place: "Cục Cảnh sát QLHC về TTXH",
-    permanent_address: "125 Lê Lợi, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh",
-    current_address: "48/12 Điện Biên Phủ, Phường 15, Quận Bình Thạnh, TP. Hồ Chí Minh",
-    emergency_contact: {
-      name: "Nguyễn Minh Tuấn",
-      relation: "Chồng",
-      phone: "0918 888 999",
-    },
-    education: {
-      degree: "Cử nhân Thiết kế Đồ họa & Tương tác",
-      school: "Đại học Kiến Trúc TP. Hồ Chí Minh",
-      grad_year: "2018",
-      certifications: ["Google UX Design Professional", "Nielsen Norman Group UX Master"],
-    },
+const PERIOD_STATUS = {
+  DRAFT: "Đang tính",
+  LOCKED: "Đã chốt",
+  PAID: "Đã chi trả",
+};
+
+const WEEK_DAYS = [
+  ["monday", "Thứ Hai"],
+  ["tuesday", "Thứ Ba"],
+  ["wednesday", "Thứ Tư"],
+  ["thursday", "Thứ Năm"],
+  ["friday", "Thứ Sáu"],
+  ["saturday", "Thứ Bảy"],
+  ["sunday", "Chủ Nhật"],
+];
+
+const ddmm = (d) =>
+  `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+
+const monthYear = (date) => {
+  if (!date) return NOT_SET;
+  const [y, m] = date.slice(0, 7).split("-");
+  return `${m}/${y}`;
+};
+
+/** Lịch tuần hiện tại dựng từ work_schedule (backend) + ngày hôm nay. */
+function buildWeek(schedule = {}, now = new Date()) {
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+  return WEEK_DAYS.map(([key, day], i) => {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + i);
+    const shift = schedule[key] ?? "Nghỉ tuần";
+    const off = !/\d/.test(shift);
+    const isToday = date.getTime() === today.getTime();
+    return {
+      day,
+      date: ddmm(date),
+      shift,
+      type: off ? "Nghỉ" : "Ca hành chính",
+      hours: off ? "0h" : `${HOURS_PER_DAY}.0h`,
+      isToday,
+      status: off
+        ? "Nghỉ"
+        : isToday
+          ? "Hôm nay"
+          : date < today
+            ? "Đã qua"
+            : "Sắp tới",
+    };
   });
+}
 
-  const employeeData = {
-    ...personalInfo,
-    department: user?.department || "Thiết kế & Trải nghiệm",
-    position: user?.position || "Senior UI/UX Designer",
-    joined_at: user?.joined_at || "2024-03-15",
-    contract_type: "Hợp đồng không xác định thời hạn",
-    contract_no: `HĐLĐ-${user?.employee_code || "NV002"}/2024`,
+/** Chuyển payload ?action=employee/dashboard sang dạng giao diện dùng. */
+function toViewModel(data, user) {
+  const info = data.user_info ?? user ?? {};
+  const contract = data.contract;
+  const payroll = (data.payroll_history ?? []).map((p) => ({
+    id: p.id,
+    period: p.month_year,
+    standard_days: p.standard_days,
+    actual_days: p.actual_days,
+    ot_hours: p.ot_hours,
+    gross: p.gross_salary,
+    bhxh: p.social_insurance,
+    tax: p.personal_tax,
+    net: p.net_salary,
+    status: PERIOD_STATUS[p.period_status] ?? p.period_status,
+  }));
+  const latest = payroll[0];
+  const team = (data.team_members ?? []).map((m) => ({
+    id: m.id,
+    code: m.employee_code,
+    name: m.full_name,
+    title: m.position || NOT_SET,
+    email: m.email,
+    status: m.status,
+    joined: monthYear(m.joined_at),
+    role: m.employee_code === info.employee_code ? "Thành viên (Tôi)" : "Thành viên",
+  }));
+  const week = buildWeek(data.work_schedule);
+  const workShift = week.find((d) => d.type !== "Nghỉ")?.shift ?? "08:30 - 17:30";
+
+  return {
+    full_name: info.full_name ?? "",
+    employee_code: info.employee_code ?? "",
+    email: info.email ?? "",
+    department: info.department || NOT_SET,
+    position: info.position || NOT_SET,
+    status: info.status || "Đang làm việc",
+    joined_at: info.joined_at ? dateLabel(info.joined_at) : NOT_SET,
+    contract,
+    contract_no: contract ? `#${contract.id}` : "Chưa có hợp đồng",
+    contract_signed: contract?.created_at
+      ? dateLabel(contract.created_at.slice(0, 10))
+      : NOT_SET,
     salary: {
-      base: 18500000,
-      insurance: 15000000,
-      allowance: 2500000,
-      dependents: 1,
-      latest_gross: 21000000,
-      latest_bhxh: 1575000,
-      latest_tax: 225000,
-      latest_net: 19200000,
-      payment_status: "Đã thanh toán (VCB)",
+      base: contract?.base_salary ?? 0,
+      insurance: contract?.insurance_salary ?? 0,
+      allowance: contract?.allowance ?? 0,
+      dependents: contract?.dependents_count ?? 0,
+      latest_gross: latest?.gross ?? 0,
+      latest_bhxh: latest?.bhxh ?? 0,
+      latest_tax: latest?.tax ?? 0,
+      latest_net: latest?.net ?? 0,
+      payment_status: latest
+        ? `Kỳ ${latest.period} · ${latest.status}`
+        : "Chưa có kỳ lương nào",
     },
     attendance: {
-      standard_days: 22,
-      actual_days: 21.5,
-      leave_days: 0.5,
-      annual_leave_total: 12,
-      annual_leave_used: 3.5,
-      annual_leave_remaining: 8.5,
-      total_hours: 172,
-      ot_hours: 6.5,
-      on_time_rate: "98.5%",
-      late_count: 1,
-      today_in: "08:24",
-      today_out: "17:30",
+      period: latest?.period,
+      standard_days: latest?.standard_days ?? data.current_period?.standard_days ?? 0,
+      actual_days: latest?.actual_days ?? 0,
+      ot_hours: latest?.ot_hours ?? 0,
+      total_hours: (latest?.actual_days ?? 0) * HOURS_PER_DAY,
+      on_time_rate:
+        latest && latest.standard_days
+          ? `${Math.round((latest.actual_days / latest.standard_days) * 1000) / 10}%`
+          : "—",
     },
-    // Đội ngũ trong team của nhân viên (Team's)
-    team_members: [
-      {
-        id: 9,
-        code: "NV009",
-        name: "Hoàng Mai Chi",
-        role: "Trưởng nhóm (Team Lead)",
-        title: "Head of Product Design",
-        email: "maichi@acme.vn",
-        phone: "0912 345 678",
-        status: "Đang làm việc",
-        joined: "12/2023",
-        birthday: "25/11",
-      },
-      {
-        id: 2,
-        code: "NV002",
-        name: personalInfo.full_name,
-        role: "Thành viên (Tôi)",
-        title: "Senior UI/UX Designer",
-        email: personalInfo.email,
-        phone: personalInfo.phone,
-        status: "Đang làm việc",
-        joined: "03/2024",
-        birthday: "18/06",
-      },
-      {
-        id: 7,
-        code: "NV007",
-        name: "Bùi Phương Anh",
-        role: "Thành viên",
-        title: "Product Designer",
-        email: "phuonganh@acme.vn",
-        phone: "0933 111 222",
-        status: "Đang làm việc",
-        joined: "05/2024",
-        birthday: "02/12",
-      },
-      {
-        id: 11,
-        code: "NV011",
-        name: "Trần Bảo Ngọc",
-        role: "Thành viên",
-        title: "UI Designer & Illustrator",
-        email: "baongoc@acme.vn",
-        phone: "0909 333 444",
-        status: "Đang làm việc",
-        joined: "07/2024",
-        birthday: "14/01",
-      },
-      {
-        id: 15,
-        code: "NV015",
-        name: "Đặng Khánh Vy",
-        role: "Thành viên",
-        title: "UX Researcher",
-        email: "khanhvy@acme.vn",
-        phone: "0977 555 666",
-        status: "Đang làm việc",
-        joined: "08/2024",
-        birthday: "30/08",
-      },
-      {
-        id: 20,
-        code: "NV020",
-        name: "Trần Mỹ Duyên",
-        role: "Thành viên",
-        title: "Design System Specialist",
-        email: "myduyen@acme.vn",
-        phone: "0988 777 888",
-        status: "Nghỉ phép",
-        joined: "09/2024",
-        birthday: "19/04",
-      },
-    ],
-    payroll_history: [
-      {
-        period: "2026-10",
-        standard_days: 22,
-        actual_days: 22,
-        ot_hours: 8,
-        gross: 21800000,
-        bhxh: 1575000,
-        tax: 295000,
-        net: 19930000,
-        status: "ĐÃ CHI TRẢ",
-        paid_at: "05/11/2026",
-      },
-      {
-        period: "2026-09",
-        standard_days: 22,
-        actual_days: 21,
-        ot_hours: 4,
-        gross: 20500000,
-        bhxh: 1575000,
-        tax: 185000,
-        net: 18740000,
-        status: "ĐÃ CHI TRẢ",
-        paid_at: "05/10/2026",
-      },
-      {
-        period: "2026-08",
-        standard_days: 22,
-        actual_days: 22,
-        ot_hours: 6.5,
-        gross: 21200000,
-        bhxh: 1575000,
-        tax: 245000,
-        net: 19380000,
-        status: "ĐÃ CHI TRẢ",
-        paid_at: "05/09/2026",
-      },
-    ],
-    schedule_this_week: [
-      { day: "Thứ Hai", date: "10/11", shift: "08:30 - 17:30", type: "Văn phòng", status: "Hoàn thành", hours: "8.0h" },
-      { day: "Thứ Ba", date: "11/11", shift: "08:30 - 17:30", type: "Văn phòng", status: "Hoàn thành", hours: "9.0h (1h OT)" },
-      { day: "Thứ Tư", date: "12/11", shift: "08:30 - 17:30", type: "Văn phòng", status: "Hoàn thành", hours: "8.0h" },
-      { day: "Thứ Năm", date: "13/11", shift: "08:30 - 17:30", type: "Văn phòng", status: "Đang làm việc", hours: "7.5h" },
-      { day: "Thứ Sáu", date: "14/11", shift: "08:30 - 17:30", type: "Remote", status: "Sắp tới", hours: "8.0h" },
-      { day: "Thứ Bảy", date: "15/11", shift: "Nghỉ tuần", type: "Nghỉ", status: "Nghỉ", hours: "0h" },
-      { day: "Chủ Nhật", date: "16/11", shift: "Nghỉ tuần", type: "Nghỉ", status: "Nghỉ", hours: "0h" },
-    ],
-    recent_logs: [
-      { date: "13/11/2026", in: "08:24", out: "--:--", duration: "7h 15m", note: "Đúng giờ" },
-      { date: "12/11/2026", in: "08:28", out: "17:31", duration: "8h 03m", note: "Đúng giờ" },
-      { date: "11/11/2026", in: "08:20", out: "18:32", duration: "9h 12m", note: "OT 1.0h được duyệt" },
-      { date: "10/11/2026", in: "08:25", out: "17:35", duration: "8h 10m", note: "Đúng giờ" },
-      { date: "07/11/2026", in: "08:35", out: "17:30", duration: "7h 55m", note: "Trễ 5 phút (Đã xin phép)" },
-      { date: "06/11/2026", in: "08:18", out: "17:30", duration: "8h 12m", note: "Đúng giờ" },
-    ],
+    current_period: data.current_period,
+    team_members: team,
+    team_active: team.filter((m) => m.status === "Đang làm việc").length,
+    payroll_history: payroll,
+    schedule_this_week: week,
+    work_shift: workShift,
+    week_range: `${week[0].date} - ${week[6].date}`,
   };
+}
+
+/** Lấy dữ liệu cổng nhân viên từ backend rồi mới render giao diện. */
+export function EmployeeDashboard({ user, onLogout }) {
+  const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
+
+  const load = useCallback(() => {
+    setError(null);
+    return authApi
+      .employeeDashboard()
+      .then(setData)
+      .catch((err) => setError(err.message));
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    authApi
+      .employeeDashboard()
+      .then((d) => !cancelled && setData(d))
+      .catch((err) => !cancelled && setError(err.message));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (error || !data) {
+    return (
+      <div className="min-h-screen bg-[#fafafa] flex items-center justify-center p-6">
+        <Card className="border-[#e5e5e5] shadow-none bg-white max-w-[420px] w-full">
+          <CardHeader>
+            <CardTitle className="text-[15px]">
+              {error ? "Không tải được dữ liệu" : "Đang tải dữ liệu…"}
+            </CardTitle>
+            <CardDescription className="text-[12px]">
+              {error ?? "Đang lấy thông tin của bạn từ máy chủ."}
+            </CardDescription>
+          </CardHeader>
+          {error && (
+            <CardContent className="flex gap-2">
+              <Button size="sm" onClick={load}>
+                Thử lại
+              </Button>
+              <Button size="sm" variant="outline" onClick={onLogout}>
+                Đăng xuất
+              </Button>
+            </CardContent>
+          )}
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <EmployeeDashboardView
+      employeeData={toViewModel(data, user)}
+      onLogout={onLogout}
+    />
+  );
+}
+
+function EmployeeDashboardView({ employeeData, onLogout }) {
+  const [activeMenu, setActiveMenu] = useState("overview"); // 'overview' | 'profile' | 'team' | 'salary' | 'schedule' | 'attendance' | 'contract'
+  const [selectedSlip, setSelectedSlip] = useState(null);
+  const latestSlip = employeeData.payroll_history[0];
 
   const navItems = [
     { id: "overview", label: "Tổng quan cá nhân", icon: LayoutDashboard },
@@ -403,13 +388,20 @@ export function EmployeeDashboard({ user, onLogout }) {
               </div>
               <div>
                 <div className="text-[10px] text-[#888] uppercase font-medium flex items-center gap-1.5">
-                  <span>Chấm công hôm nay</span>
+                  <span>Kỳ lương hiện tại</span>
                 </div>
                 <div className="text-[12px] font-semibold flex items-center gap-2 text-[#242424] mt-0.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>Vào: <strong className="text-emerald-700">{employeeData.attendance.today_in}</strong></span>
-                  <span className="text-[#ccc]">|</span>
-                  <span className="text-[#666] font-normal">Ra: <strong>{employeeData.attendance.today_out}</strong></span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  {employeeData.current_period ? (
+                    <span>
+                      {employeeData.current_period.month_year} ·{" "}
+                      <span className="text-[#666] font-normal">
+                        {employeeData.current_period.standard_days} ngày công chuẩn
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="text-[#666] font-normal">Chưa mở kỳ lương</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -443,7 +435,7 @@ export function EmployeeDashboard({ user, onLogout }) {
             <Card className="border-[#e5e5e5] shadow-none bg-white">
               <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
                 <CardTitle className="text-[11px] font-medium text-[#777] uppercase">
-                  Ngày công tháng này
+                  Ngày công kỳ gần nhất
                 </CardTitle>
                 <div className="w-7 h-7 rounded-md bg-[#f4f4f4] flex items-center justify-center text-[#555]">
                   <CalendarCheck2 size={15} />
@@ -457,10 +449,12 @@ export function EmployeeDashboard({ user, onLogout }) {
                   </span>
                 </div>
                 <div className="text-[11px] text-[#666]">
-                  Chuyên cần: <strong className="text-emerald-600">{employeeData.attendance.on_time_rate}</strong>
+                  Tỷ lệ công: <strong className="text-emerald-600">{employeeData.attendance.on_time_rate}</strong>
                 </div>
                 <p className="text-[10px] text-[#999] pt-1 border-t border-[#f0f0f0]">
-                  Đi muộn: {employeeData.attendance.late_count} lần · Nghỉ: {employeeData.attendance.leave_days} ngày
+                  {employeeData.attendance.period
+                    ? `Kỳ ${employeeData.attendance.period}`
+                    : "Chưa có dữ liệu chấm công"}
                 </p>
               </CardContent>
             </Card>
@@ -483,7 +477,7 @@ export function EmployeeDashboard({ user, onLogout }) {
                   Giờ làm thêm: +{employeeData.attendance.ot_hours}h OT
                 </div>
                 <p className="text-[10px] text-[#999] pt-1 border-t border-[#f0f0f0]">
-                  Ca chuẩn: 8.0 giờ / ngày
+                  Ước tính {HOURS_PER_DAY} giờ / ngày công
                 </p>
               </CardContent>
             </Card>
@@ -503,10 +497,12 @@ export function EmployeeDashboard({ user, onLogout }) {
                   <span className="text-[13px] font-normal text-[#888]">thành viên</span>
                 </div>
                 <div className="text-[11px] text-emerald-600 font-medium">
-                  5 đang làm việc · 1 nghỉ phép
+                  {employeeData.team_active} đang làm việc
+                  {employeeData.team_members.length - employeeData.team_active > 0 &&
+                    ` · ${employeeData.team_members.length - employeeData.team_active} khác`}
                 </div>
                 <p className="text-[10px] text-[#999] pt-1 border-t border-[#f0f0f0]">
-                  Lead: Hoàng Mai Chi
+                  Phòng {employeeData.department}
                 </p>
               </CardContent>
             </Card>
@@ -520,10 +516,10 @@ export function EmployeeDashboard({ user, onLogout }) {
                   <CardHeader className="pb-3 border-b border-[#f0f0f0]">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-[14px] font-semibold text-[#242424]">
-                        Lịch làm việc tuần này (10/11 - 16/11)
+                        Lịch làm việc tuần này ({employeeData.week_range})
                       </CardTitle>
                       <Badge variant="outline" className="text-[10px]">
-                        08:30 - 17:30
+                        {employeeData.work_shift}
                       </Badge>
                     </div>
                   </CardHeader>
@@ -533,15 +529,15 @@ export function EmployeeDashboard({ user, onLogout }) {
                         <div
                           key={idx}
                           className={`flex items-center justify-between p-3.5 px-5 text-[12px] ${
-                            item.date === "13/11" ? "bg-[#fbfbf9] font-medium" : ""
+                            item.isToday ? "bg-[#fbfbf9] font-medium" : ""
                           }`}
                         >
                           <div className="flex items-center gap-3">
                             <span
                               className={`w-2 h-2 rounded-full ${
-                                item.status === "Hoàn thành"
+                                item.status === "Đã qua"
                                   ? "bg-emerald-500"
-                                  : item.status === "Đang làm việc"
+                                  : item.status === "Hôm nay"
                                   ? "bg-blue-600 animate-ping"
                                   : item.type === "Nghỉ"
                                   ? "bg-gray-300"
@@ -550,7 +546,7 @@ export function EmployeeDashboard({ user, onLogout }) {
                             />
                             <div>
                               <div className="font-semibold text-[#242424]">
-                                {item.day} {item.date === "13/11" && "(Hôm nay)"}
+                                {item.day} {item.isToday && "(Hôm nay)"}
                               </div>
                               <div className="text-[10px] text-[#888]">{item.date}</div>
                             </div>
@@ -564,9 +560,9 @@ export function EmployeeDashboard({ user, onLogout }) {
                           <Badge
                             variant="outline"
                             className={`text-[10px] ${
-                              item.status === "Hoàn thành"
+                              item.status === "Đã qua"
                                 ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                : item.status === "Đang làm việc"
+                                : item.status === "Hôm nay"
                                 ? "bg-blue-50 text-blue-700 border-blue-200"
                                 : item.status === "Nghỉ"
                                 ? "bg-gray-100 text-gray-500 border-gray-200"
@@ -611,10 +607,11 @@ export function EmployeeDashboard({ user, onLogout }) {
                     <Button
                       variant="outline"
                       className="w-full text-[11px] h-8 mt-2"
-                      onClick={() => setSelectedSlip(employeeData.payroll_history[0])}
+                      disabled={!latestSlip}
+                      onClick={() => setSelectedSlip(latestSlip)}
                     >
                       <FileSpreadsheet size={14} className="mr-1.5" />
-                      Xem chi tiết phiếu lương
+                      {latestSlip ? "Xem chi tiết phiếu lương" : "Chưa có phiếu lương"}
                     </Button>
                   </CardContent>
                 </Card>
@@ -675,7 +672,7 @@ export function EmployeeDashboard({ user, onLogout }) {
                             {employeeData.full_name}
                           </h2>
                           <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200">
-                            Chính thức
+                            {employeeData.status}
                           </Badge>
                         </div>
                         <p className="text-[12px] text-[#777] mt-0.5">
@@ -687,108 +684,49 @@ export function EmployeeDashboard({ user, onLogout }) {
                       </div>
                     </div>
 
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-[12px] h-8 gap-1.5 border-[#e5e5e5]"
-                      onClick={() => setEditProfileOpen(true)}
-                    >
-                      <Edit3 size={13} />
-                      Cập nhật thông tin liên hệ
-                    </Button>
+                    <p className="text-[11px] text-[#999] max-w-[260px]">
+                      Cần thay đổi thông tin? Liên hệ phòng nhân sự để cập nhật
+                      trong hệ thống.
+                    </p>
                   </div>
 
-                  {/* Grid 3 cột thông tin */}
+                  {/* Thông tin lấy từ bảng users + contracts */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 text-[12px]">
-                    {/* Cột 1: Thông tin cơ bản & Định danh */}
                     <div className="space-y-3">
                       <h3 className="font-semibold text-[#242424] text-[13px] flex items-center gap-1.5 pb-2 border-b border-[#f5f5f5]">
                         <IdCard size={15} className="text-[#666]" />
-                        Thông tin định danh
+                        Thông tin công việc
                       </h3>
                       <div className="space-y-2 text-[#666]">
-                        <div>
-                          <span className="text-[10px] text-[#999] uppercase block">Ngày sinh:</span>
-                          <strong className="text-[#333]">{personalInfo.dob}</strong>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-[#999] uppercase block">Giới tính:</span>
-                          <strong className="text-[#333]">{personalInfo.gender}</strong>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-[#999] uppercase block">Số CCCD / Định danh:</span>
-                          <strong className="text-[#333] font-mono">{personalInfo.id_card}</strong>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-[#999] uppercase block">Ngày cấp & Nơi cấp:</span>
-                          <span className="text-[#444]">{personalInfo.id_card_date} ({personalInfo.id_card_place})</span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-[#999] uppercase block">Quốc tịch / Hôn nhân:</span>
-                          <span className="text-[#444]">{personalInfo.nationality} · {personalInfo.marital_status}</span>
-                        </div>
+                        <ProfileField label="Mã nhân viên" value={employeeData.employee_code} mono />
+                        <ProfileField label="Phòng ban" value={employeeData.department} />
+                        <ProfileField label="Chức danh" value={employeeData.position} />
+                        <ProfileField label="Ngày vào làm" value={employeeData.joined_at} />
                       </div>
                     </div>
-
-                    {/* Cột 2: Thông tin liên lạc & Cư trú */}
                     <div className="space-y-3">
                       <h3 className="font-semibold text-[#242424] text-[13px] flex items-center gap-1.5 pb-2 border-b border-[#f5f5f5]">
                         <Mail size={15} className="text-[#666]" />
                         Thông tin liên hệ
                       </h3>
                       <div className="space-y-2 text-[#666]">
-                        <div>
-                          <span className="text-[10px] text-[#999] uppercase block">Số điện thoại:</span>
-                          <strong className="text-[#333] font-mono">{personalInfo.phone}</strong>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-[#999] uppercase block">Email công ty:</span>
-                          <strong className="text-[#333]">{personalInfo.email}</strong>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-[#999] uppercase block">Email cá nhân:</span>
-                          <span className="text-[#444]">{personalInfo.personal_email}</span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-[#999] uppercase block">Địa chỉ thường trú:</span>
-                          <span className="text-[#444] leading-relaxed">{personalInfo.permanent_address}</span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-[#999] uppercase block">Địa chỉ tạm trú hiện tại:</span>
-                          <span className="text-[#444] leading-relaxed">{personalInfo.current_address}</span>
-                        </div>
+                        <ProfileField label="Email công ty" value={employeeData.email} />
+                        <ProfileField label="Số điện thoại" value={NOT_SET} />
+                        <ProfileField label="Địa chỉ" value={NOT_SET} />
                       </div>
                     </div>
-
-                    {/* Cột 3: Người liên hệ khẩn cấp & Học vấn */}
                     <div className="space-y-3">
                       <h3 className="font-semibold text-[#242424] text-[13px] flex items-center gap-1.5 pb-2 border-b border-[#f5f5f5]">
                         <Phone size={15} className="text-[#666]" />
-                        Liên hệ khẩn cấp & Học vấn
+                        Hợp đồng & Gia cảnh
                       </h3>
                       <div className="space-y-2 text-[#666]">
-                        <div className="p-2.5 bg-[#fbfbfb] border border-[#eee] rounded-lg">
-                          <span className="text-[10px] text-[#888] uppercase block font-semibold">Người liên hệ khẩn cấp:</span>
-                          <strong className="text-[#333] block mt-0.5">{personalInfo.emergency_contact.name} ({personalInfo.emergency_contact.relation})</strong>
-                          <span className="text-[11px] text-emerald-700 font-mono mt-0.5 block">{personalInfo.emergency_contact.phone}</span>
-                        </div>
-
-                        <div>
-                          <span className="text-[10px] text-[#999] uppercase block">Trình độ học vấn:</span>
-                          <strong className="text-[#333] block">{personalInfo.education.degree}</strong>
-                          <span className="text-[11px] text-[#777]">{personalInfo.education.school} (Khóa {personalInfo.education.grad_year})</span>
-                        </div>
-
-                        <div>
-                          <span className="text-[10px] text-[#999] uppercase block mb-1">Chứng chỉ chuyên môn:</span>
-                          <div className="flex flex-wrap gap-1">
-                            {personalInfo.education.certifications.map((c, i) => (
-                              <Badge key={i} variant="outline" className="text-[10px] font-normal bg-[#f9f9f9]">
-                                {c}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
+                        <ProfileField label="Mã hợp đồng" value={employeeData.contract_no} />
+                        <ProfileField label="Ngày ký" value={employeeData.contract_signed} />
+                        <ProfileField
+                          label="Người phụ thuộc"
+                          value={`${employeeData.salary.dependents} người`}
+                        />
                       </div>
                     </div>
                   </div>
@@ -809,7 +747,7 @@ export function EmployeeDashboard({ user, onLogout }) {
                   </div>
                   <h2 className="text-[20px] font-bold mt-1">{employeeData.department}</h2>
                   <p className="text-[12px] text-gray-300 mt-1">
-                    Chịu trách nhiệm thiết kế trải nghiệm người dùng, hệ thống Design System và giao diện sản phẩm.
+                    Đồng nghiệp cùng phòng ban, lấy từ bảng users trong database qlns.
                   </p>
                 </div>
                 <div className="flex items-center gap-4 text-center sm:text-right border-t sm:border-t-0 sm:border-l border-white/20 pt-3 sm:pt-0 sm:pl-6">
@@ -818,7 +756,7 @@ export function EmployeeDashboard({ user, onLogout }) {
                     <div className="text-[10px] text-gray-400 mt-1">Thành viên</div>
                   </div>
                   <div>
-                    <div className="text-[24px] font-bold leading-none text-emerald-400">5</div>
+                    <div className="text-[24px] font-bold leading-none text-emerald-400">{employeeData.team_active}</div>
                     <div className="text-[10px] text-gray-400 mt-1">Đang làm việc</div>
                   </div>
                 </div>
@@ -827,14 +765,14 @@ export function EmployeeDashboard({ user, onLogout }) {
               {/* Danh sách thành viên trong Team */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {employeeData.team_members.map((member) => (
-                  <Card key={member.id} className={`border-[#e5e5e5] shadow-none bg-white transition-all hover:border-[#bbb] ${member.code === "NV002" ? "ring-1 ring-[#242424]/40" : ""}`}>
+                  <Card key={member.id} className={`border-[#e5e5e5] shadow-none bg-white transition-all hover:border-[#bbb] ${member.code === employeeData.employee_code ? "ring-1 ring-[#242424]/40" : ""}`}>
                     <CardHeader className="pb-3 flex flex-row items-start justify-between space-y-0">
                       <div className="flex items-center gap-3">
                         <Avatar name={member.name} />
                         <div>
                           <CardTitle className="text-[13px] font-semibold text-[#242424] flex items-center gap-1.5">
                             <span>{member.name}</span>
-                            {member.code === "NV002" && (
+                            {member.code === employeeData.employee_code && (
                               <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200">
                                 Bạn
                               </span>
@@ -867,14 +805,7 @@ export function EmployeeDashboard({ user, onLogout }) {
                         </a>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-[#999]">Sinh nhật:</span>
-                        <span className="text-[#444] flex items-center gap-1">
-                          <Cake size={11} className="text-amber-500" />
-                          {member.birthday}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-[#999]">Gia nhập team:</span>
+                        <span className="text-[#999]">Ngày vào làm:</span>
                         <span className="text-[#444]">{member.joined}</span>
                       </div>
                     </CardContent>
@@ -917,7 +848,7 @@ export function EmployeeDashboard({ user, onLogout }) {
                 <Card className="border-[#e5e5e5] shadow-none bg-white p-4">
                   <span className="text-[11px] text-[#888] uppercase">Phụ cấp & Giảm trừ</span>
                   <div className="text-[22px] font-bold text-[#242424] mt-1">{money(employeeData.salary.allowance)}</div>
-                  <p className="text-[10px] text-[#999] mt-1">1 người phụ thuộc (4.4tr/tháng)</p>
+                  <p className="text-[10px] text-[#999] mt-1">{employeeData.salary.dependents} người phụ thuộc (4.4tr/tháng/người)</p>
                 </Card>
               </div>
 
@@ -942,6 +873,13 @@ export function EmployeeDashboard({ user, onLogout }) {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#f2f2f2]">
+                      {!employeeData.payroll_history.length && (
+                        <tr>
+                          <td colSpan={8} className="py-6 px-4 text-center text-[#888]">
+                            Chưa có kỳ lương nào được tính cho bạn.
+                          </td>
+                        </tr>
+                      )}
                       {employeeData.payroll_history.map((slip, i) => (
                         <tr key={i} className="hover:bg-[#fafafa]">
                           <td className="py-3.5 px-4 font-semibold text-[#242424]">{slip.period}</td>
@@ -980,10 +918,10 @@ export function EmployeeDashboard({ user, onLogout }) {
             <Card className="border-[#e5e5e5] shadow-none bg-white">
               <CardHeader className="pb-3 border-b border-[#f0f0f0]">
                 <CardTitle className="text-[14px] font-semibold text-[#242424]">
-                  Ca làm việc tuần chuẩn (Thứ 2 - Thứ 6: 08:30 - 17:30)
+                  Ca làm việc tuần {employeeData.week_range} (Thứ 2 - Thứ 6: {employeeData.work_shift})
                 </CardTitle>
                 <CardDescription className="text-[11px] text-[#888]">
-                  Nghỉ trưa: 12:00 - 13:00 · Địa điểm: Trụ sở chính & Hybrid
+                  Lịch hành chính chuẩn do backend cung cấp (work_schedule)
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-0">
@@ -1012,30 +950,40 @@ export function EmployeeDashboard({ user, onLogout }) {
             <Card className="border-[#e5e5e5] shadow-none bg-white">
               <CardHeader className="pb-3 border-b border-[#f0f0f0]">
                 <CardTitle className="text-[14px] font-semibold text-[#242424]">
-                  Nhật ký chấm công
+                  Tổng hợp công theo kỳ lương
                 </CardTitle>
+                <CardDescription className="text-[11px] text-[#888]">
+                  Lấy từ bảng payroll_items · Hệ thống chưa lưu giờ check-in/check-out từng ngày.
+                </CardDescription>
               </CardHeader>
               <CardContent className="p-0 overflow-x-auto">
                 <table className="w-full text-left text-[12px] border-collapse">
                   <thead className="bg-[#f9f9f9] text-[#777] border-b border-[#ececec]">
                     <tr>
-                      <th className="py-3 px-4 font-medium">Ngày</th>
-                      <th className="py-3 px-4 font-medium">Giờ vào (Check-in)</th>
-                      <th className="py-3 px-4 font-medium">Giờ ra (Check-out)</th>
-                      <th className="py-3 px-4 font-medium">Tổng giờ làm</th>
-                      <th className="py-3 px-4 font-medium">Trạng thái ghi nhận</th>
+                      <th className="py-3 px-4 font-medium">Kỳ lương</th>
+                      <th className="py-3 px-4 font-medium">Công chuẩn</th>
+                      <th className="py-3 px-4 font-medium">Công thực tế</th>
+                      <th className="py-3 px-4 font-medium">Giờ OT</th>
+                      <th className="py-3 px-4 font-medium">Trạng thái kỳ</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#f2f2f2]">
-                    {employeeData.recent_logs.map((log, idx) => (
-                      <tr key={idx} className="hover:bg-[#fafafa]">
-                        <td className="py-3.5 px-4 font-semibold text-[#242424]">{log.date}</td>
-                        <td className="py-3.5 px-4 text-[#333] font-medium">{log.in}</td>
-                        <td className="py-3.5 px-4 text-[#555]">{log.out}</td>
-                        <td className="py-3.5 px-4 font-medium">{log.duration}</td>
+                    {!employeeData.payroll_history.length && (
+                      <tr>
+                        <td colSpan={5} className="py-6 px-4 text-center text-[#888]">
+                          Chưa có dữ liệu chấm công.
+                        </td>
+                      </tr>
+                    )}
+                    {employeeData.payroll_history.map((slip) => (
+                      <tr key={slip.id} className="hover:bg-[#fafafa]">
+                        <td className="py-3.5 px-4 font-semibold text-[#242424]">{slip.period}</td>
+                        <td className="py-3.5 px-4 text-[#555]">{slip.standard_days} ngày</td>
+                        <td className="py-3.5 px-4 text-[#333] font-medium">{slip.actual_days} ngày</td>
+                        <td className="py-3.5 px-4 text-amber-700">+{slip.ot_hours}h</td>
                         <td className="py-3.5 px-4">
                           <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200">
-                            {log.note}
+                            {slip.status}
                           </Badge>
                         </td>
                       </tr>
@@ -1055,13 +1003,13 @@ export function EmployeeDashboard({ user, onLogout }) {
                     Hợp đồng lao động
                   </CardTitle>
                   <CardDescription className="text-[11px] text-[#888]">
-                    Số: {employeeData.contract_no}
+                    Mã hợp đồng: {employeeData.contract_no} · Ngày ký: {employeeData.contract_signed}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="pt-4 space-y-3 text-[#666]">
                   <div className="flex justify-between border-b border-[#f5f5f5] pb-2">
-                    <span>Loại hợp đồng:</span>
-                    <strong className="text-[#333]">{employeeData.contract_type}</strong>
+                    <span>Số người phụ thuộc:</span>
+                    <strong className="text-[#333]">{employeeData.salary.dependents}</strong>
                   </div>
                   <div className="flex justify-between border-b border-[#f5f5f5] pb-2">
                     <span>Lương cơ bản HĐLĐ:</span>
@@ -1087,15 +1035,15 @@ export function EmployeeDashboard({ user, onLogout }) {
                 <CardContent className="pt-4 space-y-3 text-[#666]">
                   <div className="flex justify-between border-b border-[#f5f5f5] pb-2">
                     <span>Mã số thuế cá nhân:</span>
-                    <strong className="text-[#333]">8492019481</strong>
+                    <strong className="text-[#999] font-normal">{NOT_SET}</strong>
                   </div>
                   <div className="flex justify-between border-b border-[#f5f5f5] pb-2">
                     <span>Số sổ BHXH (VssID):</span>
-                    <strong className="text-[#333]">7910294821</strong>
+                    <strong className="text-[#999] font-normal">{NOT_SET}</strong>
                   </div>
                   <div className="flex justify-between">
                     <span>Tài khoản nhận lương:</span>
-                    <strong className="text-[#333]">1029482910 (VCB)</strong>
+                    <strong className="text-[#999] font-normal">{NOT_SET}</strong>
                   </div>
                 </CardContent>
               </Card>
@@ -1164,70 +1112,20 @@ export function EmployeeDashboard({ user, onLogout }) {
         </Dialog>
       )}
 
-      {/* DIALOG CHỈNH SỬA THÔNG TIN LIÊN HỆ */}
-      {editProfileOpen && (
-        <Dialog open onOpenChange={setEditProfileOpen}>
-          <DialogContent className="max-w-[480px]">
-            <DialogHeader>
-              <DialogTitle className="text-[16px] font-bold text-[#242424]">
-                Cập nhật thông tin liên hệ
-              </DialogTitle>
-              <DialogDescription className="text-[12px] text-[#888]">
-                Thông tin này sẽ được lưu để phòng nhân sự (HR) liên hệ khi cần thiết.
-              </DialogDescription>
-            </DialogHeader>
+    </div>
+  );
+}
 
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                setEditProfileOpen(false);
-                toast.success("Đã cập nhật thông tin liên hệ thành công!");
-              }}
-              className="space-y-3.5 py-2 text-[12px]"
-            >
-              <div>
-                <Label htmlFor="edit-phone" className="text-[11px] text-[#666]">Số điện thoại</Label>
-                <Input
-                  id="edit-phone"
-                  value={personalInfo.phone}
-                  onChange={(e) => setPersonalInfo({ ...personalInfo, phone: e.target.value })}
-                  className="h-9 text-[12px] mt-1"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="edit-personal-email" className="text-[11px] text-[#666]">Email cá nhân</Label>
-                <Input
-                  id="edit-personal-email"
-                  type="email"
-                  value={personalInfo.personal_email}
-                  onChange={(e) => setPersonalInfo({ ...personalInfo, personal_email: e.target.value })}
-                  className="h-9 text-[12px] mt-1"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="edit-current-addr" className="text-[11px] text-[#666]">Nơi ở hiện tại</Label>
-                <Input
-                  id="edit-current-addr"
-                  value={personalInfo.current_address}
-                  onChange={(e) => setPersonalInfo({ ...personalInfo, current_address: e.target.value })}
-                  className="h-9 text-[12px] mt-1"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-3 border-t border-[#eee]">
-                <Button type="button" variant="outline" size="sm" className="h-8 text-[11px]" onClick={() => setEditProfileOpen(false)}>
-                  Hủy
-                </Button>
-                <Button type="submit" size="sm" className="h-8 text-[11px] bg-[#242424] text-white">
-                  Lưu thay đổi
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
-      )}
+function ProfileField({ label, value, mono = false }) {
+  const missing = !value || value === NOT_SET;
+  return (
+    <div>
+      <span className="text-[10px] text-[#999] uppercase block">{label}:</span>
+      <strong
+        className={`${missing ? "text-[#aaa] font-normal" : "text-[#333]"} ${mono ? "font-mono" : ""}`}
+      >
+        {value || NOT_SET}
+      </strong>
     </div>
   );
 }

@@ -18,18 +18,27 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { departments } from "@/data/workspace";
+
+/** Gợi ý mã kế tiếp dựa trên mã NVxxx lớn nhất hiện có. */
+function nextEmployeeCode(employees) {
+  const max = Math.max(
+    0,
+    ...employees.map((e) => Number(/^NV(\d+)$/i.exec(e.employee_code)?.[1] ?? 0)),
+  );
+  return `NV${String(max + 1).padStart(3, "0")}`;
+}
 export function EmployeeEditor({ employee, employees, mode, onClose, onSave }) {
   const [value, setValue] = useState(
     () =>
       employee ?? {
-        id: Math.max(0, ...employees.map((e) => e.id)) + 1,
-        employee_code: `NV${String(Math.max(0, ...employees.map((e) => e.id)) + 1).padStart(3, "0")}`,
+        // Không có id: backend sẽ tự cấp khi INSERT vào bảng users
+        employee_code: nextEmployeeCode(employees),
         full_name: "",
         email: "",
         department: "Kỹ thuật",
         position: "",
         status: "Thử việc",
-        joined_at: "2026-11-13",
+        joined_at: new Date().toISOString().slice(0, 10),
         base_salary: 15000000,
         insurance_salary: 12000000,
         dependents_count: 0,
@@ -256,7 +265,7 @@ export function EmployeeEditor({ employee, employees, mode, onClose, onSave }) {
             </label>
           </div>
           <div className="form-note">
-            Chế độ mẫu · Thay đổi được lưu trên trình duyệt này.
+            Dữ liệu được lưu vào database qlns · Tài khoản mới có mật khẩu mặc định 123456.
           </div>
           <div className="dialog-actions">
             <Button type="button" variant="outline" onClick={onClose}>

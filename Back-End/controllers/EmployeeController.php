@@ -2,24 +2,19 @@
 
 class EmployeeController
 {
+    private const STATUSES = ['Đang làm việc', 'Thử việc', 'Nghỉ phép'];
+    private const DEFAULT_PASSWORD = '123456';
+
+    /* =====================================================================
+     *  API CHO NHÂN VIÊN
+     * ===================================================================== */
+
     /**
-     * GET /employee/dashboard — Employee dashboard data
+     * GET ?action=employee/dashboard — Dữ liệu cổng thông tin của nhân viên đang đăng nhập.
      */
     public function dashboard()
     {
-        header('Content-Type: application/json');
-
-        // Check authentication
-        if (!isset($_SESSION['user_id'])) {
-            http_response_code(401);
-            echo json_encode(['success' => false, 'data' => null, 'message' => 'Chưa đăng nhập']);
-            return;
-        }
-
-        // Check role
-        if ($_SESSION['role'] !== 'EMPLOYEE') {
-            http_response_code(403);
-            echo json_encode(['success' => false, 'data' => null, 'message' => 'Không có quyền truy cập']);
+        if (!require_auth('EMPLOYEE')) {
             return;
         }
 
@@ -29,18 +24,17 @@ class EmployeeController
         $contractModel = new ContractModel();
         $payrollModel  = new PayrollModel();
 
-        $user     = $userModel->findById($userId);
+        $user = $userModel->findById($userId);
+        if (!$user) {
+            return json_response(404, null, 'Không tìm thấy người dùng');
+        }
+
         $contract = $contractModel->findByUserId($userId);
         $payroll  = $payrollModel->getItemsByUserId($userId);
         $period   = $payrollModel->getCurrentPeriod();
+        $team     = $userModel->findByDepartment($user['department']);
 
-        if (!$user) {
-            http_response_code(404);
-            echo json_encode(['success' => false, 'data' => null, 'message' => 'Không tìm thấy người dùng']);
-            return;
-        }
-
-        // Attendance summary from payroll items
+        // Tổng hợp công từ bảng lương
         $totalActualDays = 0;
         $totalOtHours    = 0;
         foreach ($payroll as $item) {
@@ -48,7 +42,6 @@ class EmployeeController
             $totalOtHours    += (float) $item['ot_hours'];
         }
 
-        // Work schedule
         $workSchedule = [
             'monday'    => '08:30 - 17:30',
             'tuesday'   => '08:30 - 17:30',
@@ -59,33 +52,293 @@ class EmployeeController
             'sunday'    => 'Nghỉ tuần',
         ];
 
-        http_response_code(200);
-        echo json_encode([
-            'success' => true,
-            'data'    => [
-                'user_info' => [
-                    'full_name'     => $user['full_name'],
-                    'email'         => $user['email'],
-                    'employee_code' => $user['employee_code'],
-                    'role'          => $user['role'],
-                ],
-                'contract' => $contract ? [
-                    'base_salary'      => $contract['base_salary'],
-                    'insurance_salary' => $contract['insurance_salary'],
-                    'allowance'        => $contract['allowance'],
-                    'dependents_count' => $contract['dependents_count'],
-                ] : null,
-                'payroll_history' => $payroll,
-                'attendance_summary' => [
-                    'total_actual_days' => $totalActualDays,
-                    'total_ot_hours'    => $totalOtHours,
-                ],
-                'current_period'  => $period ?: null,
-                'work_schedule'   => $workSchedule,
+        json_response(200, [
+            'user_info' => [
+                'id'            => (int) $user['id'],
+                'full_name'     => $user['full_name'],
+                'email'         => $user['email'],
+                'employee_code' => $user['employee_code'],
+                'role'          => $user['role'],
+                'department'    => $user['department'],
+                'position'      => $user['position'],
+                'status'        => $user['status'],
+                'joined_at'     => $user['joined_at'],
             ],
-            'message' => 'Lấy dữ liệu dashboard thành công',
-        ]);
+            'contract' => $contract ? [
+                'id'               => (int) $contract['id'],
+                'base_salary'      => (float) $contract['base_salary'],
+                'insurance_salary' => (float) $contract['insurance_salary'],
+                'allowance'        => (float) $contract['allowance'],
+                'dependents_count' => (int) $contract['dependents_count'],
+                'created_at'       => $contract['created_at'],
+            ] : null,
+            'payroll_history' => array_map([$this, 'formatPayrollItem'], $payroll),
+            'attendance_summary' => [
+                'total_actual_days' => $totalActualDays,
+                'total_ot_hours'    => $totalOtHours,
+            ],
+            'current_period' => $period ?: null,
+            'work_schedule'  => $workSchedule,
+            'team_members'   => array_map(fn ($m) => [
+                'id'            => (int) $m['id'],
+                'employee_code' => $m['employee_code'],
+                'full_name'     => $m['full_name'],
+                'email'         => $m['email'],
+                'position'      => $m['position'],
+                'status'        => $m['status'],
+                'joined_at'     => $m['joined_at'],
+            ], $team),
+        ], 'Lấy dữ liệu dashboard thành công');
     }
 
-}
+    /* =====================================================================
+     *  API CHO ADMIN — quản lý nhân viên + hợp đồng
+     * ===================================================================== */
 
+    /**
+     * GET ?action=employees — Danh sách nhân viên kèm hợp đồng mới nhất.
+     */
+    public function index()
+    {
+        if (!require_method('GET') || !require_auth('ADMIN')) {
+            return;
+        }
+
+        $rows = (new UserModel())->getAllWithContract();
+        json_response(200, array_map([$this, 'formatEmployee'], $rows), 'Lấy danh sách nhân viên thành công');
+    }
+
+    /**
+     * GET ?action=employees/show&id=1 — Chi tiết 1 nhân viên.
+     */
+    public function show()
+    {
+        if (!require_method('GET') || !require_auth('ADMIN')) {
+            return;
+        }
+
+        $id = $this->idFromQuery();
+        if ($id === null) {
+            return json_response(400, null, 'Thiếu hoặc sai tham số id');
+        }
+
+        $row = (new UserModel())->findWithContract($id);
+        if (!$row) {
+            return json_response(404, null, 'Không tìm thấy nhân viên');
+        }
+
+        json_response(200, $this->formatEmployee($row), 'Lấy thông tin nhân viên thành công');
+    }
+
+    /**
+     * POST ?action=employees/create — Thêm nhân viên + hợp đồng.
+     * Mật khẩu mặc định: 123456 (nếu body không gửi "password").
+     */
+    public function store()
+    {
+        if (!require_method('POST') || !require_auth('ADMIN')) {
+            return;
+        }
+
+        [$data, $error] = $this->validate(read_json_body());
+        if ($error) {
+            return json_response(422, null, $error);
+        }
+
+        $userModel = new UserModel();
+        if ($userModel->existsCodeOrEmail($data['employee_code'], $data['email'])) {
+            return json_response(409, null, 'Email hoặc mã nhân viên đã tồn tại');
+        }
+
+        try {
+            $userModel->beginTransaction();
+            $id = $userModel->create($data + [
+                'password' => $data['password'] ?? self::DEFAULT_PASSWORD,
+                'role'     => 'EMPLOYEE',
+            ]);
+            (new ContractModel())->saveForUser($id, $data);
+            $userModel->commit();
+        } catch (Throwable $e) {
+            $userModel->rollBack();
+            throw $e;
+        }
+
+        json_response(201, $this->formatEmployee($userModel->findWithContract($id)), 'Đã thêm nhân viên');
+    }
+
+    /**
+     * PUT ?action=employees/update&id=1 — Cập nhật hồ sơ + hợp đồng.
+     */
+    public function update()
+    {
+        if (!require_method('PUT', 'POST') || !require_auth('ADMIN')) {
+            return;
+        }
+
+        $id = $this->idFromQuery();
+        if ($id === null) {
+            return json_response(400, null, 'Thiếu hoặc sai tham số id');
+        }
+
+        $userModel = new UserModel();
+        if (!$userModel->findById($id)) {
+            return json_response(404, null, 'Không tìm thấy nhân viên');
+        }
+
+        [$data, $error] = $this->validate(read_json_body());
+        if ($error) {
+            return json_response(422, null, $error);
+        }
+
+        if ($userModel->existsCodeOrEmail($data['employee_code'], $data['email'], $id)) {
+            return json_response(409, null, 'Email hoặc mã nhân viên đã tồn tại');
+        }
+
+        try {
+            $userModel->beginTransaction();
+            $userModel->update($id, $data);
+            (new ContractModel())->saveForUser($id, $data);
+            $userModel->commit();
+        } catch (Throwable $e) {
+            $userModel->rollBack();
+            throw $e;
+        }
+
+        json_response(200, $this->formatEmployee($userModel->findWithContract($id)), 'Đã cập nhật nhân viên');
+    }
+
+    /**
+     * DELETE ?action=employees/delete&id=1 — Xóa nhân viên (hợp đồng, bảng lương xóa theo).
+     */
+    public function destroy()
+    {
+        if (!require_method('DELETE', 'POST') || !require_auth('ADMIN')) {
+            return;
+        }
+
+        $id = $this->idFromQuery();
+        if ($id === null) {
+            return json_response(400, null, 'Thiếu hoặc sai tham số id');
+        }
+        if ($id === (int) $_SESSION['user_id']) {
+            return json_response(409, null, 'Không thể xóa tài khoản đang đăng nhập');
+        }
+
+        if (!(new UserModel())->delete($id)) {
+            return json_response(404, null, 'Không tìm thấy nhân viên');
+        }
+
+        json_response(200, ['id' => $id], 'Đã xóa nhân viên');
+    }
+
+    /* =====================================================================
+     *  Hàm hỗ trợ
+     * ===================================================================== */
+
+    private function idFromQuery(): ?int
+    {
+        $id = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        return $id === false ? null : $id;
+    }
+
+    /**
+     * Kiểm tra dữ liệu gửi lên. Trả về [dữ liệu đã chuẩn hóa, thông báo lỗi | null].
+     */
+    private function validate(?array $input): array
+    {
+        if ($input === null) {
+            return [null, 'Dữ liệu JSON không hợp lệ'];
+        }
+
+        $text = fn ($key) => trim((string) ($input[$key] ?? ''));
+        $data = [
+            'employee_code' => $text('employee_code'),
+            'full_name'     => $text('full_name'),
+            'email'         => $text('email'),
+            'department'    => $text('department'),
+            'position'      => $text('position'),
+            'status'        => $text('status') ?: 'Đang làm việc',
+            'joined_at'     => $text('joined_at') ?: date('Y-m-d'),
+        ];
+
+        foreach (['employee_code' => 20, 'full_name' => 100, 'email' => 100, 'department' => 100, 'position' => 100] as $key => $max) {
+            if ($data[$key] === '') {
+                return [null, "Trường {$key} không được để trống"];
+            }
+            if (mb_strlen($data[$key]) > $max) {
+                return [null, "Trường {$key} tối đa {$max} ký tự"];
+            }
+        }
+        if (!filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
+            return [null, 'Email không hợp lệ'];
+        }
+        if (!in_array($data['status'], self::STATUSES, true)) {
+            return [null, 'Trạng thái phải là: ' . implode(', ', self::STATUSES)];
+        }
+        $date = DateTime::createFromFormat('Y-m-d', $data['joined_at']);
+        if (!$date || $date->format('Y-m-d') !== $data['joined_at']) {
+            return [null, 'joined_at phải có dạng YYYY-MM-DD'];
+        }
+
+        foreach (['base_salary', 'insurance_salary', 'allowance'] as $key) {
+            $value = $input[$key] ?? 0;
+            if (!is_numeric($value) || (float) $value < 0 || (float) $value > 9999999999) {
+                return [null, "Trường {$key} phải là số không âm"];
+            }
+            $data[$key] = round((float) $value, 2);
+        }
+        $dependents = filter_var($input['dependents_count'] ?? 0, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 99]]);
+        if ($dependents === false) {
+            return [null, 'dependents_count phải là số nguyên từ 0 đến 99'];
+        }
+        $data['dependents_count'] = $dependents;
+
+        if (isset($input['password']) && $input['password'] !== '') {
+            if (mb_strlen((string) $input['password']) < 6) {
+                return [null, 'Mật khẩu tối thiểu 6 ký tự'];
+            }
+            $data['password'] = (string) $input['password'];
+        }
+
+        return [$data, null];
+    }
+
+    /** Ép kiểu số để Front-End nhận number thay vì string. */
+    private function formatEmployee(array $row): array
+    {
+        return [
+            'id'               => (int) $row['id'],
+            'employee_code'    => $row['employee_code'],
+            'full_name'        => $row['full_name'],
+            'email'            => $row['email'],
+            'role'             => $row['role'],
+            'department'       => $row['department'],
+            'position'         => $row['position'],
+            'status'           => $row['status'],
+            'joined_at'        => $row['joined_at'],
+            'contract_id'      => $row['contract_id'] !== null ? (int) $row['contract_id'] : null,
+            'base_salary'      => (float) ($row['base_salary'] ?? 0),
+            'insurance_salary' => (float) ($row['insurance_salary'] ?? 0),
+            'allowance'        => (float) ($row['allowance'] ?? 0),
+            'dependents_count' => (int) ($row['dependents_count'] ?? 0),
+        ];
+    }
+
+    private function formatPayrollItem(array $item): array
+    {
+        return [
+            'id'               => (int) $item['id'],
+            'period_id'        => (int) $item['period_id'],
+            'month_year'       => $item['month_year'],
+            'standard_days'    => (int) $item['standard_days'],
+            'period_status'    => $item['period_status'],
+            'actual_days'      => (float) $item['actual_days'],
+            'ot_hours'         => (float) $item['ot_hours'],
+            'gross_salary'     => (float) $item['gross_salary'],
+            'social_insurance' => (float) $item['social_insurance'],
+            'tax_deduction'    => (float) $item['tax_deduction'],
+            'personal_tax'     => (float) $item['personal_tax'],
+            'net_salary'       => (float) $item['net_salary'],
+        ];
+    }
+}

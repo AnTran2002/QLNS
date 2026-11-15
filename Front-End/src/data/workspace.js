@@ -1,3 +1,4 @@
+// Danh sách phòng ban dùng cho bộ lọc / form. Giá trị lưu ở cột users.department.
 export const departments = [
   "Kỹ thuật",
   "Thiết kế",
@@ -5,68 +6,6 @@ export const departments = [
   "Kinh doanh",
   "Nhân sự",
   "Tài chính",
-];
-const names = [
-  "Nguyễn Minh Anh",
-  "Trần Hoàng Nam",
-  "Lê Thảo Linh",
-  "Phạm Đức Huy",
-  "Vũ Ngọc Hà",
-  "Đặng Tuấn Kiệt",
-  "Bùi Phương Anh",
-  "Đỗ Quang Minh",
-  "Hoàng Mai Chi",
-  "Nguyễn Thanh Tùng",
-  "Trần Bảo Ngọc",
-  "Lê Quốc Bảo",
-  "Phạm Thu Trang",
-  "Vũ Hải Đăng",
-  "Đặng Khánh Vy",
-  "Bùi Gia Hân",
-  "Đỗ Anh Tuấn",
-  "Hoàng Nhật Linh",
-  "Nguyễn Đức Anh",
-  "Trần Mỹ Duyên",
-  "Lê Minh Khang",
-  "Phạm Ngọc Hân",
-  "Vũ Thành Long",
-  "Đặng Yến Nhi",
-];
-const assignments = [
-  1, 0, 2, 0, 4, 3, 1, 0, 5, 3, 2, 0, 4, 0, 1, 5, 3, 2, 0, 1, 3, 2, 0, 4,
-];
-const positions = [
-  "Frontend Developer",
-  "Product Designer",
-  "Marketing Specialist",
-  "Sales Executive",
-  "HR Specialist",
-  "Financial Analyst",
-];
-export const seedEmployees = names.map((full_name, i) => {
-  const departmentIndex = assignments[i];
-  return {
-    id: i + 1,
-    employee_code: `NV${String(i + 1).padStart(3, "0")}`,
-    full_name,
-    email: `${["minhanh", "hoangnam", "thaolinh", "duchuy", "ngocha", "tuankiet"][i % 6]}${i > 5 ? i : ""}@acme.vn`,
-    department: departments[departmentIndex],
-    position: positions[departmentIndex],
-    status:
-      i === 4 || i === 16 ? "Nghỉ phép" : i > 20 ? "Thử việc" : "Đang làm việc",
-    joined_at: `2026-${String(3 + Math.floor(i / 3)).padStart(2, "0")}-${String(2 + (i % 24)).padStart(2, "0")}`,
-    base_salary: (15 + (i % 8) * 3) * 1000000,
-    insurance_salary: 12000000,
-    dependents_count: i % 3,
-    allowance: 1500000,
-  };
-});
-export const workforceHistory = [
-  { month: "T6", total: 9 },
-  { month: "T7", total: 12 },
-  { month: "T8", total: 16 },
-  { month: "T9", total: 19 },
-  { month: "T10", total: 21 },
 ];
 export const money = (value) =>
   new Intl.NumberFormat("vi-VN", {

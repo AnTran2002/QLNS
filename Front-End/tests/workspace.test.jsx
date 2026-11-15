@@ -1,18 +1,14 @@
-import {
-  act,
-  render,
-  renderHook,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "../src/App";
-import { useWorkspace } from "../src/hooks/use-workspace";
-import { createContractsApi } from "../src/lib/contracts-api";
 import { EmployeeEditor } from "../src/features/employee-editor";
-import { seedEmployees, exportCsv } from "../src/data/workspace";
+import { exportCsv } from "../src/data/workspace";
+import { authApi } from "../src/lib/auth-api";
+import { employeesApi } from "../src/lib/employees-api";
+import { callApi, http } from "../src/lib/api-client";
+import { adminUser, employeeRows } from "./fixtures";
+
 vi.mock("recharts", () => ({
   ResponsiveContainer: ({ children }) => <div>{children}</div>,
   AreaChart: () => <div aria-label="Biểu đồ mẫu" />,
@@ -22,71 +18,122 @@ vi.mock("recharts", () => ({
   YAxis: () => null,
   Tooltip: () => null,
 }));
-describe("PeopleOS workspace flows", () => {
-  it("loads, persists, restores and resets the demo workspace", () => {
-    const first = renderHook(() => useWorkspace());
-    expect(first.result.current.employees).toHaveLength(24);
-    act(() => first.result.current.save(seedEmployees.slice(0, 2)));
-    first.unmount();
-    const restored = renderHook(() => useWorkspace());
-    expect(restored.result.current.employees).toHaveLength(2);
-    act(() => restored.result.current.reset());
-    expect(restored.result.current.employees).toHaveLength(24);
+
+/** Giả lập backend: bảng users trong bộ nhớ. */
+let db;
+beforeEach(() => {
+  db = employeeRows();
+  vi.spyOn(authApi, "me").mockResolvedValue({ user: adminUser });
+  vi.spyOn(authApi, "logout").mockResolvedValue(null);
+  vi.spyOn(employeesApi, "list").mockImplementation(async () => [...db]);
+  vi.spyOn(employeesApi, "create").mockImplementation(async (e) => {
+    const saved = { ...e, id: Math.max(...db.map((r) => r.id)) + 1, role: "EMPLOYEE" };
+    db.push(saved);
+    return saved;
   });
-  it("recovers from corrupt persisted data", () => {
-    localStorage.setItem("qlns-workspace-v1", '[{"id":1}]');
-    expect(
-      renderHook(() => useWorkspace()).result.current.employees,
-    ).toHaveLength(24);
+  vi.spyOn(employeesApi, "update").mockImplementation(async (id, e) => {
+    const saved = { ...db.find((r) => r.id === id), ...e, id };
+    db = db.map((r) => (r.id === id ? saved : r));
+    return saved;
   });
-  it("searches without Vietnamese accents and clears an empty result", async () => {
-    const user = userEvent.setup();
+  vi.spyOn(employeesApi, "remove").mockImplementation(async (id) => {
+    db = db.filter((r) => r.id !== id);
+    return null;
+  });
+});
+
+async function renderApp() {
+  const view = render(<App />);
+  await screen.findByRole("heading", { level: 1 });
+  return view;
+}
+
+describe("PeopleOS workspace flows (API)", () => {
+  it("shows the login page when the backend session is empty", async () => {
+    authApi.me.mockRejectedValueOnce(new Error("Chưa đăng nhập"));
     render(<App />);
+    expect(
+      await screen.findByRole("heading", { name: "Đăng nhập hệ thống" }),
+    ).toBeInTheDocument();
+    expect(employeesApi.list).not.toHaveBeenCalled();
+  });
+
+  it("loads employees from the API and searches without accents", async () => {
+    const user = userEvent.setup();
+    await renderApp();
+    expect(await screen.findByRole("table")).toHaveTextContent("Trần Thị Bình");
+    expect(employeesApi.list).toHaveBeenCalledOnce();
     const input = screen.getByRole("textbox", { name: "Tìm nhân viên" });
-    await user.type(input, "nguyen minh anh");
-    expect(screen.getByRole("table")).toHaveTextContent("Nguyễn Minh Anh");
+    await user.type(input, "le van cuong");
     expect(screen.getAllByRole("row")).toHaveLength(2);
     await user.clear(input);
     await user.type(input, "no-such-person");
     expect(screen.getByText("Không tìm thấy kết quả")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Xóa bộ lọc" }));
-    expect(screen.getAllByRole("row")).toHaveLength(9);
+    expect(screen.getAllByRole("row")).toHaveLength(db.length + 1);
   });
-  it("creates an employee and keeps the new record after reload", async () => {
+
+  it("shows an error state with retry when the API fails", async () => {
+    employeesApi.list.mockRejectedValueOnce(
+      new Error("Không thể kết nối máy chủ. Kiểm tra backend PHP đang chạy."),
+    );
     const user = userEvent.setup();
-    const app = render(<App />);
+    render(<App />);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Không thể kết nối máy chủ",
+    );
+    await user.click(screen.getByRole("button", { name: "Thử lại" }));
+    expect(await screen.findByRole("table")).toHaveTextContent("Trần Thị Bình");
+  });
+
+  it("creates an employee through the API", async () => {
+    const user = userEvent.setup();
+    await renderApp();
+    await screen.findByRole("table");
     await user.click(screen.getByRole("button", { name: "Thêm nhân viên" }));
     const dialog = screen.getByRole("dialog");
-    await user.type(
-      within(dialog).getByLabelText("Họ và tên"),
-      "Nhân Viên Mới",
-    );
-    await user.type(
-      within(dialog).getByLabelText("Email công việc"),
-      "new@acme.vn",
-    );
+    expect(within(dialog).getByLabelText("Mã nhân viên")).toHaveValue("NV004");
+    await user.type(within(dialog).getByLabelText("Họ và tên"), "Nhân Viên Mới");
+    await user.type(within(dialog).getByLabelText("Email công việc"), "new@company.vn");
     await user.type(within(dialog).getByLabelText("Chức danh"), "QA Engineer");
-    await user.click(
-      within(dialog).getByRole("button", { name: "Thêm nhân viên" }),
-    );
+    await user.click(within(dialog).getByRole("button", { name: "Thêm nhân viên" }));
     await waitFor(() =>
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
-    expect(screen.getByRole("table")).toHaveTextContent("Nhân Viên Mới");
-    expect(JSON.parse(localStorage.getItem("qlns-workspace-v1"))).toHaveLength(
-      25,
+    expect(employeesApi.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        employee_code: "NV004",
+        full_name: "Nhân Viên Mới",
+        email: "new@company.vn",
+      }),
     );
-    app.unmount();
-    render(<App />);
+    expect(employeesApi.create.mock.calls[0][0].id).toBeUndefined();
     expect(screen.getByRole("table")).toHaveTextContent("Nhân Viên Mới");
   });
-  it("rejects duplicate email before saving", async () => {
+
+  it("keeps the editor open and shows the backend message when saving fails", async () => {
+    employeesApi.create.mockRejectedValueOnce(new Error("Mã nhân viên hoặc email đã tồn tại"));
+    const user = userEvent.setup();
+    await renderApp();
+    await screen.findByRole("table");
+    await user.click(screen.getByRole("button", { name: "Thêm nhân viên" }));
+    const dialog = screen.getByRole("dialog");
+    await user.type(within(dialog).getByLabelText("Họ và tên"), "Trùng Mã");
+    await user.type(within(dialog).getByLabelText("Email công việc"), "dup@company.vn");
+    await user.type(within(dialog).getByLabelText("Chức danh"), "Tester");
+    await user.click(within(dialog).getByRole("button", { name: "Thêm nhân viên" }));
+    expect(await screen.findByText("Mã nhân viên hoặc email đã tồn tại")).toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("rejects duplicate email before calling the API", async () => {
+    const rows = employeeRows();
     const user = userEvent.setup();
     const onSave = vi.fn();
     render(
       <EmployeeEditor
-        employee={seedEmployees[0]}
-        employees={seedEmployees}
+        employee={rows[1]}
+        employees={rows}
         mode="employee"
         onClose={vi.fn()}
         onSave={onSave}
@@ -94,17 +141,18 @@ describe("PeopleOS workspace flows", () => {
     );
     const email = screen.getByLabelText("Email công việc");
     await user.clear(email);
-    await user.type(email, seedEmployees[1].email);
+    await user.type(email, rows[2].email);
     await user.click(screen.getByRole("button", { name: "Lưu thay đổi" }));
     expect(onSave).not.toHaveBeenCalled();
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
-  it("saves contract fields through the contract editor", async () => {
+
+  it("saves contract fields through the update API", async () => {
     window.location.hash = "#contracts";
     const user = userEvent.setup();
-    render(<App />);
+    await renderApp();
     await user.click(
-      screen.getByRole("button", { name: /Đặng Yến Nhi\s*NV024/ }),
+      await screen.findByRole("button", { name: /Lê Văn Cường\s*NV003/ }),
     );
     const input = screen.getByLabelText("Lương cơ bản (VNĐ)");
     await user.clear(input);
@@ -113,17 +161,17 @@ describe("PeopleOS workspace flows", () => {
     await waitFor(() =>
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
-    expect(
-      JSON.parse(localStorage.getItem("qlns-workspace-v1")).find(
-        (e) => e.id === 24,
-      ).base_salary,
-    ).toBe(42000000);
+    expect(employeesApi.update).toHaveBeenCalledWith(
+      3,
+      expect.objectContaining({ base_salary: 42000000 }),
+    );
     expect(screen.getByRole("table")).toHaveTextContent("42.000.000");
   });
+
   it("navigates to a department and applies its filter", async () => {
     window.location.hash = "#departments";
     const user = userEvent.setup();
-    render(<App />);
+    await renderApp();
     await user.click(screen.getAllByRole("button", { name: "Xem đội ngũ" })[0]);
     await waitFor(() =>
       expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
@@ -132,25 +180,24 @@ describe("PeopleOS workspace flows", () => {
     );
     expect(screen.getByRole("combobox")).toHaveTextContent("Kỹ thuật");
     expect(screen.getAllByRole("row")).toHaveLength(
-      seedEmployees.filter((e) => e.department === "Kỹ thuật").length + 1,
+      db.filter((e) => e.department === "Kỹ thuật").length + 1,
     );
   });
+
   it("opens quick search with Ctrl+K and selects an employee", async () => {
     const user = userEvent.setup();
-    render(<App />);
+    await renderApp();
+    await screen.findByRole("table");
     await user.keyboard("{Control>}k{/Control}");
     const dialog = screen.getByRole("dialog");
     await user.type(
       within(dialog).getByRole("textbox", { name: "Từ khóa tìm kiếm" }),
-      "NV001",
+      "NV002",
     );
-    await user.click(
-      within(dialog).getByRole("button", { name: /Nguyễn Minh Anh/ }),
-    );
-    expect(
-      await screen.findByDisplayValue("Nguyễn Minh Anh"),
-    ).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: /Trần Thị Bình/ }));
+    expect(await screen.findByDisplayValue("Trần Thị Bình")).toBeInTheDocument();
   });
+
   it("exports a CSV with BOM, quoting and spreadsheet formula protection", async () => {
     const createUrl = vi.fn(() => "blob:test");
     vi.stubGlobal(
@@ -178,40 +225,28 @@ describe("PeopleOS workspace flows", () => {
     expect(click).toHaveBeenCalledOnce();
   });
 });
-describe("documented contract API adapter", () => {
-  it("uses GET and PUT endpoints, JSON bodies and handles 204", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify([{ id: 7 }]), { status: 200 }),
-      )
-      .mockResolvedValueOnce(new Response(null, { status: 204 }));
-    vi.stubGlobal("fetch", fetchMock);
-    const api = createContractsApi("https://api.example.test/");
-    expect(await api.list()).toEqual([{ id: 7 }]);
-    const data = {
-      base_salary: 20000000,
-      insurance_salary: 12000000,
-      dependents_count: 1,
-      allowance: 1000000,
-    };
-    expect(await api.update(7, data)).toBeNull();
-    expect(fetchMock.mock.calls[0][0]).toBe(
-      "https://api.example.test/api/contracts",
+
+describe("api-client", () => {
+  it("unwraps { success, data } and sends the action as a query param", async () => {
+    const request = vi
+      .spyOn(http, "request")
+      .mockResolvedValue({ data: { success: true, data: [{ id: 7 }], message: "ok" } });
+    expect(await callApi("employees", { params: { page: 2 } })).toEqual([{ id: 7 }]);
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: "GET",
+        params: { action: "employees", page: 2 },
+      }),
     );
-    expect(fetchMock.mock.calls[1][0]).toBe(
-      "https://api.example.test/api/contracts/7",
-    );
-    expect(fetchMock.mock.calls[1][1]).toMatchObject({
-      method: "PUT",
-      body: JSON.stringify(data),
-    });
   });
-  it("surfaces a non-success response instead of returning sample data", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(new Response("Not found", { status: 404 })),
-    );
-    await expect(createContractsApi("").get(1)).rejects.toThrow("HTTP 404");
+
+  it("throws the backend message on HTTP errors", async () => {
+    vi.spyOn(http, "request").mockRejectedValue({
+      response: { status: 401, data: { success: false, message: "Chưa đăng nhập" } },
+    });
+    await expect(callApi("me")).rejects.toMatchObject({
+      message: "Chưa đăng nhập",
+      status: 401,
+    });
   });
 });

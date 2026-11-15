@@ -21,7 +21,21 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, Panel, StatCard, Status, ViewAll } from "@/components/shared";
-import { departments, money, workforceHistory } from "@/data/workspace";
+import { departments, money } from "@/data/workspace";
+
+/** Số nhân sự cộng dồn theo tháng, tính từ ngày vào làm (joined_at). */
+function buildHistory(employees, months, now = new Date()) {
+  return Array.from({ length: months }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (months - 1 - i), 1);
+    const end = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+    return {
+      month: `T${d.getMonth() + 1}`,
+      total: employees.filter(
+        (e) => !e.joined_at || new Date(e.joined_at) < end,
+      ).length,
+    };
+  });
+}
 export function Dashboard({ employees, navigate, onAdd, onEdit }) {
   const [range, setRange] = useState("6 tháng");
   const [offset, setOffset] = useState(0);
@@ -30,12 +44,12 @@ export function Dashboard({ employees, navigate, onAdd, onEdit }) {
     (sum, e) => sum + e.base_salary + e.allowance,
     0,
   );
+  const [now] = useState(() => new Date());
+  const thisMonth = now.toISOString().slice(0, 7);
   const newPeople = employees.filter((e) =>
-    e.joined_at.startsWith("2026-11"),
+    (e.joined_at ?? "").startsWith(thisMonth),
   ).length;
-  const history = [...workforceHistory, { month: "T11", total }].slice(
-    range === "3 tháng" ? -3 : 0,
-  );
+  const history = buildHistory(employees, range === "3 tháng" ? 3 : 6, now);
   const distribution = departments.map((name, i) => ({
     name,
     count: employees.filter((e) => e.department === name).length,
@@ -44,7 +58,7 @@ export function Dashboard({ employees, navigate, onAdd, onEdit }) {
     ],
   }));
   const recent = [...employees]
-    .sort((a, b) => b.joined_at.localeCompare(a.joined_at))
+    .sort((a, b) => (b.joined_at ?? "").localeCompare(a.joined_at ?? ""))
     .slice(0, 4);
   const selectedMonth = new Date(2026, 10 + offset, 1);
   const days = new Date(2026, 11 + offset, 0).getDate();
@@ -394,12 +408,12 @@ export function Dashboard({ employees, navigate, onAdd, onEdit }) {
               <strong>
                 {offset === 0
                   ? "Hoàn thiện bảng lương tháng 11"
-                  : "Không có lịch công việc mẫu"}
+                  : "Không có lịch công việc"}
               </strong>
               <p>
                 {offset === 0
                   ? "25 tháng 11 · Nhắc việc minh họa"
-                  : "Lịch trong chế độ dữ liệu mẫu"}
+                  : "Chưa có sự kiện trong tháng này"}
               </p>
             </div>
           </div>
@@ -407,7 +421,7 @@ export function Dashboard({ employees, navigate, onAdd, onEdit }) {
       </div>
       <div className="dashboard-note">
         <span>Được xây dựng cho những đội ngũ tốt đẹp hơn.</span>
-        <span>Quỹ lương: {money(salary)} · Dữ liệu mẫu</span>
+        <span>Quỹ lương: {money(salary)} · Database qlns</span>
       </div>
     </>
   );

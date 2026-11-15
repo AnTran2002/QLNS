@@ -85,6 +85,10 @@ CREATE TABLE `users` (
   `email` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Email dùng đăng nhập hệ thống',
   `password` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Mật khẩu mã hóa Bcrypt',
   `role` enum('ADMIN','EMPLOYEE') COLLATE utf8mb4_unicode_ci DEFAULT 'EMPLOYEE' COMMENT 'Phân quyền hệ thống (RBAC)',
+  `department` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Kỹ thuật' COMMENT 'Phòng ban',
+  `position` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT 'Chức danh',
+  `status` enum('Đang làm việc','Thử việc','Nghỉ phép') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Đang làm việc' COMMENT 'Trạng thái làm việc',
+  `joined_at` date DEFAULT NULL COMMENT 'Ngày gia nhập',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Thời điểm tạo bản ghi'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -105,7 +109,8 @@ ALTER TABLE `contracts`
 ALTER TABLE `payroll_items`
   ADD PRIMARY KEY (`id`),
   ADD KEY `idx_items_period_id` (`period_id`),
-  ADD KEY `idx_items_user_id` (`user_id`);
+  ADD KEY `idx_items_user_id` (`user_id`),
+  ADD UNIQUE KEY `uniq_period_user` (`period_id`, `user_id`);
 
 --
 -- Indexes for table `payroll_periods`
@@ -172,12 +177,12 @@ ALTER TABLE `payroll_items`
 -- to replace the temporary password values with a bcrypt hash of `123456`.
 --
 
-INSERT INTO `users` (`id`, `employee_code`, `full_name`, `email`, `password`, `role`, `created_at`) VALUES
-(1, 'NV001', 'Nguyễn Văn An', 'an.nguyen@company.vn', '__PASSWORD_HASH_PENDING__', 'ADMIN', '2026-01-01 09:00:00'),
-(2, 'NV002', 'Trần Thị Bình', 'binh.tran@company.vn', '__PASSWORD_HASH_PENDING__', 'EMPLOYEE', '2026-01-02 09:00:00'),
-(3, 'NV003', 'Lê Hoàng Cường', 'cuong.le@company.vn', '__PASSWORD_HASH_PENDING__', 'EMPLOYEE', '2026-01-03 09:00:00'),
-(4, 'NV004', 'Phạm Minh Đức', 'duc.pham@company.vn', '__PASSWORD_HASH_PENDING__', 'EMPLOYEE', '2026-01-04 09:00:00'),
-(5, 'NV005', 'Hoàng Thị Em', 'em.hoang@company.vn', '__PASSWORD_HASH_PENDING__', 'EMPLOYEE', '2026-01-05 09:00:00');
+INSERT INTO `users` (`id`, `employee_code`, `full_name`, `email`, `password`, `role`, `department`, `position`, `status`, `joined_at`, `created_at`) VALUES
+(1, 'NV001', 'Nguyễn Văn An', 'an.nguyen@company.vn', '__PASSWORD_HASH_PENDING__', 'ADMIN', 'Nhân sự', 'Giám đốc nhân sự', 'Đang làm việc', '2026-01-01', '2026-01-01 09:00:00'),
+(2, 'NV002', 'Trần Thị Bình', 'binh.tran@company.vn', '__PASSWORD_HASH_PENDING__', 'EMPLOYEE', 'Thiết kế', 'Senior UI/UX Designer', 'Đang làm việc', '2026-01-02', '2026-01-02 09:00:00'),
+(3, 'NV003', 'Lê Hoàng Cường', 'cuong.le@company.vn', '__PASSWORD_HASH_PENDING__', 'EMPLOYEE', 'Kỹ thuật', 'Backend Developer', 'Đang làm việc', '2026-01-03', '2026-01-03 09:00:00'),
+(4, 'NV004', 'Phạm Minh Đức', 'duc.pham@company.vn', '__PASSWORD_HASH_PENDING__', 'EMPLOYEE', 'Kỹ thuật', 'Frontend Developer', 'Đang làm việc', '2026-01-04', '2026-01-04 09:00:00'),
+(5, 'NV005', 'Hoàng Thị Em', 'em.hoang@company.vn', '__PASSWORD_HASH_PENDING__', 'EMPLOYEE', 'Kinh doanh', 'Sales Executive', 'Thử việc', '2026-01-05', '2026-01-05 09:00:00');
 
 INSERT INTO `contracts` (`id`, `user_id`, `base_salary`, `insurance_salary`, `dependents_count`, `allowance`, `created_at`) VALUES
 (1, 1, 25000000.00, 20000000.00, 1, 3000000.00, '2026-01-01 09:00:00'),

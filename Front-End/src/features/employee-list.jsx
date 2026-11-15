@@ -321,7 +321,7 @@ export function EmployeeList({
                             onClick={() => onRemove(e)}
                           >
                             <UserRoundX size={14} />
-                            Xóa nhân viên mẫu
+                            Xóa nhân viên
                           </DropdownMenuItem>
                         )}
                       </DropdownMenuContent>
@@ -394,7 +394,7 @@ export function EmployeeList({
         </div>
       </section>
       <div className="page-footnote">
-        Dữ liệu mẫu được lưu tại trình duyệt ·{" "}
+        Dữ liệu lấy từ database qlns ·{" "}
         {contract
           ? "Các trường hợp đồng khớp với bảng contracts trong database qlns."
           : "Chọn nhân viên để xuất danh sách theo nhu cầu."}

@@ -4,7 +4,9 @@ Hệ thống Quản lý Nhân sự **PeopleOS** hỗ trợ đăng nhập bằng 
 
 ---
 
-## 📌 Danh Sách 2 Tài Khoản Đăng Nhập
+## 📌 Tài Khoản Đăng Nhập
+
+Database mẫu có 5 tài khoản `NV001`–`NV005`, đều dùng mật khẩu `123456` (sau khi chạy `seed_passwords.php`). Hai tài khoản tiêu biểu:
 
 ### 1. 🛡️ Tài Khoản Quản Trị Viên (Admin)
 > Dành cho ban giám đốc, phòng nhân sự (HR) để quản lý nhân sự, hợp đồng và bảng lương.
@@ -31,9 +33,9 @@ Hệ thống Quản lý Nhân sự **PeopleOS** hỗ trợ đăng nhập bằng 
 | **Mật khẩu** | `123456` |
 | **Họ và tên** | Trần Thị Bình |
 | **Vai trò (Role)** | `EMPLOYEE` (Nhân viên) |
-| **Phòng ban** | Thiết kế & Trải nghiệm |
+| **Phòng ban** | Thiết kế |
 | **Vị trí** | Senior UI/UX Designer |
-| **Các mục trên Dashboard bên cạnh** | • **1. Tổng quan cá nhân**: Các chỉ số KPI chính, trạng thái chấm công hôm nay (Vào: `08:24`, Ra: `17:30`).<br>• **2. Lương & Phiếu lương**: Lương Net thực nhận (19.2tr), Gross (21tr), lương HĐLĐ (18.5tr), BHXH 10.5% (15tr), phụ cấp (2.5tr), thuế TNCN, mở popup **Phiếu lương điện tử (Payslip Dialog)**.<br>• **3. Lịch làm việc tuần**: Ca làm việc chuẩn `08:30 - 17:30` từ Thứ Hai đến Thứ Sáu, ngày nghỉ tuần Thứ Bảy & Chủ Nhật.<br>• **4. Chấm công & Giờ làm**: Xem chi tiết giờ vào, giờ ra, tổng 172h làm việc, +6.5h OT, chuyên cần 98.5%, quỹ phép còn lại (8.5/12 ngày).<br>• **5. Hợp đồng & Phúc lợi**: Số hợp đồng, mã số thuế TNCN, mã số sổ BHXH (VssID), tài khoản ngân hàng VCB. |
+| **Các mục trên Dashboard bên cạnh** | Toàn bộ số liệu lấy từ API `?action=employee/dashboard`:<br>• **1. Tổng quan cá nhân**: lương Net/Gross kỳ gần nhất, ngày công, giờ OT, quy mô team, lịch tuần hiện tại.<br>• **2. Hồ sơ cá nhân**: mã NV, phòng ban, chức danh, ngày vào làm, email, hợp đồng.<br>• **3. Đội ngũ**: đồng nghiệp cùng phòng ban (bảng `users`).<br>• **4. Lương & Phiếu lương**: thông số hợp đồng (`contracts`) và lịch sử kỳ lương (`payroll_items`), mở **Phiếu lương điện tử**.<br>• **5. Lịch làm việc tuần**: ca chuẩn `08:30 - 17:30` Thứ Hai–Thứ Sáu.<br>• **6. Chấm công**: tổng công và OT theo từng kỳ lương.<br>• **7. Hợp đồng & Phúc lợi**: lương HĐLĐ, BHXH, phụ cấp, người phụ thuộc. Các thông tin chưa có trong database hiển thị "Chưa cập nhật". |
 
 ---
 
@@ -47,24 +49,21 @@ Hệ thống Quản lý Nhân sự **PeopleOS** hỗ trợ đăng nhập bằng 
 
 ## 🛠️ Hướng Dẫn Khởi Động Dự Án
 
-### Khởi động Frontend (React + Vite)
+Chi tiết từng bước (phpMyAdmin, `env.php`, proxy, danh sách API) xem tại **[HUONG_DAN_KET_NOI_API.md](HUONG_DAN_KET_NOI_API.md)**. Tóm tắt:
+
 ```bash
+# 1. Import QLNS-Database.sql bằng phpMyAdmin, rồi đặt mật khẩu mẫu
+cp Back-End/configs/env.example.php Back-End/configs/env.php   # sửa DB_PORT/DB_PASSWORD nếu cần
+php Back-End/database/seed_passwords.php
+
+# 2. Backend
+cd Back-End
+php -S localhost:8000 index.php
+
+# 3. Frontend (terminal khác)
 cd Front-End
 npm install
-npm run dev
-```
-Truy cập: `http://localhost:5173`
-
-### Khởi động Backend (PHP MVC)
-Sau khi import `QLNS-Database.sql`, chạy một lần script dưới đây để thiết lập mật khẩu bcrypt `123456` cho các tài khoản mẫu:
-```bash
-php Back-End/database/seed_passwords.php
+npm run dev        # http://localhost:5173
 ```
 
-Sau đó khởi động backend:
-```bash
-cd Back-End
-php -S localhost:8888
-```
-*(Nếu máy chủ PHP chưa bật, Frontend có chế độ offline tự động nhận diện tài khoản `NV001` và `NV002` với mật khẩu `123456` để trải nghiệm mượt mà).*
-
+Frontend **bắt buộc** cần backend đang chạy, không còn chế độ offline/dữ liệu mẫu.
