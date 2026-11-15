@@ -25,7 +25,6 @@ import {
   Mail,
   MapPin,
   Phone,
-  Scan,
   ShieldCheck,
   Sparkles,
   Timer,
@@ -246,12 +245,12 @@ export function EmployeeDashboard({ user, onLogout }) {
       { day: "Chủ Nhật", date: "16/11", shift: "Nghỉ tuần", type: "Nghỉ", status: "Nghỉ", hours: "0h" },
     ],
     recent_logs: [
-      { date: "13/11/2026", in: "08:24", out: "--:--", duration: "7h 15m", note: "Đúng giờ (Face ID Camera)" },
-      { date: "12/11/2026", in: "08:28", out: "17:31", duration: "8h 03m", note: "Đúng giờ (Face ID)" },
+      { date: "13/11/2026", in: "08:24", out: "--:--", duration: "7h 15m", note: "Đúng giờ" },
+      { date: "12/11/2026", in: "08:28", out: "17:31", duration: "8h 03m", note: "Đúng giờ" },
       { date: "11/11/2026", in: "08:20", out: "18:32", duration: "9h 12m", note: "OT 1.0h được duyệt" },
-      { date: "10/11/2026", in: "08:25", out: "17:35", duration: "8h 10m", note: "Đúng giờ (Face ID)" },
+      { date: "10/11/2026", in: "08:25", out: "17:35", duration: "8h 10m", note: "Đúng giờ" },
       { date: "07/11/2026", in: "08:35", out: "17:30", duration: "7h 55m", note: "Trễ 5 phút (Đã xin phép)" },
-      { date: "06/11/2026", in: "08:18", out: "17:30", duration: "8h 12m", note: "Đúng giờ (Face ID)" },
+      { date: "06/11/2026", in: "08:18", out: "17:30", duration: "8h 12m", note: "Đúng giờ" },
     ],
   };
 
@@ -400,15 +399,11 @@ export function EmployeeDashboard({ user, onLogout }) {
             {/* Trạng thái chấm công */}
             <div className="flex items-center gap-3 bg-white border border-[#e5e5e5] rounded-xl p-3 shadow-xs">
               <div className="w-9 h-9 rounded-lg bg-[#f4f4f4] flex items-center justify-center text-[#555]">
-                <Scan size={18} />
+                <Clock size={18} />
               </div>
               <div>
                 <div className="text-[10px] text-[#888] uppercase font-medium flex items-center gap-1.5">
                   <span>Chấm công hôm nay</span>
-                  <span className="text-[#ccc]">·</span>
-                  <span className="text-emerald-700 bg-emerald-50 px-1 rounded border border-emerald-100 text-[9px]">
-                    Face ID ghi nhận
-                  </span>
                 </div>
                 <div className="text-[12px] font-semibold flex items-center gap-2 text-[#242424] mt-0.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -1017,7 +1012,7 @@ export function EmployeeDashboard({ user, onLogout }) {
             <Card className="border-[#e5e5e5] shadow-none bg-white">
               <CardHeader className="pb-3 border-b border-[#f0f0f0]">
                 <CardTitle className="text-[14px] font-semibold text-[#242424]">
-                  Nhật ký chấm công qua thiết bị Camera Face ID / Admin
+                  Nhật ký chấm công
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0 overflow-x-auto">

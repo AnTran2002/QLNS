@@ -13,7 +13,6 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
-  Scan,
   Search,
   Settings2,
   Sparkles,
@@ -51,7 +50,6 @@ import { useWorkspace } from "@/hooks/use-workspace";
 import { useAuth } from "@/hooks/use-auth";
 import { LoginPage } from "@/features/login-page";
 import { EmployeeDashboard } from "@/features/employee-dashboard";
-import { FaceAttendanceModal } from "@/features/face-attendance-modal";
 const Dashboard = lazy(() =>
   import("@/features/dashboard").then((module) => ({
     default: module.Dashboard,
@@ -85,7 +83,7 @@ function initialCompany() {
     return "Acme Studio";
   }
 }
-function Sidebar({ page, count, company, navigate, showHelp, onOpenFaceModal, onLogout, user }) {
+function Sidebar({ page, count, company, navigate, showHelp, onLogout, user }) {
   return (
     <div className="sidebar-inner">
       <a
@@ -137,15 +135,6 @@ function Sidebar({ page, count, company, navigate, showHelp, onOpenFaceModal, on
             )}
           </button>
         ))}
-
-        {/* Nút Chấm công khuôn mặt AI trong Sidebar Admin */}
-        <button
-          onClick={onOpenFaceModal}
-          className="nav-item text-emerald-800 bg-emerald-50/80 hover:bg-emerald-100/90 border border-emerald-200/80 font-medium mt-1"
-        >
-          <Scan size={18} className="text-emerald-700" />
-          <span>Chấm công khuôn mặt</span>
-        </button>
       </nav>
       <div className="sidebar-spacer" />
       <div className="sidebar-tip">
@@ -199,7 +188,6 @@ function Sidebar({ page, count, company, navigate, showHelp, onOpenFaceModal, on
 }
 export default function App() {
   const { user, loading, login, logout } = useAuth();
-  const [faceModalOpen, setFaceModalOpen] = useState(false);
   const { employees, save, reset } = useWorkspace();
   const [pageKey, setPageKey] = useState(() => {
     const hash = decodeURIComponent(window.location.hash.slice(1));
@@ -333,7 +321,6 @@ export default function App() {
             company={company}
             navigate={navigate}
             showHelp={() => setHelpOpen(true)}
-            onOpenFaceModal={() => setFaceModalOpen(true)}
             onLogout={logout}
             user={user}
           />
@@ -371,15 +358,6 @@ export default function App() {
                   <Command size={10} />K
                 </kbd>
               </button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setFaceModalOpen(true)}
-                className="h-8 text-[12px] gap-1.5 border-emerald-300 text-emerald-800 bg-emerald-50/70 hover:bg-emerald-100"
-              >
-                <Scan size={14} className="text-emerald-700" />
-                <span className="hidden sm:inline">Chấm công khuôn mặt</span>
-              </Button>
               <span className="topbar-divider" />
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -443,10 +421,6 @@ export default function App() {
                     {user?.full_name || "Quản trị viên"} · {user?.role === "ADMIN" ? "Quản trị viên" : "Nhân viên"}
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setFaceModalOpen(true)}>
-                    <Scan size={14} className="text-emerald-600" />
-                    Chấm công khuôn mặt
-                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate("settings")}>
                     <Settings2 size={14} />
                     Cài đặt không gian
@@ -547,10 +521,6 @@ export default function App() {
             showHelp={() => {
               setSidebarOpen(false);
               setHelpOpen(true);
-            }}
-            onOpenFaceModal={() => {
-              setSidebarOpen(false);
-              setFaceModalOpen(true);
             }}
             onLogout={logout}
             user={user}
@@ -716,11 +686,6 @@ export default function App() {
           </Button>
         </DialogContent>
       </Dialog>
-      <FaceAttendanceModal
-        open={faceModalOpen}
-        onOpenChange={setFaceModalOpen}
-        employees={employees}
-      />
       <Toaster
         theme="light"
         position="bottom-right"

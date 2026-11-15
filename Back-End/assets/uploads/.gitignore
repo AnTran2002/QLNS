@@ -2,4 +2,4 @@
 !.gitignore
 
 # Bỏ qua file cấu hình môi trường
-back-end/configs/env.php
+back-end/configs/.env.php
