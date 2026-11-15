@@ -9,7 +9,7 @@ class UserModel extends BaseModel
      */
     public function findByCodeOrEmail($identifier)
     {
-        $stmt = $this->pdo->prepare("SELECT * FROM {$this->table} WHERE employee_code = :id OR email = :id LIMIT 1");
+        $stmt = $this->db->prepare("SELECT * FROM {$this->table} WHERE employee_code = :id OR email = :id LIMIT 1");
         $stmt->execute(['id' => $identifier]);
         return $stmt->fetch();
     }
@@ -19,7 +19,7 @@ class UserModel extends BaseModel
      */
     public function findByEmail($email)
     {
-        $stmt = $this->pdo->prepare("SELECT * FROM {$this->table} WHERE email = :email LIMIT 1");
+        $stmt = $this->db->prepare("SELECT * FROM {$this->table} WHERE email = :email LIMIT 1");
         $stmt->execute(['email' => $email]);
         return $stmt->fetch();
     }
@@ -29,7 +29,7 @@ class UserModel extends BaseModel
      */
     public function findById($id)
     {
-        $stmt = $this->pdo->prepare("SELECT id, employee_code, full_name, email, role, created_at FROM {$this->table} WHERE id = :id LIMIT 1");
+        $stmt = $this->db->prepare("SELECT id, employee_code, full_name, email, role, created_at FROM {$this->table} WHERE id = :id LIMIT 1");
         $stmt->execute(['id' => $id]);
         return $stmt->fetch();
     }
@@ -39,7 +39,7 @@ class UserModel extends BaseModel
      */
     public function getAll()
     {
-        $stmt = $this->pdo->query("SELECT id, employee_code, full_name, email, role, created_at FROM {$this->table} ORDER BY id ASC");
+        $stmt = $this->db->query("SELECT id, employee_code, full_name, email, role, created_at FROM {$this->table} ORDER BY id ASC");
         return $stmt->fetchAll();
     }
 }

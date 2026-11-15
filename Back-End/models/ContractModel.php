@@ -9,9 +9,9 @@ class ContractModel extends BaseModel
      */
     public function findByUserId($userId)
     {
-        $stmt = $this->pdo->prepare("SELECT * FROM {$this->table} WHERE user_id = :user_id ORDER BY created_at DESC LIMIT 1");
+        $stmt = $this->db->prepare("SELECT * FROM {$this->table} WHERE user_id = :user_id ORDER BY created_at DESC LIMIT 1");
         $stmt->execute(['user_id' => $userId]);
-        return $stmt->fetch();
+        return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 }
 

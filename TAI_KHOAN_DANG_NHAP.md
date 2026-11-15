@@ -56,6 +56,12 @@ npm run dev
 Truy cập: `http://localhost:5173`
 
 ### Khởi động Backend (PHP MVC)
+Sau khi import `QLNS-Database.sql`, chạy một lần script dưới đây để thiết lập mật khẩu bcrypt `123456` cho các tài khoản mẫu:
+```bash
+php Back-End/database/seed_passwords.php
+```
+
+Sau đó khởi động backend:
 ```bash
 cd Back-End
 php -S localhost:8888
