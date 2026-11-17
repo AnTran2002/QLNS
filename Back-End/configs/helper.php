@@ -34,6 +34,7 @@ if (!function_exists('json_response')) {
         http_response_code($status);
         echo json_encode([
             'success' => $status >= 200 && $status < 300,
+            'status'  => ($status >= 200 && $status < 300) ? 'success' : 'error',
             'data'    => $data,
             'message' => $message,
         ], JSON_UNESCAPED_UNICODE);
