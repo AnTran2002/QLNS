@@ -144,7 +144,7 @@ export function LoginPage({ onLogin }) {
           <Button
             type="submit"
             disabled={loading}
-            className="h-10 text-[13px] rounded-lg mt-1 gap-2 w-full bg-[#242424] hover:bg-[#333] text-white shadow-none font-medium"
+            className="h-10 text-[13px] rounded-lg mt-1 gap-2 w-full bg-[#242424] hover:bg-[#333] text-white shadow-none font-medium cursor-pointer"
           >
             {loading ? (
               <>
@@ -159,6 +159,55 @@ export function LoginPage({ onLogin }) {
             )}
           </Button>
         </form>
+
+        {/* Chọn nhanh tài khoản demo để kiểm tra phân quyền RBAC */}
+        <div className="mt-5 pt-4 border-t border-[#f0f0f0]">
+          <div className="text-[11px] font-medium text-[#777] mb-2 flex items-center justify-between">
+            <span>Chọn nhanh tài khoản mẫu:</span>
+            <span className="text-[10px] text-[#999]">Mật khẩu: 123456</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setEmployeeCode("NV001");
+                setPassword("123456");
+                setError(null);
+              }}
+              className={`p-2 rounded-lg border text-left transition-all text-[11px] cursor-pointer ${
+                employeeCode === "NV001"
+                  ? "border-[#242424] bg-[#242424]/5 font-medium text-[#242424]"
+                  : "border-[#e5e5e5] hover:border-[#ccc] bg-[#fafafa] text-[#555]"
+              }`}
+            >
+              <div className="font-semibold flex items-center gap-1 text-blue-700">
+                <span>🛡️ NV001</span>
+                <span className="text-[9px] px-1 py-0.5 bg-blue-100 rounded text-blue-800 font-mono">ADMIN</span>
+              </div>
+              <div className="text-[10px] text-[#777] mt-0.5 truncate">Nguyễn Văn An</div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setEmployeeCode("NV002");
+                setPassword("123456");
+                setError(null);
+              }}
+              className={`p-2 rounded-lg border text-left transition-all text-[11px] cursor-pointer ${
+                employeeCode === "NV002"
+                  ? "border-[#242424] bg-[#242424]/5 font-medium text-[#242424]"
+                  : "border-[#e5e5e5] hover:border-[#ccc] bg-[#fafafa] text-[#555]"
+              }`}
+            >
+              <div className="font-semibold flex items-center gap-1 text-emerald-700">
+                <span>👤 NV002</span>
+                <span className="text-[9px] px-1 py-0.5 bg-emerald-100 rounded text-emerald-800 font-mono">EMPLOYEE</span>
+              </div>
+              <div className="text-[10px] text-[#777] mt-0.5 truncate">Trần Thị Bình</div>
+            </button>
+          </div>
+        </div>
 
         {/* Footer info */}
         <p className="text-[11px] text-center text-[#aaa] mt-7 leading-relaxed border-t border-[#f0f0f0] pt-4">

@@ -20,14 +20,15 @@ import {
 import { departments } from "@/data/workspace";
 
 /** Gợi ý mã kế tiếp dựa trên mã NVxxx lớn nhất hiện có. */
-function nextEmployeeCode(employees) {
+function nextEmployeeCode(employees = []) {
+  const list = Array.isArray(employees) ? employees : [];
   const max = Math.max(
     0,
-    ...employees.map((e) => Number(/^NV(\d+)$/i.exec(e.employee_code)?.[1] ?? 0)),
+    ...list.map((e) => Number(/^NV(\d+)$/i.exec(e.employee_code)?.[1] ?? 0)),
   );
   return `NV${String(max + 1).padStart(3, "0")}`;
 }
-export function EmployeeEditor({ employee, employees, mode, onClose, onSave }) {
+export function EmployeeEditor({ employee, employees = [], mode, onClose, onSave }) {
   const [value, setValue] = useState(
     () =>
       employee ?? {
