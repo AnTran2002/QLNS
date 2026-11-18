@@ -3,8 +3,7 @@ import { Fade } from "@/components/animate-ui/primitives/effects/fade";
 import { Slide } from "@/components/animate-ui/primitives/effects/slide";
 import { Blur } from "@/components/animate-ui/primitives/effects/blur";
 import { CountingNumber } from "@/components/animate-ui/primitives/texts/counting-number";
-import { SlidingNumber } from "@/components/animate-ui/primitives/texts/sliding-number";
-import { formatMoney, formatMoneyShort, formatNumber } from "@/lib/format";
+import { formatMoneyShort, formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /** Lò xo mềm kiểu Apple — dùng chung cho mọi hiệu ứng xuất hiện. */
@@ -58,45 +57,21 @@ export function Count({ value, className, suffix }) {
   );
 }
 
-/**
- * Số tiền với các chữ số lăn như đồng hồ cơ (Animate UI SlidingNumber).
- * Văn bản đầy đủ "25.000.000 ₫" luôn có trong DOM cho trợ năng và kiểm thử.
- */
+/** Số tiền tĩnh "25.000.000 ₫" — không hiệu ứng lăn số. */
 export function Money({ value, className, currencyClassName }) {
   const n = Math.round(Number(value) || 0);
   return (
     <span className={cn("tabular inline-flex items-baseline", className)}>
-      <span className="sr-only">{formatMoney(n)}</span>
-      <span aria-hidden="true" className="inline-flex items-baseline">
-        {n < 0 && "−"}
-        <SlidingNumber number={Math.abs(n)} fromNumber={0} thousandSeparator="." inView inViewOnce />
-        <span className={cn("ml-[0.18em] opacity-60", currencyClassName)}>₫</span>
-      </span>
+      {n < 0 && "−"}
+      {formatNumber(Math.abs(n))}
+      <span className={cn("ml-[0.18em] opacity-60", currencyClassName)}>₫</span>
     </span>
   );
 }
 
-/** "18,5 tr" — số rút gọn có hiệu ứng lăn. */
+/** "18,5 tr" — số rút gọn, hiển thị tĩnh. */
 export function MoneyShort({ value, className }) {
   const n = Number(value) || 0;
-  const abs = Math.abs(n);
-  const [scaled, unit] = abs >= 1e9 ? [n / 1e9, "tỷ"] : abs >= 1e6 ? [n / 1e6, "tr"] : [null, null];
-  if (scaled === null) return <Money value={n} className={className} />;
-  const rounded = Math.round(scaled * 10) / 10;
-  return (
-    <span className={cn("tabular inline-flex items-baseline", className)}>
-      <span className="sr-only">{formatMoneyShort(n)}</span>
-      <span aria-hidden="true" className="inline-flex items-baseline">
-        <SlidingNumber
-          number={rounded}
-          fromNumber={0}
-          decimalSeparator=","
-          decimalPlaces={Number.isInteger(rounded) ? 0 : 1}
-          inView
-          inViewOnce
-        />
-        <span className="ml-[0.2em] opacity-60">{unit}</span>
-      </span>
-    </span>
-  );
+  if (Math.abs(n) < 1e6) return <Money value={n} className={className} />;
+  return <span className={cn("tabular", className)}>{formatMoneyShort(n)}</span>;
 }
