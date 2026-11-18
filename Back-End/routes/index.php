@@ -83,6 +83,8 @@ match ($action) {
     'employees/delete'   => (new EmployeeController)->destroy(),
 
     // Bảng lương (ADMIN)
+    'payroll/periods'    => (new PayrollController)->periods(),
+    'payroll/items'      => (new PayrollController)->items(),
     'payroll/calculate'  => (new PayrollController)->calculateAndSave(),
 
     default              => json_response(404, null, 'Không tìm thấy API: ' . $action),

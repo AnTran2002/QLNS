@@ -4,6 +4,66 @@ require_once __DIR__ . '/../services/PayrollEngine.php';
 
 class PayrollController
 {
+    public function periods()
+    {
+        if (!require_method('GET') || !require_auth('ADMIN')) {
+            return;
+        }
+
+        $rows = (new PayrollModel())->getAllPeriods();
+        foreach ($rows as &$row) {
+            $row['id'] = (int) $row['id'];
+            $row['standard_days'] = (int) $row['standard_days'];
+            $row['items_count'] = (int) $row['items_count'];
+            $row['total_gross'] = (float) $row['total_gross'];
+            $row['total_net'] = (float) $row['total_net'];
+        }
+        unset($row);
+
+        json_response(200, $rows, 'Lấy danh sách kỳ lương thành công');
+    }
+
+    public function items()
+    {
+        if (!require_method('GET') || !require_auth('ADMIN')) {
+            return;
+        }
+
+        $periodId = filter_var($_GET['period_id'] ?? null, FILTER_VALIDATE_INT);
+        if ($periodId === false || $periodId < 1) {
+            json_response(400, null, 'Thiếu hoặc sai tham số period_id');
+            return;
+        }
+
+        $model = new PayrollModel();
+        if (!$model->getPeriodById($periodId)) {
+            json_response(404, null, 'Không tìm thấy kỳ lương');
+            return;
+        }
+
+        $rows = $model->getItemsByPeriod($periodId);
+        foreach ($rows as &$row) {
+            foreach ([
+                'id', 'period_id', 'user_id', 'standard_days',
+            ] as $field) {
+                if (isset($row[$field])) {
+                    $row[$field] = (int) $row[$field];
+                }
+            }
+            foreach ([
+                'actual_days', 'ot_hours', 'gross_salary', 'social_insurance',
+                'tax_deduction', 'personal_tax', 'net_salary',
+            ] as $field) {
+                if (isset($row[$field])) {
+                    $row[$field] = (float) $row[$field];
+                }
+            }
+        }
+        unset($row);
+
+        json_response(200, $rows, 'Lấy danh sách lương theo kỳ thành công');
+    }
+
     public function calculateAndSave()
     {
         header('Content-Type: application/json; charset=UTF-8');

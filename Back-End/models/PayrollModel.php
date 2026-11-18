@@ -4,6 +4,33 @@ require_once __DIR__ . '/BaseModel.php';
 class PayrollModel extends BaseModel {
     protected $table = 'payroll_items';
 
+    public function getAllPeriods()
+    {
+        $sql = "SELECT pp.id, pp.month_year, pp.standard_days, pp.status,
+                       COUNT(pi.id) AS items_count,
+                       COALESCE(SUM(pi.gross_salary), 0) AS total_gross,
+                       COALESCE(SUM(pi.net_salary), 0) AS total_net
+                FROM payroll_periods pp
+                LEFT JOIN payroll_items pi ON pi.period_id = pp.id
+                GROUP BY pp.id, pp.month_year, pp.standard_days, pp.status
+                ORDER BY pp.month_year DESC";
+        return $this->db->query($sql)->fetchAll();
+    }
+
+    public function getItemsByPeriod($periodId)
+    {
+        $sql = "SELECT pi.*, pp.month_year, pp.standard_days, pp.status AS period_status,
+                       u.full_name, u.employee_code
+                FROM payroll_items pi
+                INNER JOIN payroll_periods pp ON pi.period_id = pp.id
+                INNER JOIN users u ON pi.user_id = u.id
+                WHERE pi.period_id = :period_id
+                ORDER BY u.employee_code";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute(['period_id' => $periodId]);
+        return $stmt->fetchAll();
+    }
+
     // Lấy chi tiết bảng lương theo kỳ và nhân viên để trả về JSON cho React
     public function getByPeriodAndUser($periodId, $userId) {
         $sql = "SELECT pi.*, p.month_year, p.standard_days, u.full_name, u.employee_code 
