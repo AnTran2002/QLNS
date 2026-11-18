@@ -383,7 +383,7 @@ Thêm nhân viên trong phpMyAdmin:
 
 | Triệu chứng | Nguyên nhân và cách sửa |
 | --- | --- |
-| Giao diện báo *"Không thể kết nối máy chủ…"* | Backend chưa chạy hoặc sai cổng. Chạy `php -S localhost:8000 index.php`, kiểm tra `BACKEND_URL` |
+| Giao diện báo *"Không thể kết nối máy chủ…"* hoặc Vite báo `ECONNREFUSED` | Backend PHP chưa chạy hoặc không nghe trên cổng 8000. Chạy `php -S localhost:8000 index.php` trong thư mục `Back-End`, kiểm tra `BACKEND_URL=http://localhost:8000`, rồi khởi động lại Vite |
 | *"Phản hồi từ backend không đúng định dạng JSON"* | `BACKEND_URL` trỏ vào trang HTML (ví dụ trang chủ MAMP). Mở URL đó trong trình duyệt để xem |
 | `Lỗi cơ sở dữ liệu: SQLSTATE[HY000] [2002] Connection refused` | Sai `DB_HOST`/`DB_PORT` trong `env.php` hoặc MySQL chưa bật. MAMP dùng 8889, XAMPP dùng 3306 |
 | `SQLSTATE[HY000] [1049] Unknown database 'qlns'` | Chưa import `QLNS-Database.sql` (mục 2.1) |
