@@ -1,8 +1,8 @@
 import { Printer } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/animate-ui/components/buttons/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/animate-ui/components/radix/dialog";
 import { PayslipBreakdown, PayslipHeader } from "@/components/app/payslip";
-import { PeriodStatusBadge } from "@/components/app/shared";
+import { PeriodStatusBadge } from "@/components/app/kit";
 
 export function PayslipDialog({ item, user, onOpenChange }) {
   return (
@@ -15,13 +15,13 @@ export function PayslipDialog({ item, user, onOpenChange }) {
         {item && (
           <div className="grid gap-5">
             <PayslipHeader name={user?.full_name} code={user?.employee_code} department={user?.department} position={user?.position} monthYear={item.month_year} />
-            <div className="flex items-center justify-between text-[13px] text-muted-foreground">
+            <div className="flex items-center justify-between px-1 text-[13px] text-muted-foreground">
               <span>Trạng thái kỳ</span>
               <PeriodStatusBadge status={item.period_status} />
             </div>
             <PayslipBreakdown item={item} />
-            <DialogFooter className="print:hidden">
-              <Button variant="outline" onClick={() => window.print()}><Printer /> In phiếu lương</Button>
+            <DialogFooter className="no-print">
+              <Button variant="secondary" onClick={() => window.print()}><Printer /> In phiếu lương</Button>
             </DialogFooter>
           </div>
         )}

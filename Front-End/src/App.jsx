@@ -1,6 +1,7 @@
 import { lazy } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MotionConfig } from "motion/react";
 import {
   Building2,
   CalendarCheck,
@@ -12,13 +13,15 @@ import {
   UsersRound,
   Wallet,
 } from "lucide-react";
-import { Toaster } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { ShimmeringText } from "@/components/animate-ui/primitives/texts/shimmering";
 import { AppShell } from "@/components/app/app-shell";
 import { BrandMark } from "@/components/app/brand";
-import { ErrorState } from "@/components/app/shared";
+import { ErrorState } from "@/components/app/kit";
+import { Toaster } from "@/components/app/toaster";
 import { AuthProvider, homeFor, useAuth } from "@/hooks/use-auth";
+import { ThemeProvider } from "@/hooks/use-theme";
 import LoginPage from "@/pages/login";
+
 // Mỗi trang tách thành chunk riêng — admin không tải mã của cổng nhân viên và ngược lại.
 const AdminOverview = lazy(() => import("@/pages/admin/overview"));
 const EmployeesPage = lazy(() => import("@/pages/admin/employees"));
@@ -34,7 +37,7 @@ const EmployeeTeam = lazy(() => import("@/pages/employee/team"));
 const ADMIN_NAV = [
   {
     label: "Tổng quan",
-    items: [{ to: "/admin", label: "Bảng điều khiển", icon: LayoutDashboard, end: true }],
+    items: [{ to: "/admin", label: "Tổng quan", icon: LayoutDashboard, end: true }],
   },
   {
     label: "Nhân sự",
@@ -57,7 +60,7 @@ const EMPLOYEE_NAV = [
     label: "Cá nhân",
     items: [
       { to: "/nhan-vien", label: "Tổng quan", icon: LayoutDashboard, end: true },
-      { to: "/nhan-vien/ho-so", label: "Hồ sơ & hợp đồng", icon: UserRound },
+      { to: "/nhan-vien/ho-so", label: "Hồ sơ", icon: UserRound },
     ],
   },
   {
@@ -72,9 +75,14 @@ const EMPLOYEE_NAV = [
 
 function FullScreenLoader() {
   return (
-    <div className="flex min-h-svh flex-col items-center justify-center gap-4 bg-canvas" aria-busy="true">
-      <BrandMark className="size-10 animate-pulse" />
-      <p className="text-[14px] text-muted-foreground">Đang kiểm tra phiên đăng nhập…</p>
+    <div className="flex min-h-svh flex-col items-center justify-center gap-5" aria-busy="true">
+      <BrandMark className="size-12 animate-pulse" />
+      <ShimmeringText
+        text="Đang kiểm tra phiên đăng nhập…"
+        className="text-[14px]"
+        color="var(--color-muted-foreground)"
+        shimmeringColor="var(--color-foreground)"
+      />
     </div>
   );
 }
@@ -114,7 +122,7 @@ export function AppRoutes() {
       <Route path="/" element={<RootRedirect />} />
       <Route path="/login" element={<GuestOnly><LoginPage /></GuestOnly>} />
 
-      <Route path="/admin" element={<RequireRole role="ADMIN"><AppShell groups={ADMIN_NAV} subtitle="Trang quản trị" /></RequireRole>}>
+      <Route path="/admin" element={<RequireRole role="ADMIN"><AppShell groups={ADMIN_NAV} title="Quản trị" /></RequireRole>}>
         <Route index element={<AdminOverview />} />
         <Route path="nhan-vien" element={<EmployeesPage />} />
         <Route path="phong-ban" element={<DepartmentsPage />} />
@@ -122,7 +130,7 @@ export function AppRoutes() {
         <Route path="bang-luong" element={<PayrollPage />} />
       </Route>
 
-      <Route path="/nhan-vien" element={<RequireRole role="EMPLOYEE"><AppShell groups={EMPLOYEE_NAV} subtitle="Cổng nhân viên" /></RequireRole>}>
+      <Route path="/nhan-vien" element={<RequireRole role="EMPLOYEE"><AppShell groups={EMPLOYEE_NAV} title="Cổng nhân viên" /></RequireRole>}>
         <Route index element={<EmployeeOverview />} />
         <Route path="ho-so" element={<EmployeeProfile />} />
         <Route path="phieu-luong" element={<EmployeePayslips />} />
@@ -147,15 +155,18 @@ const queryClient = createQueryClient();
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <TooltipProvider delayDuration={300}>
-          <BrowserRouter>
-            <AppRoutes />
-          </BrowserRouter>
-          <Toaster position="top-right" />
-        </TooltipProvider>
-      </AuthProvider>
-    </QueryClientProvider>
+    <ThemeProvider>
+      <MotionConfig reducedMotion="user">
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            {/* useTransitions: điều hướng chạy trong startTransition → hiệu ứng chuyển trang (View Transitions) */}
+            <BrowserRouter useTransitions>
+              <AppRoutes />
+            </BrowserRouter>
+            <Toaster />
+          </AuthProvider>
+        </QueryClientProvider>
+      </MotionConfig>
+    </ThemeProvider>
   );
 }

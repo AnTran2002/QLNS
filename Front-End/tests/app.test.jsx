@@ -1,10 +1,11 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppRoutes, createQueryClient } from "@/App";
 import { AuthProvider } from "@/hooks/use-auth";
+import { ThemeProvider } from "@/hooks/use-theme";
 import { ApiError, api } from "@/lib/api";
 import { formatMoney, formatMoneyShort, formatPeriod, initials } from "@/lib/format";
 
@@ -29,13 +30,15 @@ const DASHBOARD = {
 
 function renderApp(path) {
   return render(
-    <QueryClientProvider client={createQueryClient()}>
-      <AuthProvider>
-        <MemoryRouter initialEntries={[path]}>
-          <AppRoutes />
-        </MemoryRouter>
-      </AuthProvider>
-    </QueryClientProvider>,
+    <ThemeProvider>
+      <QueryClientProvider client={createQueryClient()}>
+        <AuthProvider>
+          <MemoryRouter initialEntries={[path]}>
+            <AppRoutes />
+          </MemoryRouter>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ThemeProvider>,
   );
 }
 
@@ -72,16 +75,29 @@ describe("Phân quyền & đăng nhập", () => {
     await user.type(await screen.findByLabelText("Mã nhân viên hoặc email"), "NV001");
     await user.type(screen.getByLabelText("Mật khẩu"), "123456");
     await user.click(screen.getByRole("button", { name: /Đăng nhập/ }));
-    expect(await screen.findByText("Tổng quan quản trị")).toBeInTheDocument();
+    expect(await screen.findByText(/Tổng quan quản trị/)).toBeInTheDocument();
     expect(api.login).toHaveBeenCalledWith("NV001", "123456");
   });
 
   it("EMPLOYEE không vào được /admin, bị chuyển về cổng nhân viên", async () => {
     api.me.mockResolvedValue({ user: EMPLOYEE });
     renderApp("/admin/nhan-vien");
-    expect(await screen.findByText("Cổng nhân viên", { selector: "p" })).toBeInTheDocument();
+    expect((await screen.findAllByText("Cổng nhân viên")).length).toBeGreaterThan(0);
     expect(await screen.findByText("20.407.727 ₫")).toBeInTheDocument();
     expect(api.employees).not.toHaveBeenCalled();
+  });
+});
+
+describe("Giao diện", () => {
+  it("nút chuyển sáng/tối đổi class .dark trên <html>", async () => {
+    api.me.mockRejectedValue(new ApiError("Chưa đăng nhập", 401));
+    renderApp("/login");
+    const user = userEvent.setup();
+    const toggle = await screen.findByRole("button", { name: /Chuyển sang giao diện tối/ });
+    await user.click(toggle);
+    await waitFor(() => expect(document.documentElement).toHaveClass("dark"));
+    await user.click(await screen.findByRole("button", { name: /Chuyển sang giao diện sáng/ }));
+    await waitFor(() => expect(document.documentElement).not.toHaveClass("dark"));
   });
 });
 

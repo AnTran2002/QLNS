@@ -1,6 +1,6 @@
 # QLNS · PeopleOS
 
-Giao diện quản lý nhân sự tiếng Việt, dùng **React + JavaScript + Vite, Tailwind CSS v4, shadcn/ui và Recharts**. Phong cách trắng đen, chuyển động nhẹ, bố cục thích ứng desktop/tablet/mobile, font Be Vietnam Pro được đóng gói cục bộ.
+Giao diện quản lý nhân sự tiếng Việt, dùng **React + JavaScript + Vite, Tailwind CSS v4, shadcn/ui và [Animate UI](https://animate-ui.com/docs) (Motion)**. Phong cách Apple theo `Front-End/DESIGN.md` (`npx getdesign@latest add apple`): nền trắng/parchment, tile tối, một màu nhấn xanh, nút pill; có chế độ **sáng / tối** (nút trên header, hiệu ứng quét View Transition), chuyển trang mượt, số liệu lăn số, bố cục thích ứng desktop/tablet/mobile.
 
 ## Chạy dự án
 
@@ -24,17 +24,16 @@ Hướng dẫn đầy đủ (kết nối API, lấy dữ liệu từ phpMyAdmin,
 
 ```bash
 npm test       # Kiểm tra luồng giao diện (API được mock)
-npm run lint   # Kiểm tra React/JavaScript
 npm run build  # Build production vào dist/
 ```
 
 ## Chức năng hiện có
 
 - **Đăng nhập** bằng mã nhân viên hoặc email, phiên PHP (cookie `PHPSESSID`), phân quyền `ADMIN` / `EMPLOYEE`.
-- **ADMIN:** tổng quan, danh sách nhân viên (thêm/sửa/xóa ghi thẳng vào database), phòng ban, hợp đồng, dự toán bảng lương, báo cáo CSV, tìm nhanh `⌘K` / `Ctrl+K`.
+- **ADMIN:** tổng quan, danh sách nhân viên (thêm/sửa/xóa ghi thẳng vào database), phòng ban, hợp đồng, dự toán bảng lương, báo cáo CSV, tìm nhanh kiểu Spotlight `⌘K` / `Ctrl+K` (trang + nhân viên).
 - **EMPLOYEE:** cổng thông tin cá nhân: hồ sơ, đồng nghiệp cùng phòng, hợp đồng, lịch sử kỳ lương và phiếu lương.
 
-**Nguồn dữ liệu:** toàn bộ lấy từ database MySQL `qlns` qua API PHP (`Back-End/routes/index.php`). Frontend không lưu dữ liệu nhân sự trong trình duyệt; chỉ tên tổ chức (tuỳ chọn hiển thị) được nhớ trong `localStorage`.
+**Nguồn dữ liệu:** toàn bộ lấy từ database MySQL `qlns` qua API PHP (`Back-End/routes/index.php`). Frontend không lưu dữ liệu nhân sự trong trình duyệt; chỉ lựa chọn giao diện sáng/tối được nhớ trong `localStorage`.
 
 ## Cấu trúc backend
 

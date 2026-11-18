@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/animate-ui/components/buttons/button";
 import {
   Dialog,
   DialogContent,
@@ -10,13 +10,15 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@/components/animate-ui/components/radix/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FormError } from "@/components/app/kit";
 import { api } from "@/lib/api";
 import { DEPARTMENT_SUGGESTIONS, EMPLOYEE_STATUSES } from "@/lib/constants";
 import { formatMoney } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -45,10 +47,10 @@ function suggestCode(employees = []) {
 
 function Field({ label, htmlFor, hint, children, className }) {
   return (
-    <div className={className}>
-      <Label htmlFor={htmlFor} className="mb-2 text-[13px] text-ink">{label}</Label>
+    <div className={cn("space-y-2", className)}>
+      <Label htmlFor={htmlFor}>{label}</Label>
       {children}
-      {hint && <p className="mt-1.5 text-[12px] text-muted-foreground">{hint}</p>}
+      {hint && <p className="text-[12px] text-muted-foreground">{hint}</p>}
     </div>
   );
 }
@@ -108,11 +110,12 @@ function EmployeeForm({ employee, employees, onDone }) {
   };
 
   const departments = [...new Set([...employees.map((e) => e.department), ...DEPARTMENT_SUGGESTIONS])].filter(Boolean);
+  const money = (key) => (form[key] ? formatMoney(form[key]) : null);
 
   return (
     <form onSubmit={submit} noValidate className="grid gap-6">
       <section className="grid gap-4 sm:grid-cols-2">
-        <p className="caption-upper text-muted-foreground sm:col-span-2">Hồ sơ</p>
+        <p className="text-eyebrow sm:col-span-2">Hồ sơ</p>
         <Field label="Mã nhân viên" htmlFor="employee_code">
           <Input id="employee_code" value={form.employee_code} onChange={set("employee_code")} className="font-mono" maxLength={20} />
         </Field>
@@ -149,15 +152,15 @@ function EmployeeForm({ employee, employees, onDone }) {
         )}
       </section>
 
-      <section className="grid gap-4 rounded-lg bg-surface-soft p-4 sm:grid-cols-2">
-        <p className="caption-upper text-muted-foreground sm:col-span-2">Hợp đồng · bảng contracts</p>
-        <Field label="Lương cơ bản (₫)" htmlFor="base_salary" hint={form.base_salary ? formatMoney(form.base_salary) : null}>
+      <section className="grid gap-4 rounded-2xl bg-muted p-5 sm:grid-cols-2">
+        <p className="text-eyebrow sm:col-span-2">Hợp đồng</p>
+        <Field label="Lương cơ bản (₫)" htmlFor="base_salary" hint={money("base_salary")}>
           <Input id="base_salary" type="number" min="0" step="100000" inputMode="numeric" value={form.base_salary} onChange={set("base_salary")} className="tabular" />
         </Field>
-        <Field label="Lương đóng BHXH (₫)" htmlFor="insurance_salary" hint={form.insurance_salary ? formatMoney(form.insurance_salary) : null}>
+        <Field label="Lương đóng BHXH (₫)" htmlFor="insurance_salary" hint={money("insurance_salary")}>
           <Input id="insurance_salary" type="number" min="0" step="100000" inputMode="numeric" value={form.insurance_salary} onChange={set("insurance_salary")} className="tabular" />
         </Field>
-        <Field label="Phụ cấp cố định (₫)" htmlFor="allowance" hint={form.allowance ? formatMoney(form.allowance) : null}>
+        <Field label="Phụ cấp cố định (₫)" htmlFor="allowance" hint={money("allowance")}>
           <Input id="allowance" type="number" min="0" step="100000" inputMode="numeric" value={form.allowance} onChange={set("allowance")} className="tabular" />
         </Field>
         <Field label="Số người phụ thuộc" htmlFor="dependents_count">
@@ -165,10 +168,10 @@ function EmployeeForm({ employee, employees, onDone }) {
         </Field>
       </section>
 
-      {error && <p role="alert" className="rounded-md bg-destructive/8 px-3.5 py-2.5 text-[14px] text-destructive">{error}</p>}
+      <FormError message={error} />
 
-      <DialogFooter className="gap-2">
-        <Button type="button" variant="outline" onClick={onDone}>Huỷ</Button>
+      <DialogFooter>
+        <Button type="button" variant="secondary" onClick={onDone}>Huỷ</Button>
         <Button type="submit" disabled={mutation.isPending}>
           {mutation.isPending && <Loader2 className="animate-spin" />}
           {isEdit ? "Lưu thay đổi" : "Thêm nhân viên"}
@@ -186,8 +189,8 @@ export function EmployeeFormDialog({ open, onOpenChange, employee, employees = [
           <DialogTitle>{employee ? "Sửa hồ sơ nhân viên" : "Thêm nhân viên"}</DialogTitle>
           <DialogDescription>
             {employee
-              ? `Cập nhật ${employee.full_name} — thay đổi được ghi thẳng vào bảng users và contracts.`
-              : "Tạo tài khoản vai trò EMPLOYEE kèm hợp đồng đầu tiên."}
+              ? `Cập nhật ${employee.full_name} — thay đổi được ghi thẳng vào cơ sở dữ liệu.`
+              : "Tạo tài khoản vai trò nhân viên kèm hợp đồng đầu tiên."}
           </DialogDescription>
         </DialogHeader>
         {open && <EmployeeForm employee={employee} employees={employees} onDone={() => onOpenChange(false)} />}

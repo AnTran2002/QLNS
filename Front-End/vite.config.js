@@ -22,6 +22,21 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
+    build: {
+      rolldownOptions: {
+        output: {
+          // Tách thư viện ít thay đổi thành chunk riêng → trình duyệt cache lâu dài giữa các lần deploy.
+          codeSplitting: {
+            groups: [
+              { name: "react", test: /node_modules[\\/](react|react-dom|scheduler|react-router)[\\/]/ },
+              { name: "motion", test: /node_modules[\\/](motion|framer-motion|motion-dom|motion-utils)[\\/]/ },
+              { name: "radix", test: /node_modules[\\/](radix-ui|@radix-ui|@floating-ui)[\\/]/ },
+              { name: "data", test: /node_modules[\\/](@tanstack|axios)[\\/]/ },
+            ],
+          },
+        },
+      },
+    },
     test: {
       environment: "jsdom",
       setupFiles: ["./tests/setup.js"],

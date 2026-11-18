@@ -1,17 +1,21 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Calculator, Download, FileText, Loader2, Lock } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
+import { Calculator, Download, FileText, Loader2, Lock, Wallet } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/animate-ui/components/buttons/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/animate-ui/components/radix/dialog";
+import { Progress } from "@/components/animate-ui/components/radix/progress";
+import { AutoHeight } from "@/components/animate-ui/primitives/effects/auto-height";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { EmptyState, ErrorState, LoadingBlock, PageHeader, PeriodStatusBadge, PersonAvatar } from "@/components/app/shared";
+import { EmptyState, ErrorState, FormError, LoadingState, PageHeader, PeriodStatusBadge, PersonAvatar } from "@/components/app/kit";
+import { MoneyShort, Reveal, SPRING } from "@/components/app/motion";
 import { PayslipBreakdown, PayslipHeader } from "@/components/app/payslip";
 import { api } from "@/lib/api";
-import { formatMoney, formatMoneyShort, formatNumber, formatPeriod } from "@/lib/format";
+import { formatMoney, formatNumber, formatPeriod } from "@/lib/format";
 
 function CalculateForm({ employee, period, item, onClose }) {
   const queryClient = useQueryClient();
@@ -40,45 +44,72 @@ function CalculateForm({ employee, period, item, onClose }) {
     mutation.mutate();
   };
 
-  if (result) {
-    return (
-      <div className="grid gap-5">
-        <PayslipHeader name={employee.full_name} code={employee.employee_code} department={employee.department} position={employee.position} monthYear={period.month_year} />
-        <PayslipBreakdown item={{ ...result, standard_days: period.standard_days }} detail={result} />
-        <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={() => setResult(null)}>Tính lại</Button>
-          <Button onClick={onClose}>Xong</Button>
-        </DialogFooter>
-      </div>
-    );
-  }
-
   return (
-    <form onSubmit={submit} noValidate className="grid gap-5">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <Label htmlFor="actual_days" className="mb-2 text-[13px] text-ink">Ngày công thực tế</Label>
-          <Input id="actual_days" type="number" min="0" step="0.5" value={actualDays} onChange={(e) => setActualDays(e.target.value)} className="tabular" />
-          <p className="mt-1.5 text-[12px] text-muted-foreground">Công chuẩn kỳ này: {period.standard_days} ngày</p>
-        </div>
-        <div>
-          <Label htmlFor="ot_hours" className="mb-2 text-[13px] text-ink">Giờ làm thêm (OT)</Label>
-          <Input id="ot_hours" type="number" min="0" step="0.5" value={otHours} onChange={(e) => setOtHours(e.target.value)} className="tabular" />
-          <p className="mt-1.5 text-[12px] text-muted-foreground">Hệ số OT 1,5</p>
-        </div>
-      </div>
-      <div className="grid gap-1 rounded-lg bg-surface-card p-4 text-[13px] text-body">
-        <p>Lương cơ bản <span className="tabular font-medium text-ink">{formatMoney(employee.base_salary)}</span> · Phụ cấp <span className="tabular font-medium text-ink">{formatMoney(employee.allowance)}</span></p>
-        <p>Lương đóng BHXH <span className="tabular font-medium text-ink">{formatMoney(employee.insurance_salary)}</span> · Người phụ thuộc <span className="font-medium text-ink">{employee.dependents_count}</span></p>
-      </div>
-      {error && <p role="alert" className="rounded-md bg-destructive/8 px-3.5 py-2.5 text-[14px] text-destructive">{error}</p>}
-      <DialogFooter className="gap-2">
-        <Button type="button" variant="outline" onClick={onClose}>Huỷ</Button>
-        <Button type="submit" disabled={mutation.isPending}>
-          {mutation.isPending ? <Loader2 className="animate-spin" /> : <Calculator />} Tính & lưu
-        </Button>
-      </DialogFooter>
-    </form>
+    <AutoHeight deps={[result, error]} transition={{ type: "spring", stiffness: 260, damping: 30 }}>
+      <AnimatePresence mode="wait" initial={false}>
+        {result ? (
+          <motion.div
+            key="result"
+            initial={{ opacity: 0, scale: 0.98, filter: "blur(6px)" }}
+            animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+            exit={{ opacity: 0, scale: 0.98, filter: "blur(6px)" }}
+            transition={SPRING}
+            className="grid gap-5"
+          >
+            <PayslipHeader name={employee.full_name} code={employee.employee_code} department={employee.department} position={employee.position} monthYear={period.month_year} />
+            <PayslipBreakdown item={{ ...result, standard_days: period.standard_days }} detail={result} />
+            <DialogFooter>
+              <Button variant="secondary" onClick={() => setResult(null)}>Tính lại</Button>
+              <Button onClick={onClose}>Xong</Button>
+            </DialogFooter>
+          </motion.div>
+        ) : (
+          <motion.form
+            key="form"
+            onSubmit={submit}
+            noValidate
+            initial={{ opacity: 0, scale: 0.98, filter: "blur(6px)" }}
+            animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+            exit={{ opacity: 0, scale: 0.98, filter: "blur(6px)" }}
+            transition={SPRING}
+            className="grid gap-5"
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="actual_days">Ngày công thực tế</Label>
+                <Input id="actual_days" type="number" min="0" step="0.5" value={actualDays} onChange={(e) => setActualDays(e.target.value)} className="tabular" />
+                <p className="text-[12px] text-muted-foreground">Công chuẩn kỳ này: {period.standard_days} ngày</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ot_hours">Giờ làm thêm (OT)</Label>
+                <Input id="ot_hours" type="number" min="0" step="0.5" value={otHours} onChange={(e) => setOtHours(e.target.value)} className="tabular" />
+                <p className="text-[12px] text-muted-foreground">Hệ số OT 1,5</p>
+              </div>
+            </div>
+            <dl className="grid grid-cols-2 gap-4 rounded-2xl bg-muted p-4 text-[14px]">
+              {[
+                ["Lương cơ bản", formatMoney(employee.base_salary)],
+                ["Phụ cấp", formatMoney(employee.allowance)],
+                ["Lương đóng BHXH", formatMoney(employee.insurance_salary)],
+                ["Người phụ thuộc", employee.dependents_count],
+              ].map(([k, v]) => (
+                <div key={k}>
+                  <dt className="text-[12px] text-muted-foreground">{k}</dt>
+                  <dd className="tabular mt-0.5 font-medium text-foreground">{v}</dd>
+                </div>
+              ))}
+            </dl>
+            <FormError message={error} />
+            <DialogFooter>
+              <Button type="button" variant="secondary" onClick={onClose}>Huỷ</Button>
+              <Button type="submit" disabled={mutation.isPending}>
+                {mutation.isPending ? <Loader2 className="animate-spin" /> : <Calculator />} Tính & lưu
+              </Button>
+            </DialogFooter>
+          </motion.form>
+        )}
+      </AnimatePresence>
+    </AutoHeight>
   );
 }
 
@@ -109,7 +140,7 @@ export default function PayrollPage() {
   });
 
   const [target, setTarget] = useState(null); // { employee, item }
-  const [viewing, setViewing] = useState(null); // item
+  const [viewing, setViewing] = useState(null); // { item, employee }
 
   const rows = useMemo(() => {
     const items = itemsQuery.data ?? [];
@@ -128,26 +159,27 @@ export default function PayrollPage() {
     insurance: items.reduce((s, i) => s + i.social_insurance, 0),
     tax: items.reduce((s, i) => s + i.personal_tax, 0),
   };
+  const headcount = employeesQuery.data?.length ?? 0;
   const editable = period?.status === "DRAFT";
   const error = periodsQuery.error || employeesQuery.error || itemsQuery.error;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
       <PageHeader
-        eyebrow="Bảng lương"
-        title="Kỳ lương & tính lương"
-        description="Nhập ngày công và giờ OT, engine PayrollEngine tính Gross → Net theo biểu thuế 7 bậc và lưu vào payroll_items."
+        eyebrow="Tiền lương"
+        title="Bảng lương"
+        description="Nhập ngày công và giờ OT — hệ thống tính Gross → Net theo biểu thuế 7 bậc và lưu vào kỳ lương."
         actions={
           <>
             {periods.length > 0 && (
               <Select value={String(period?.id ?? "")} onValueChange={setSelectedId}>
-                <SelectTrigger className="w-48" aria-label="Chọn kỳ lương"><SelectValue /></SelectTrigger>
+                <SelectTrigger size="sm" className="w-44" aria-label="Chọn kỳ lương"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {periods.map((p) => <SelectItem key={p.id} value={String(p.id)}>{formatPeriod(p.month_year)}</SelectItem>)}
                 </SelectContent>
               </Select>
             )}
-            <Button variant="outline" disabled={!items.length} onClick={() => exportCsv(period, items)}>
+            <Button variant="outline" size="sm" disabled={!items.length} onClick={() => exportCsv(period, items)}>
               <Download /> Xuất CSV
             </Button>
           </>
@@ -157,113 +189,146 @@ export default function PayrollPage() {
       {error ? (
         <ErrorState error={error} onRetry={() => { periodsQuery.refetch(); employeesQuery.refetch(); itemsQuery.refetch(); }} />
       ) : periodsQuery.isPending || employeesQuery.isPending ? (
-        <LoadingBlock rows={4} />
+        <LoadingState rows={4} />
       ) : !period ? (
-        <EmptyState title="Chưa có kỳ lương" description="Thêm một dòng vào bảng payroll_periods (VD: 2026-12, DRAFT) để bắt đầu." />
+        <EmptyState icon={Wallet} title="Chưa có kỳ lương" description="Thêm một dòng vào bảng payroll_periods (VD: 2026-12, DRAFT) để bắt đầu." />
       ) : (
         <>
-          {/* Dải tóm tắt kỳ lương — dark surface */}
-          <section className="grid gap-6 rounded-xl bg-surface-dark p-6 text-on-dark md:grid-cols-[1.2fr_2fr] md:p-8">
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <p className="caption-upper text-primary">Kỳ lương</p>
-                <PeriodStatusBadge status={period.status} />
-              </div>
-              <p className="font-serif text-[40px] leading-none tracking-[-1px]">{formatPeriod(period.month_year)}</p>
-              <p className="text-[14px] text-on-dark-soft">
-                {period.standard_days} ngày công chuẩn · đã tính {items.length}/{employeesQuery.data?.length ?? 0} nhân viên
-              </p>
-              {!editable && (
-                <p className="flex items-center gap-2 text-[13px] text-on-dark-soft">
-                  <Lock className="size-3.5" /> Kỳ đã khoá — Back-End chỉ cho tính lương kỳ ở trạng thái DRAFT.
-                </p>
-              )}
-            </div>
-            <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-              {[
-                ["Tổng Gross", totals.gross],
-                ["BHXH trích", totals.insurance],
-                ["Thuế TNCN", totals.tax],
-                ["Tổng Net", totals.net],
-              ].map(([label, value]) => (
-                <div key={label} className="rounded-lg bg-surface-dark-elevated p-4">
-                  <dt className="text-[12px] text-on-dark-soft">{label}</dt>
-                  <dd className="tabular mt-2 font-serif text-[22px] leading-none tracking-[-0.3px]">{formatMoneyShort(value)}</dd>
+          <Reveal delay={80}>
+            <section className="tile grid gap-8 p-7 md:grid-cols-[1fr_1.6fr] md:p-10">
+              <div className="flex flex-col justify-between gap-6">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <p className="text-[14px] font-semibold text-tile-muted">Kỳ lương</p>
+                    <PeriodStatusBadge status={period.status} onTile />
+                  </div>
+                  <AnimatePresence mode="wait" initial={false}>
+                    <motion.p
+                      key={period.id}
+                      initial={{ opacity: 0, y: 12, filter: "blur(8px)" }}
+                      animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                      exit={{ opacity: 0, y: -12, filter: "blur(8px)" }}
+                      transition={SPRING}
+                      className="font-display text-[40px] leading-none font-semibold tracking-[-0.035em] md:text-[48px]"
+                    >
+                      {formatPeriod(period.month_year)}
+                    </motion.p>
+                  </AnimatePresence>
+                  <p className="text-[15px] text-tile-muted">
+                    {period.standard_days} ngày công chuẩn · đã tính {items.length}/{headcount} nhân viên
+                  </p>
                 </div>
-              ))}
-            </dl>
-          </section>
+                <div className="space-y-3">
+                  <Progress value={headcount ? Math.min(100, (items.length / headcount) * 100) : 0} className="h-1.5 bg-white/12" aria-label="Tiến độ tính lương" />
+                  {!editable && (
+                    <p className="flex items-center gap-2 text-[13px] text-tile-muted">
+                      <Lock className="size-3.5" /> Kỳ đã khoá — chỉ tính lương được ở kỳ Nháp.
+                    </p>
+                  )}
+                </div>
+              </div>
+              <dl className="grid grid-cols-2 gap-3">
+                {[
+                  ["Tổng Gross", totals.gross],
+                  ["BHXH trích", totals.insurance],
+                  ["Thuế TNCN", totals.tax],
+                  ["Tổng Net", totals.net],
+                ].map(([label, value], i) => (
+                  <motion.div
+                    key={label}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ ...SPRING, delay: 0.15 + i * 0.06 }}
+                    className={i === 3 ? "rounded-2xl bg-primary p-5 text-white" : "rounded-2xl bg-tile-elevated p-5"}
+                  >
+                    <dt className={i === 3 ? "text-[13px] text-white/80" : "text-[13px] text-tile-muted"}>{label}</dt>
+                    <dd className="mt-3 font-display text-[26px] leading-none font-semibold tracking-[-0.03em] md:text-[30px]">
+                      <MoneyShort key={`${period.id}-${label}`} value={value} />
+                    </dd>
+                  </motion.div>
+                ))}
+              </dl>
+            </section>
+          </Reveal>
 
           {itemsQuery.isPending ? (
-            <LoadingBlock rows={5} />
+            <LoadingState rows={5} />
           ) : (
-            <div className="overflow-hidden rounded-lg border border-hairline">
-              <Table>
-                <TableHeader className="bg-surface-soft">
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead>Nhân viên</TableHead>
-                    <TableHead className="text-right">Công / OT</TableHead>
-                    <TableHead className="hidden text-right md:table-cell">Gross</TableHead>
-                    <TableHead className="hidden text-right lg:table-cell">BHXH</TableHead>
-                    <TableHead className="hidden text-right lg:table-cell">Thuế TNCN</TableHead>
-                    <TableHead className="text-right">Net</TableHead>
-                    <TableHead className="w-28 text-right"><span className="sr-only">Thao tác</span></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map(({ employee, item }) => {
-                    const name = employee?.full_name ?? item?.full_name;
-                    const code = employee?.employee_code ?? item?.employee_code;
-                    return (
-                      <TableRow key={employee?.id ?? `item-${item.id}`}>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <PersonAvatar name={name} seed={code} size="sm" />
-                            <span className="grid">
-                              <span className="font-medium text-ink">{name}</span>
-                              <span className="text-[13px] text-muted-foreground">
-                                <span className="font-mono text-[12px]">{code}</span> · {employee?.department ?? item?.department}
+            <Reveal delay={160}>
+              <div className="card overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead>Nhân viên</TableHead>
+                      <TableHead className="text-right">Công / OT</TableHead>
+                      <TableHead className="hidden text-right md:table-cell">Gross</TableHead>
+                      <TableHead className="hidden text-right lg:table-cell">BHXH</TableHead>
+                      <TableHead className="hidden text-right lg:table-cell">Thuế TNCN</TableHead>
+                      <TableHead className="text-right">Net</TableHead>
+                      <TableHead className="w-32 text-right"><span className="sr-only">Thao tác</span></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {rows.map(({ employee, item }, i) => {
+                      const name = employee?.full_name ?? item?.full_name;
+                      const code = employee?.employee_code ?? item?.employee_code;
+                      return (
+                        <motion.tr
+                          key={`${period.id}-${employee?.id ?? `item-${item.id}`}`}
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ ...SPRING, delay: Math.min(i, 12) * 0.03 }}
+                          className="border-b border-border/60 transition-colors duration-200 hover:bg-muted/60"
+                        >
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <PersonAvatar name={name} seed={code} size="sm" />
+                              <span className="grid">
+                                <span className="text-[15px] font-medium text-foreground">{name}</span>
+                                <span className="text-[13px] text-muted-foreground">
+                                  <span className="font-mono text-[12px]">{code}</span> · {employee?.department ?? item?.department}
+                                </span>
                               </span>
-                            </span>
-                          </div>
-                        </TableCell>
-                        {item ? (
-                          <>
-                            <TableCell className="tabular text-right">{formatNumber(item.actual_days)} · {formatNumber(item.ot_hours)}h</TableCell>
-                            <TableCell className="tabular hidden text-right md:table-cell">{formatMoney(item.gross_salary)}</TableCell>
-                            <TableCell className="tabular hidden text-right lg:table-cell">{formatMoney(item.social_insurance)}</TableCell>
-                            <TableCell className="tabular hidden text-right lg:table-cell">{formatMoney(item.personal_tax)}</TableCell>
-                            <TableCell className="tabular text-right font-medium text-ink">{formatMoney(item.net_salary)}</TableCell>
-                          </>
-                        ) : (
-                          <TableCell colSpan={5} className="text-right text-[13px] text-muted-foreground">Chưa tính lương kỳ này</TableCell>
-                        )}
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
-                            {item && (
-                              <Button variant="ghost" size="icon-sm" aria-label={`Xem phiếu lương của ${name}`} onClick={() => setViewing({ item, employee })}>
-                                <FileText />
-                              </Button>
-                            )}
-                            {editable && employee && (
-                              <Button
-                                variant={item ? "ghost" : "secondary"}
-                                size="sm"
-                                disabled={!employee.contract_id}
-                                title={employee.contract_id ? undefined : "Nhân viên chưa có hợp đồng"}
-                                onClick={() => setTarget({ employee, item })}
-                              >
-                                <Calculator /> {item ? "Tính lại" : "Tính"}
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+                            </div>
+                          </TableCell>
+                          {item ? (
+                            <>
+                              <TableCell className="tabular text-right text-foreground/85">{formatNumber(item.actual_days)} · {formatNumber(item.ot_hours)}h</TableCell>
+                              <TableCell className="tabular hidden text-right text-foreground/85 md:table-cell">{formatMoney(item.gross_salary)}</TableCell>
+                              <TableCell className="tabular hidden text-right text-foreground/85 lg:table-cell">{formatMoney(item.social_insurance)}</TableCell>
+                              <TableCell className="tabular hidden text-right text-foreground/85 lg:table-cell">{formatMoney(item.personal_tax)}</TableCell>
+                              <TableCell className="tabular text-right font-semibold text-foreground">{formatMoney(item.net_salary)}</TableCell>
+                            </>
+                          ) : (
+                            <TableCell colSpan={5} className="text-right text-[13px] text-muted-foreground">Chưa tính lương kỳ này</TableCell>
+                          )}
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-1">
+                              {item && (
+                                <Button variant="ghost" size="icon-sm" aria-label={`Xem phiếu lương của ${name}`} onClick={() => setViewing({ item, employee })}>
+                                  <FileText />
+                                </Button>
+                              )}
+                              {editable && employee && (
+                                <Button
+                                  variant={item ? "ghost" : "secondary"}
+                                  size="sm"
+                                  disabled={!employee.contract_id}
+                                  title={employee.contract_id ? undefined : "Nhân viên chưa có hợp đồng"}
+                                  onClick={() => setTarget({ employee, item })}
+                                >
+                                  <Calculator /> {item ? "Tính lại" : "Tính"}
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </motion.tr>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </Reveal>
           )}
         </>
       )}

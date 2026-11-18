@@ -20,3 +20,14 @@ if (!window.matchMedia) {
 if (!globalThis.ResizeObserver) {
   globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
 }
+
+// jsdom không có IntersectionObserver (hiệu ứng xuất hiện khi cuộn của motion cần) → coi như luôn trong khung nhìn
+if (!globalThis.IntersectionObserver) {
+  globalThis.IntersectionObserver = class {
+    constructor(cb) { this.cb = cb; }
+    observe(el) { this.cb([{ isIntersecting: true, intersectionRatio: 1, target: el }], this); }
+    unobserve() {}
+    disconnect() {}
+    takeRecords() { return []; }
+  };
+}
