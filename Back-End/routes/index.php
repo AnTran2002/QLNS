@@ -85,6 +85,8 @@ match ($action) {
     // Bảng lương (ADMIN)
     'payroll/periods'    => (new PayrollController)->periods(),
     'payroll/items'      => (new PayrollController)->items(),
+    'payroll/attendance' => (new PayrollController)->attendance(),
+    'payroll/import'     => (new PayrollController)->importAttendance(),
     'payroll/calculate'  => (new PayrollController)->calculateAndSave(),
 
     default              => json_response(404, null, 'Không tìm thấy API: ' . $action),

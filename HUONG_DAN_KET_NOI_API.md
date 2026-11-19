@@ -57,6 +57,8 @@ Migration thêm:
 
 > Chỉ chạy migration **một lần**. Chạy lần hai sẽ báo lỗi `Duplicate column name`, lỗi này vô hại.
 
+Đối với UC-02, chạy thêm migration `Back-End/database/migrations/002_payroll_period_unique_month.sql` một lần để bảo đảm mỗi tháng chỉ có một kỳ lương. Nếu database đã có nhiều kỳ cùng `month_year`, cần xử lý dữ liệu trùng trước khi chạy migration này.
+
 ### 2.3. Đặt mật khẩu cho tài khoản mẫu
 
 Mật khẩu lưu dạng bcrypt. Sau khi import, chạy một lần:
@@ -168,7 +170,13 @@ Tất cả gọi tới `index.php?action=<tên>`. Các API có dấu 🔒 cần 
 | `employees/create` | POST | 🔒 ADMIN | Xem ví dụ bên dưới | Nhân viên vừa tạo (HTTP 201). Mật khẩu mặc định `123456` |
 | `employees/update` | PUT | 🔒 ADMIN | `?id=2` + body như create | Nhân viên sau khi sửa |
 | `employees/delete` | DELETE | 🔒 ADMIN | `?id=2` | `null` (không cho tự xoá chính mình) |
+| `payroll/periods` | POST | 🔒 ADMIN | `{ "month_year": "2026-12", "standard_days": 22 }` | Kỳ lương mới ở trạng thái `DRAFT` |
+| `payroll/attendance` | GET | 🔒 ADMIN | `?period_id=2` | Kỳ lương và danh sách nhân viên đầy đủ cùng ngày công/OT hiện tại |
+| `payroll/attendance` | PUT/POST | 🔒 ADMIN | `{ "period_id": 2, "entries": [{ "user_id": 2, "actual_days": 22, "ot_hours": 4 }] }` | Lưu lô ngày công/OT và tính lại lương trong cùng transaction |
+| `payroll/import` | POST | 🔒 ADMIN | `multipart/form-data`: `period_id`, `file` (.xlsx) | Kiểm tra toàn file rồi nhập nguyên tử, không lưu dở một phần |
 | `payroll/calculate` | POST | 🔒 ADMIN | `{ user_id, period_id, actual_days, ot_hours }` | Kết quả tính lương (kỳ phải ở trạng thái `DRAFT`) |
+
+File Excel UC-02 cần có worksheet đầu tiên với hàng tiêu đề `employee_code`, `actual_days`, `ot_hours` (hoặc `Mã nhân viên`, `Ngày công`, `Giờ OT`). Mỗi mã nhân viên chỉ xuất hiện một lần; file tối đa 10 MB và 10.000 dòng. Backend yêu cầu bật PHP extension `zip` để đọc `.xlsx`; cấu hình PHP cần cho phép `upload_max_filesize=10M` và `post_max_size` lớn hơn 10 MB. Nhập Excel và chỉnh sửa grid đều chỉ ghi vào kỳ `DRAFT`, từ chối nhân viên không tồn tại/không có hợp đồng và rollback toàn bộ nếu có lỗi.
 
 Mỗi bản ghi nhân viên (`employees`, `employees/show`, `employees/create`, `employees/update`):
 

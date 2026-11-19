@@ -1,13 +1,24 @@
 <?php
 
 require_once __DIR__ . '/../services/PayrollEngine.php';
+require_once __DIR__ . '/../services/AttendanceService.php';
+require_once __DIR__ . '/../services/XlsxAttendanceReader.php';
 
 class PayrollController
 {
     public function periods()
     {
-        if (!require_method('GET') || !require_auth('ADMIN')) {
+        $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+        if (!in_array($method, ['GET', 'POST'], true)) {
+            header('Allow: GET, POST');
+            return json_response(405, null, 'Phương thức không được hỗ trợ');
+        }
+        if (!require_auth('ADMIN')) {
             return;
+        }
+
+        if ($method === 'POST') {
+            return $this->createPeriod();
         }
 
         $rows = (new PayrollModel())->getAllPeriods();
@@ -21,6 +32,162 @@ class PayrollController
         unset($row);
 
         json_response(200, $rows, 'Lấy danh sách kỳ lương thành công');
+    }
+
+    public function attendance()
+    {
+        $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+        if (!in_array($method, ['GET', 'POST', 'PUT'], true)) {
+            header('Allow: GET, POST, PUT');
+            return json_response(405, null, 'Phương thức không được hỗ trợ');
+        }
+        if (!require_auth('ADMIN')) {
+            return;
+        }
+
+        if ($method !== 'GET') {
+            return $this->saveAttendance();
+        }
+
+        $periodId = filter_var($_GET['period_id'] ?? null, FILTER_VALIDATE_INT, [
+            'options' => ['min_range' => 1],
+        ]);
+        if ($periodId === false) {
+            return json_response(400, null, 'Thiếu hoặc sai tham số period_id');
+        }
+
+        $model = new PayrollModel();
+        $period = $model->getPeriodById($periodId);
+        if (!$period) {
+            return json_response(404, null, 'Không tìm thấy kỳ lương');
+        }
+
+        json_response(200, [
+            'period' => $period,
+            'items' => array_map([$this, 'formatAttendanceRow'], $model->getAttendanceRows($periodId)),
+        ], 'Lấy dữ liệu ngày công và OT thành công');
+    }
+
+    public function importAttendance()
+    {
+        if (!require_method('POST') || !require_auth('ADMIN')) {
+            return;
+        }
+
+        $periodId = filter_var($_POST['period_id'] ?? null, FILTER_VALIDATE_INT, [
+            'options' => ['min_range' => 1],
+        ]);
+        if ($periodId === false) {
+            return json_response(400, null, 'Thiếu hoặc sai tham số period_id');
+        }
+
+        if (!isset($_FILES['file']) || !is_array($_FILES['file'])) {
+            return json_response(422, null, 'Thiếu file Excel trong trường multipart "file"');
+        }
+
+        $file = $_FILES['file'];
+        $uploadError = $file['error'] ?? UPLOAD_ERR_NO_FILE;
+        if ($uploadError !== UPLOAD_ERR_OK) {
+            $status = in_array($uploadError, [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true) ? 413 : 422;
+            return json_response($status, null, 'Upload file Excel không thành công');
+        }
+        if (!isset($file['tmp_name'], $file['name'], $file['size'])
+            || !is_string($file['tmp_name'])
+            || !is_string($file['name'])
+            || (int) $file['size'] < 4
+            || (int) $file['size'] > 10485760
+            || strtolower(pathinfo($file['name'], PATHINFO_EXTENSION)) !== 'xlsx'
+            || !is_uploaded_file($file['tmp_name'])
+        ) {
+            return json_response(422, null, 'File phải là .xlsx hợp lệ và không vượt quá 10 MB');
+        }
+        if (file_get_contents($file['tmp_name'], false, null, 0, 4) !== "PK\x03\x04") {
+            return json_response(422, null, 'Nội dung file không phải Excel .xlsx hợp lệ');
+        }
+
+        try {
+            $records = (new XlsxAttendanceReader())->read($file['tmp_name']);
+        } catch (UnexpectedValueException $e) {
+            return json_response(422, null, $e->getMessage());
+        } catch (RuntimeException $e) {
+            error_log($e->getMessage());
+            return json_response(500, null, $e->getMessage());
+        }
+
+        $employeeCodes = [];
+        $rowNumbersByCode = [];
+        $inputErrors = [];
+        foreach ($records as $record) {
+            $code = trim($record['employee_code']);
+            $normalizedCode = strtoupper($code);
+            if ($code === '') {
+                $inputErrors[] = [
+                    'row_number' => $record['row_number'],
+                    'message' => 'Thiếu mã nhân viên',
+                ];
+                continue;
+            }
+            if (isset($rowNumbersByCode[$normalizedCode])) {
+                $inputErrors[] = [
+                    'row_number' => $record['row_number'],
+                    'message' => 'Mã nhân viên bị lặp trong file',
+                ];
+                continue;
+            }
+            $rowNumbersByCode[$normalizedCode] = $record['row_number'];
+            $employeeCodes[] = $code;
+
+            foreach (['actual_days', 'ot_hours'] as $field) {
+                if ($record[$field] === '' || !is_numeric($record[$field]) || !is_finite((float) $record[$field])) {
+                    $inputErrors[] = [
+                        'row_number' => $record['row_number'],
+                        'message' => "{$field} phải là số hợp lệ",
+                    ];
+                    continue;
+                }
+                if ((float) $record[$field] < 0) {
+                    $inputErrors[] = [
+                        'row_number' => $record['row_number'],
+                        'message' => "{$field} không được âm",
+                    ];
+                }
+            }
+        }
+
+        if ($inputErrors !== []) {
+            return json_response(422, ['errors' => $inputErrors], 'File Excel có dữ liệu không hợp lệ');
+        }
+
+        $model = new PayrollModel();
+        $usersByCode = [];
+        foreach ($model->getUsersByEmployeeCodes($employeeCodes) as $code => $userId) {
+            $usersByCode[strtoupper($code)] = $userId;
+        }
+
+        $entries = [];
+        $unknownCodes = [];
+        $rowNumbersByUserId = [];
+        foreach ($records as $record) {
+            $normalizedCode = strtoupper($record['employee_code']);
+            if (!isset($usersByCode[$normalizedCode])) {
+                $unknownCodes[] = [
+                    'row_number' => $record['row_number'],
+                    'employee_code' => $record['employee_code'],
+                ];
+                continue;
+            }
+            $entries[] = [
+                'user_id' => $usersByCode[$normalizedCode],
+                'actual_days' => $record['actual_days'],
+                'ot_hours' => $record['ot_hours'],
+            ];
+            $rowNumbersByUserId[$usersByCode[$normalizedCode]] = $record['row_number'];
+        }
+        if ($unknownCodes !== []) {
+            return json_response(422, ['unknown_employees' => $unknownCodes], 'File Excel có mã nhân viên không tồn tại');
+        }
+
+        return $this->saveAttendanceEntries($periodId, $entries, true, $rowNumbersByUserId);
     }
 
     public function items()
@@ -68,7 +235,7 @@ class PayrollController
     {
         header('Content-Type: application/json; charset=UTF-8');
 
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
             header('Allow: POST');
             return $this->respond(405, null, 'Phương thức không được hỗ trợ');
         }
@@ -81,14 +248,18 @@ class PayrollController
             return $this->respond(403, null, 'Không có quyền thực hiện');
         }
 
-        $input = json_decode(file_get_contents('php://input'), true);
-        if (json_last_error() !== JSON_ERROR_NONE || !is_array($input)) {
+        $input = read_json_body();
+        if ($input === null) {
             return $this->respond(400, null, 'Dữ liệu JSON không hợp lệ');
         }
 
-        $userId = filter_var($input['user_id'] ?? null, FILTER_VALIDATE_INT);
-        $periodId = filter_var($input['period_id'] ?? null, FILTER_VALIDATE_INT);
-        if ($userId === false || $userId < 1 || $periodId === false || $periodId < 1) {
+        $userId = filter_var($input['user_id'] ?? null, FILTER_VALIDATE_INT, [
+            'options' => ['min_range' => 1],
+        ]);
+        $periodId = filter_var($input['period_id'] ?? null, FILTER_VALIDATE_INT, [
+            'options' => ['min_range' => 1],
+        ]);
+        if ($userId === false || $periodId === false) {
             return $this->respond(400, null, 'user_id và period_id phải là số nguyên dương');
         }
 
@@ -102,55 +273,19 @@ class PayrollController
         }
 
         try {
-            $contractModel = new ContractModel();
-            $payrollModel = new PayrollModel();
-
-            $contract = $contractModel->findByUserId($userId);
-            if (!$contract) {
-                return $this->respond(404, null, 'Không tìm thấy hợp đồng của nhân viên');
-            }
-
-            $period = $payrollModel->getPeriodById($periodId);
-            if (!$period) {
-                return $this->respond(404, null, 'Không tìm thấy kỳ lương');
-            }
-            if ($period['status'] !== 'DRAFT') {
-                return $this->respond(409, null, 'Chỉ được tính và lưu lương cho kỳ đang ở trạng thái DRAFT');
-            }
-
-            $standardDays = (float) $period['standard_days'];
-            if ($standardDays <= 0) {
-                return $this->respond(422, null, 'Kỳ lương có số ngày công chuẩn không hợp lệ');
-            }
-
-            $actualDays = (float) $input['actual_days'];
-            $otHours = (float) $input['ot_hours'];
-            $calculation = PayrollEngine::calculateNetSalary(
-                (float) $contract['base_salary'],
-                (float) $contract['allowance'],
-                $actualDays,
-                $standardDays,
-                $otHours,
-                1.5,
-                (int) $contract['dependents_count'],
-                (float) $contract['insurance_salary']
-            );
-
-            $payrollModel->saveOrUpdate($periodId, $userId, [
-                'actual_days' => $actualDays,
-                'ot_hours' => $otHours,
-                'gross_salary' => $calculation['gross_salary'],
-                'social_insurance' => $calculation['social_insurance'],
-                'tax_deduction' => $calculation['tax_deduction'],
-                'personal_tax' => $calculation['personal_tax'],
-                'net_salary' => $calculation['net_salary'],
-            ]);
+            $result = (new AttendanceService())->save($periodId, [[
+                'user_id' => $userId,
+                'actual_days' => $input['actual_days'],
+                'ot_hours' => $input['ot_hours'],
+            ]]);
 
             return $this->respond(200, [
                 'user_id' => $userId,
-                'period' => $period,
-                'calculation' => $calculation,
+                'period' => $result['period'],
+                'calculation' => $result['calculations'][$userId],
             ], 'Đã tính và lưu bảng lương');
+        } catch (AttendanceException $e) {
+            return $this->respond($e->statusCode, $e->details ?: null, $e->getMessage());
         } catch (PDOException $e) {
             error_log($e->getMessage());
             return $this->respond(500, null, 'Không thể xử lý bảng lương do lỗi cơ sở dữ liệu');
@@ -165,5 +300,105 @@ class PayrollController
             'data' => $data,
             'message' => $message,
         ]);
+    }
+
+    private function createPeriod()
+    {
+        $input = read_json_body();
+        if ($input === null) {
+            return json_response(400, null, 'Dữ liệu JSON không hợp lệ');
+        }
+
+        $monthYear = trim((string) ($input['month_year'] ?? ''));
+        if (preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $monthYear) !== 1) {
+            return json_response(422, null, 'month_year phải có định dạng YYYY-MM');
+        }
+
+        $standardDays = filter_var($input['standard_days'] ?? null, FILTER_VALIDATE_INT, [
+            'options' => ['min_range' => 1, 'max_range' => 31],
+        ]);
+        if ($standardDays === false) {
+            return json_response(422, null, 'standard_days phải là số nguyên từ 1 đến 31');
+        }
+
+        try {
+            $model = new PayrollModel();
+            $periodId = $model->createPeriod($monthYear, $standardDays);
+            json_response(201, $model->getPeriodById($periodId), 'Đã tạo kỳ lương mới');
+        } catch (PDOException $e) {
+            if ($e->getCode() === '23000') {
+                return json_response(409, null, 'Kỳ lương tháng này đã tồn tại');
+            }
+            throw $e;
+        }
+    }
+
+    private function saveAttendance()
+    {
+        $input = read_json_body();
+        if ($input === null) {
+            return json_response(400, null, 'Dữ liệu JSON không hợp lệ');
+        }
+
+        $periodId = filter_var($input['period_id'] ?? null, FILTER_VALIDATE_INT, [
+            'options' => ['min_range' => 1],
+        ]);
+        if ($periodId === false) {
+            return json_response(400, null, 'Thiếu hoặc sai tham số period_id');
+        }
+        if (!isset($input['entries']) || !is_array($input['entries'])) {
+            return json_response(422, null, 'entries phải là danh sách ngày công');
+        }
+
+        $this->saveAttendanceEntries($periodId, $input['entries']);
+    }
+
+    private function saveAttendanceEntries(
+        int $periodId,
+        array $entries,
+        bool $isImport = false,
+        array $rowNumbersByUserId = []
+    ) {
+        try {
+            $result = (new AttendanceService())->save($periodId, $entries);
+            $result['items'] = array_map([$this, 'formatAttendanceRow'], $result['items']);
+            if ($isImport) {
+                $result['imported_count'] = $result['updated_count'];
+            }
+            json_response(200, $result, $isImport ? 'Đã nhập ngày công và OT từ Excel' : 'Đã lưu ngày công và OT');
+        } catch (AttendanceException $e) {
+            $details = $e->details;
+            if ($isImport && isset($details['user_ids'])) {
+                $details['row_numbers'] = array_values(array_filter(array_map(
+                    static function (int $userId) use ($rowNumbersByUserId): ?int {
+                        return $rowNumbersByUserId[$userId] ?? null;
+                    },
+                    $details['user_ids']
+                )));
+            }
+            if ($isImport && isset($details['entry_index'])) {
+                $userId = $entries[$details['entry_index']]['user_id'] ?? null;
+                if ($userId !== null && isset($rowNumbersByUserId[$userId])) {
+                    $details['row_number'] = $rowNumbersByUserId[$userId];
+                }
+            }
+            json_response($e->statusCode, $details ?: null, $e->getMessage());
+        }
+    }
+
+    private function formatAttendanceRow(array $row): array
+    {
+        foreach (['user_id', 'payroll_item_id', 'dependents_count'] as $field) {
+            if (isset($row[$field])) {
+                $row[$field] = (int) $row[$field];
+            }
+        }
+        foreach ([
+            'base_salary', 'insurance_salary', 'allowance', 'actual_days', 'ot_hours',
+            'gross_salary', 'social_insurance', 'tax_deduction', 'personal_tax', 'net_salary',
+        ] as $field) {
+            $row[$field] = $row[$field] === null ? null : (float) $row[$field];
+        }
+        return $row;
     }
 }
