@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../services/PayrollEngine.php';
 require_once __DIR__ . '/../services/AttendanceService.php';
 require_once __DIR__ . '/../services/XlsxAttendanceReader.php';
+require_once __DIR__ . '/../services/PayrollRunService.php';
 
 class PayrollController
 {
@@ -231,6 +232,36 @@ class PayrollController
         json_response(200, $rows, 'Lấy danh sách lương theo kỳ thành công');
     }
 
+    public function run()
+    {
+        if (!require_method('POST') || !require_auth('ADMIN')) {
+            return;
+        }
+
+        $input = read_json_body();
+        if ($input === null) {
+            return json_response(400, null, 'Dữ liệu JSON không hợp lệ');
+        }
+
+        $periodId = filter_var($input['period_id'] ?? null, FILTER_VALIDATE_INT, [
+            'options' => ['min_range' => 1],
+        ]);
+        if ($periodId === false) {
+            return json_response(400, null, 'period_id phải là số nguyên dương');
+        }
+
+        try {
+            $result = (new PayrollRunService())->run($periodId);
+            $result['items'] = array_map([$this, 'formatPayrollItem'], $result['items']);
+            json_response(200, $result, 'Đã chạy và lưu bảng lương cho toàn kỳ');
+        } catch (PayrollRunException $e) {
+            json_response($e->statusCode, $e->details ?: null, $e->getMessage());
+        } catch (PDOException $e) {
+            error_log($e->getMessage());
+            json_response(500, null, 'Không thể chạy bảng lương do lỗi cơ sở dữ liệu');
+        }
+    }
+
     public function calculateAndSave()
     {
         header('Content-Type: application/json; charset=UTF-8');
@@ -400,5 +431,23 @@ class PayrollController
             $row[$field] = $row[$field] === null ? null : (float) $row[$field];
         }
         return $row;
+    }
+
+    private function formatPayrollItem(array $item): array
+    {
+        foreach (['id', 'period_id', 'user_id', 'standard_days'] as $field) {
+            if (isset($item[$field])) {
+                $item[$field] = (int) $item[$field];
+            }
+        }
+        foreach ([
+            'actual_days', 'ot_hours', 'gross_salary', 'social_insurance',
+            'tax_deduction', 'personal_tax', 'net_salary',
+        ] as $field) {
+            if (isset($item[$field])) {
+                $item[$field] = (float) $item[$field];
+            }
+        }
+        return $item;
     }
 }

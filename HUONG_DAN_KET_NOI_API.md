@@ -174,9 +174,12 @@ Tất cả gọi tới `index.php?action=<tên>`. Các API có dấu 🔒 cần 
 | `payroll/attendance` | GET | 🔒 ADMIN | `?period_id=2` | Kỳ lương và danh sách nhân viên đầy đủ cùng ngày công/OT hiện tại |
 | `payroll/attendance` | PUT/POST | 🔒 ADMIN | `{ "period_id": 2, "entries": [{ "user_id": 2, "actual_days": 22, "ot_hours": 4 }] }` | Lưu lô ngày công/OT và tính lại lương trong cùng transaction |
 | `payroll/import` | POST | 🔒 ADMIN | `multipart/form-data`: `period_id`, `file` (.xlsx) | Kiểm tra toàn file rồi nhập nguyên tử, không lưu dở một phần |
+| `payroll/run` | POST | 🔒 ADMIN | `{ "period_id": 2 }` | Tính lại và lưu Gross, BHXH 10.5%, TNCN 7 bậc và Net cho toàn kỳ |
 | `payroll/calculate` | POST | 🔒 ADMIN | `{ user_id, period_id, actual_days, ot_hours }` | Kết quả tính lương (kỳ phải ở trạng thái `DRAFT`) |
 
 File Excel UC-02 cần có worksheet đầu tiên với hàng tiêu đề `employee_code`, `actual_days`, `ot_hours` (hoặc `Mã nhân viên`, `Ngày công`, `Giờ OT`). Mỗi mã nhân viên chỉ xuất hiện một lần; file tối đa 10 MB và 10.000 dòng. Backend yêu cầu bật PHP extension `zip` để đọc `.xlsx`; cấu hình PHP cần cho phép `upload_max_filesize=10M` và `post_max_size` lớn hơn 10 MB. Nhập Excel và chỉnh sửa grid đều chỉ ghi vào kỳ `DRAFT`, từ chối nhân viên không tồn tại/không có hợp đồng và rollback toàn bộ nếu có lỗi.
+
+UC-03 chỉ chạy trên kỳ `DRAFT`, yêu cầu mọi nhân viên đều có dòng công/OT và hợp đồng. Hệ thống tính lại toàn bộ kỳ trong một transaction; thiếu dữ liệu, công/OT ngoài giới hạn hoặc lỗi database sẽ không lưu kết quả dở dang. API trả `calculated_count`, tổng Gross/BHXH/TNCN/Net và các dòng lương đã tính. Engine dùng công thức prorate theo ngày công, OT hệ số 1.5, bảo hiểm 10.5% trên lương đóng bảo hiểm và biểu thuế lũy tiến 7 bậc hiện có trong `PayrollEngine`.
 
 Mỗi bản ghi nhân viên (`employees`, `employees/show`, `employees/create`, `employees/update`):
 

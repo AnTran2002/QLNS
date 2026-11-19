@@ -88,6 +88,7 @@ match ($action) {
     'payroll/attendance' => (new PayrollController)->attendance(),
     'payroll/import'     => (new PayrollController)->importAttendance(),
     'payroll/calculate'  => (new PayrollController)->calculateAndSave(),
+    'payroll/run'        => (new PayrollController)->run(),
 
     default              => json_response(404, null, 'Không tìm thấy API: ' . $action),
 };

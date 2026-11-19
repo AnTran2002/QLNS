@@ -161,6 +161,31 @@ class PayrollModel extends BaseModel {
         ]);
     }
 
+    public function updateCalculation(int $periodId, int $userId, array $calculation): void
+    {
+        $stmt = $this->db->prepare(
+            "UPDATE payroll_items
+             SET gross_salary = :gross_salary,
+                 social_insurance = :social_insurance,
+                 tax_deduction = :tax_deduction,
+                 personal_tax = :personal_tax,
+                 net_salary = :net_salary
+             WHERE period_id = :period_id AND user_id = :user_id"
+        );
+        $stmt->execute([
+            'period_id' => $periodId,
+            'user_id' => $userId,
+            'gross_salary' => $calculation['gross_salary'],
+            'social_insurance' => $calculation['social_insurance'],
+            'tax_deduction' => $calculation['tax_deduction'],
+            'personal_tax' => $calculation['personal_tax'],
+            'net_salary' => $calculation['net_salary'],
+        ]);
+        if ($stmt->rowCount() === 0 && !$this->getByPeriodAndUser($periodId, $userId)) {
+            throw new RuntimeException('Không tìm thấy dữ liệu công để cập nhật kết quả lương');
+        }
+    }
+
     public function getPeriodById($periodId)
     {
         $stmt = $this->db->prepare(
