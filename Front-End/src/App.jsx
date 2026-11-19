@@ -5,6 +5,7 @@ import { MotionConfig } from "motion/react";
 import {
   Building2,
   CalendarCheck,
+  ClipboardList,
   FileSignature,
   FileText,
   LayoutDashboard,
@@ -14,6 +15,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { ShimmeringText } from "@/components/animate-ui/primitives/texts/shimmering";
+import { AdminShell } from "@/components/admin/admin-shell";
 import { AppShell } from "@/components/app/app-shell";
 import { BrandMark } from "@/components/app/brand";
 import { ErrorState } from "@/components/app/kit";
@@ -28,6 +30,7 @@ const EmployeesPage = lazy(() => import("@/pages/admin/employees"));
 const DepartmentsPage = lazy(() => import("@/pages/admin/departments"));
 const ContractsPage = lazy(() => import("@/pages/admin/contracts"));
 const PayrollPage = lazy(() => import("@/pages/admin/payroll"));
+const AttendancePage = lazy(() => import("@/pages/admin/attendance"));
 const EmployeeOverview = lazy(() => import("@/pages/employee/overview"));
 const EmployeeProfile = lazy(() => import("@/pages/employee/profile"));
 const EmployeePayslips = lazy(() => import("@/pages/employee/payslips"));
@@ -49,6 +52,7 @@ const ADMIN_NAV = [
   {
     label: "Tiền lương",
     items: [
+      { to: "/admin/cham-cong", label: "Chấm công & OT", icon: ClipboardList, badge: "UC-02" },
       { to: "/admin/hop-dong", label: "Hợp đồng", icon: FileSignature },
       { to: "/admin/bang-luong", label: "Bảng lương", icon: Wallet },
     ],
@@ -122,10 +126,11 @@ export function AppRoutes() {
       <Route path="/" element={<RootRedirect />} />
       <Route path="/login" element={<GuestOnly><LoginPage /></GuestOnly>} />
 
-      <Route path="/admin" element={<RequireRole role="ADMIN"><AppShell groups={ADMIN_NAV} title="Quản trị" /></RequireRole>}>
+      <Route path="/admin" element={<RequireRole role="ADMIN"><AdminShell groups={ADMIN_NAV} title="Quản trị" /></RequireRole>}>
         <Route index element={<AdminOverview />} />
         <Route path="nhan-vien" element={<EmployeesPage />} />
         <Route path="phong-ban" element={<DepartmentsPage />} />
+        <Route path="cham-cong" element={<AttendancePage />} />
         <Route path="hop-dong" element={<ContractsPage />} />
         <Route path="bang-luong" element={<PayrollPage />} />
       </Route>

@@ -1,223 +1,551 @@
 import { useMemo } from "react";
+import { Link, useNavigate } from "react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router";
-import { motion } from "motion/react";
-import { ArrowRight, Briefcase, Calculator, ChevronRight, Clock, Plus, UserCheck, Users } from "lucide-react";
+import { Bar, BarChart, CartesianGrid, Cell, LabelList, Pie, PieChart, XAxis, YAxis } from "recharts";
+import {
+  ArrowRight,
+  ArrowUpRight,
+  CalendarClock,
+  ClipboardList,
+  Clock,
+  FileSignature,
+  Landmark,
+  Users,
+  Wallet,
+} from "lucide-react";
 import { Button } from "@/components/animate-ui/components/buttons/button";
-import { Progress } from "@/components/animate-ui/components/radix/progress";
-import { AvatarGroup, AvatarGroupTooltip } from "@/components/animate-ui/components/animate/avatar-group";
-import { EmployeeStatusBadge, ErrorState, LoadingState, PeriodStatusBadge, PersonAvatar, SectionTitle, StatTile } from "@/components/app/kit";
-import { BlurIn, Count, Money, MoneyShort, Reveal, RevealGroup, SPRING } from "@/components/app/motion";
-import { useAuth } from "@/hooks/use-auth";
+import { KpiCard, TrendBadge } from "@/components/admin/kpi-card";
+import { ErrorState, LoadingState, PeriodStatusBadge, PersonAvatar } from "@/components/app/kit";
+import { Reveal } from "@/components/app/motion";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
+import { Meter } from "@/components/ui/meter";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { api } from "@/lib/api";
-import { formatDate, formatPeriod, givenName, greeting } from "@/lib/format";
+import { EMPLOYEE_STATUSES } from "@/lib/constants";
+import { formatMoney, formatMoneyShort, formatNumber, formatPeriod } from "@/lib/format";
 import { groupByDepartment } from "@/lib/hr";
 
-const today = new Intl.DateTimeFormat("vi-VN", { weekday: "long", day: "numeric", month: "long" });
+const todayLabel = new Intl.DateTimeFormat("vi-VN", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
+/* Màu theo thực thể — cố định thứ tự, đã kiểm tra tương phản & mù màu cho cả nền sáng/tối. */
+const PERIOD_CHART = {
+  gross: { label: "Tổng thu nhập (Gross)", color: "var(--chart-1)" },
+  net: { label: "Thực nhận (Net)", color: "var(--chart-3)" },
+};
+const STATUS_COLORS = {
+  "Đang làm việc": "var(--chart-1)",
+  "Thử việc": "var(--chart-2)",
+  "Nghỉ phép": "var(--chart-3)",
+};
+const STATUS_CHART = Object.fromEntries(EMPLOYEE_STATUSES.map((s) => [s, { label: s, color: STATUS_COLORS[s] }]));
+const DEPT_CHART = { payroll: { label: "Quỹ lương / tháng", color: "var(--chart-1)" } };
+const STRUCTURE = [
+  { key: "net", label: "Thực nhận", color: "var(--chart-1)" },
+  { key: "insurance", label: "BHXH · BHYT · BHTN", color: "var(--chart-2)" },
+  { key: "tax", label: "Thuế TNCN", color: "var(--chart-3)" },
+];
+
+const pctChange = (now, before) => (before > 0 ? ((now - before) / before) * 100 : null);
+const sum = (rows, key) => rows.reduce((s, r) => s + (Number(r[key]) || 0), 0);
+
+/* ------------------------------------------------------------------ */
+
+function PeriodChart({ periods }) {
+  const data = useMemo(
+    () =>
+      [...periods]
+        .filter((p) => p.items_count > 0)
+        .reverse()
+        .slice(-8)
+        .map((p) => ({ label: formatPeriod(p.month_year).replace("Tháng ", "T"), gross: p.total_gross, net: p.total_net })),
+    [periods],
+  );
+
+  return (
+    <Card className="h-full gap-4">
+      <CardHeader>
+        <CardTitle>Quỹ lương theo kỳ</CardTitle>
+        <CardDescription>Tổng Gross và Net đã chốt của từng kỳ lương (payroll_items)</CardDescription>
+      </CardHeader>
+      <CardContent className="px-3 sm:px-6">
+        {data.length === 0 ? (
+          <p className="flex h-[240px] items-center justify-center text-[13px] text-muted-foreground">
+            Chưa có kỳ lương nào được tính.
+          </p>
+        ) : (
+          <ChartContainer config={PERIOD_CHART} className="aspect-auto h-[260px] w-full">
+            <BarChart data={data} margin={{ left: 4, right: 4, top: 8 }} barGap={2}>
+              <CartesianGrid vertical={false} strokeDasharray="0" />
+              <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
+              <YAxis tickLine={false} axisLine={false} width={56} tickFormatter={(v) => formatMoneyShort(v)} />
+              <ChartTooltip cursor={{ radius: 6 }} content={<ChartTooltipContent valueFormatter={formatMoney} />} />
+              <ChartLegend content={<ChartLegendContent />} />
+              <Bar dataKey="gross" fill="var(--color-gross)" radius={[4, 4, 0, 0]} maxBarSize={36} />
+              <Bar dataKey="net" fill="var(--color-net)" radius={[4, 4, 0, 0]} maxBarSize={36} />
+            </BarChart>
+          </ChartContainer>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function StatusDonut({ employees }) {
+  const data = EMPLOYEE_STATUSES.map((s) => ({
+    status: s,
+    value: employees.filter((e) => e.status === s).length,
+    fill: STATUS_COLORS[s],
+  }));
+  const total = employees.length;
+
+  return (
+    <Card className="h-full gap-4">
+      <CardHeader>
+        <CardTitle>Trạng thái nhân sự</CardTitle>
+        <CardDescription>Theo cột users.status</CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-1 flex-col justify-center gap-5">
+        <div className="relative mx-auto aspect-square w-full max-w-[200px]">
+          <ChartContainer config={STATUS_CHART} className="aspect-square h-full w-full">
+            <PieChart>
+              <ChartTooltip content={<ChartTooltipContent hideLabel nameKey="status" valueFormatter={(v) => `${v} người`} />} />
+              <Pie
+                data={data}
+                dataKey="value"
+                nameKey="status"
+                innerRadius="68%"
+                outerRadius="100%"
+                paddingAngle={2}
+                cornerRadius={4}
+                stroke="var(--card)"
+                strokeWidth={2}
+              >
+                {data.map((d) => (
+                  <Cell key={d.status} fill={d.fill} />
+                ))}
+              </Pie>
+            </PieChart>
+          </ChartContainer>
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+            <span className="font-display text-[30px] leading-none font-semibold tracking-[-0.03em] tabular-nums">{total}</span>
+            <span className="mt-1 text-[12px] text-muted-foreground">nhân sự</span>
+          </div>
+        </div>
+        <ul className="grid gap-2 text-[13px]">
+          {data.map((d) => (
+            <li key={d.status} className="flex items-center gap-2">
+              <span className="size-2.5 shrink-0 rounded-[3px]" style={{ background: d.fill }} aria-hidden="true" />
+              <span className="flex-1 text-muted-foreground">{d.status}</span>
+              <span className="font-medium tabular-nums">{d.value}</span>
+              <span className="w-10 text-right text-muted-foreground tabular-nums">
+                {total ? Math.round((d.value / total) * 100) : 0}%
+              </span>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  );
+}
+
+function DepartmentChart({ employees }) {
+  const data = useMemo(
+    () =>
+      groupByDepartment(employees)
+        .map((d) => ({ name: d.name, payroll: d.payroll, members: d.members.length }))
+        .sort((a, b) => b.payroll - a.payroll),
+    [employees],
+  );
+
+  return (
+    <Card className="h-full gap-4">
+      <CardHeader>
+        <CardTitle>Quỹ lương theo phòng ban</CardTitle>
+        <CardDescription>Lương cơ bản + phụ cấp theo hợp đồng hiện hành</CardDescription>
+      </CardHeader>
+      <CardContent className="px-3 sm:px-6">
+        {data.length === 0 ? (
+          <p className="py-10 text-center text-[13px] text-muted-foreground">Chưa có nhân viên.</p>
+        ) : (
+          <ChartContainer config={DEPT_CHART} className="aspect-auto w-full" style={{ height: Math.max(140, data.length * 46 + 16) }}>
+            <BarChart data={data} layout="vertical" margin={{ left: 0, right: 56 }} barCategoryGap={10}>
+              <XAxis type="number" hide />
+              <YAxis
+                type="category"
+                dataKey="name"
+                tickLine={false}
+                axisLine={false}
+                width={96}
+                tick={{ fontSize: 12 }}
+              />
+              <ChartTooltip
+                cursor={false}
+                content={
+                  <ChartTooltipContent
+                    formatter={(value, _name, item) => (
+                      <div className="grid w-full gap-0.5">
+                        <div className="flex justify-between gap-4">
+                          <span className="text-muted-foreground">Quỹ lương</span>
+                          <span className="font-mono font-medium tabular-nums">{formatMoney(value)}</span>
+                        </div>
+                        <div className="flex justify-between gap-4">
+                          <span className="text-muted-foreground">Nhân sự</span>
+                          <span className="font-mono font-medium tabular-nums">{item.payload.members}</span>
+                        </div>
+                      </div>
+                    )}
+                  />
+                }
+              />
+              <Bar dataKey="payroll" fill="var(--color-payroll)" radius={4} maxBarSize={26}>
+                <LabelList
+                  dataKey="payroll"
+                  position="right"
+                  offset={8}
+                  className="fill-foreground"
+                  fontSize={12}
+                  formatter={(v) => formatMoneyShort(v)}
+                />
+              </Bar>
+            </BarChart>
+          </ChartContainer>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Cơ cấu Gross của kỳ gần nhất: Net / Bảo hiểm / Thuế — thanh xếp chồng tĩnh. */
+function PayoutStructure({ period, items }) {
+  const entered = items.filter((i) => i.payroll_item_id);
+  const gross = sum(entered, "gross_salary");
+  const values = {
+    net: sum(entered, "net_salary"),
+    insurance: sum(entered, "social_insurance"),
+    tax: sum(entered, "personal_tax"),
+  };
+
+  return (
+    <Card className="h-full gap-4">
+      <CardHeader>
+        <CardTitle>Cơ cấu chi trả</CardTitle>
+        <CardDescription>{period ? `${formatPeriod(period.month_year)} · ${entered.length} phiếu lương` : "Chưa có kỳ đã tính"}</CardDescription>
+        {period && (
+          <CardAction>
+            <PeriodStatusBadge status={period.status} />
+          </CardAction>
+        )}
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <div>
+          <p className="text-[12px] text-muted-foreground">Tổng Gross</p>
+          <p className="font-display text-[24px] font-semibold tracking-[-0.02em] tabular-nums">{formatMoney(gross)}</p>
+        </div>
+        <div className="flex h-3 w-full gap-[2px] overflow-hidden rounded-full bg-muted" aria-hidden="true">
+          {gross > 0 &&
+            STRUCTURE.map((s) => (
+              <div
+                key={s.key}
+                className="h-full first:rounded-l-full last:rounded-r-full"
+                style={{ width: `${(values[s.key] / gross) * 100}%`, background: s.color }}
+              />
+            ))}
+        </div>
+        <ul className="grid gap-2.5 text-[13px]">
+          {STRUCTURE.map((s) => (
+            <li key={s.key} className="flex items-center gap-2">
+              <span className="size-2.5 shrink-0 rounded-[3px]" style={{ background: s.color }} aria-hidden="true" />
+              <span className="flex-1 text-muted-foreground">{s.label}</span>
+              <span className="font-medium tabular-nums">{formatMoneyShort(values[s.key])}</span>
+              <span className="w-11 text-right text-muted-foreground tabular-nums">
+                {gross > 0 ? `${((values[s.key] / gross) * 100).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%` : "—"}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  );
+}
+
+function TopOvertime({ period, items }) {
+  const top = [...items]
+    .filter((i) => i.payroll_item_id && i.ot_hours > 0)
+    .sort((a, b) => b.ot_hours - a.ot_hours)
+    .slice(0, 5);
+  const max = Math.max(1, ...top.map((t) => t.ot_hours));
+
+  return (
+    <Card className="h-full gap-4">
+      <CardHeader>
+        <CardTitle>Giờ OT nhiều nhất</CardTitle>
+        <CardDescription>{period ? formatPeriod(period.month_year) : "—"}</CardDescription>
+        <CardAction>
+          <Clock className="size-4 text-muted-foreground" />
+        </CardAction>
+      </CardHeader>
+      <CardContent>
+        {top.length === 0 ? (
+          <p className="py-6 text-center text-[13px] text-muted-foreground">Không có giờ OT trong kỳ.</p>
+        ) : (
+          <ul className="grid gap-4">
+            {top.map((t) => (
+              <li key={t.user_id} className="flex items-center gap-3">
+                <PersonAvatar name={t.full_name} seed={t.employee_code} size="xs" />
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <div className="flex items-baseline justify-between gap-2 text-[13px]">
+                    <span className="truncate font-medium">{t.full_name}</span>
+                    <span className="shrink-0 tabular-nums text-muted-foreground">{formatNumber(t.ot_hours)} giờ</span>
+                  </div>
+                  <Meter value={(t.ot_hours / max) * 100} className="h-1.5" label={`${t.full_name}: ${t.ot_hours} giờ OT`} />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function PeriodsTable({ periods, headcount }) {
+  const navigate = useNavigate();
+  return (
+    <Card className="h-full gap-2 pb-2">
+      <CardHeader>
+        <CardTitle>Kỳ lương</CardTitle>
+        <CardDescription>Bảng payroll_periods · bấm một kỳ để mở lưới chấm công</CardDescription>
+        <CardAction>
+          <Button variant="ghost" size="sm" asChild>
+            <Link to="/admin/bang-luong">
+              Bảng lương <ArrowUpRight />
+            </Link>
+          </Button>
+        </CardAction>
+      </CardHeader>
+      <CardContent className="px-2 sm:px-3">
+        {periods.length === 0 ? (
+          <p className="py-10 text-center text-[13px] text-muted-foreground">Chưa có kỳ lương nào.</p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>Kỳ</TableHead>
+                <TableHead>Trạng thái</TableHead>
+                <TableHead className="text-right">Công chuẩn</TableHead>
+                <TableHead className="text-right">Đã nhập</TableHead>
+                <TableHead className="text-right">Gross</TableHead>
+                <TableHead className="text-right">Net</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {periods.slice(0, 6).map((p) => (
+                <TableRow
+                  key={p.id}
+                  className="cursor-pointer"
+                  onClick={() => navigate(`/admin/cham-cong?ky=${p.id}`)}
+                >
+                  <TableCell className="font-medium">{formatPeriod(p.month_year)}</TableCell>
+                  <TableCell>
+                    <PeriodStatusBadge status={p.status} />
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">{p.standard_days} ngày</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {p.items_count}
+                    <span className="text-muted-foreground">/{headcount}</span>
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">{formatMoneyShort(p.total_gross)}</TableCell>
+                  <TableCell className="text-right font-medium tabular-nums">{formatMoneyShort(p.total_net)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 
 export default function AdminOverview() {
-  const { user } = useAuth();
   const employeesQuery = useQuery({ queryKey: ["employees"], queryFn: api.employees });
   const periodsQuery = useQuery({ queryKey: ["payroll", "periods"], queryFn: api.payrollPeriods });
   const employees = useMemo(() => employeesQuery.data ?? [], [employeesQuery.data]);
-  const periods = periodsQuery.data ?? [];
-  const current = periods[0];
-  const lastPaid = periods.find((p) => p.status === "PAID");
+  const periods = useMemo(() => periodsQuery.data ?? [], [periodsQuery.data]);
+
+  // Kỳ đang mở (DRAFT) để theo dõi tiến độ nhập công; kỳ gần nhất đã có dữ liệu để thống kê chi trả.
+  const openPeriod = periods.find((p) => p.status === "DRAFT") ?? periods[0];
+  const withItems = periods.filter((p) => p.items_count > 0);
+  const latest = withItems[0];
+  const previous = withItems[1];
+
+  const latestQuery = useQuery({
+    queryKey: ["payroll", "attendance", latest?.id],
+    queryFn: () => api.payrollAttendance(latest.id),
+    enabled: Boolean(latest),
+  });
+  const latestItems = latestQuery.data?.items ?? [];
 
   const stats = useMemo(() => {
-    const count = (s) => employees.filter((e) => e.status === s).length;
+    const withContract = employees.filter((e) => e.contract_id || e.base_salary > 0);
     return {
       total: employees.length,
-      active: count("Đang làm việc"),
-      probation: count("Thử việc"),
-      leave: count("Nghỉ phép"),
-      fund: employees.reduce((s, e) => s + e.base_salary + e.allowance, 0),
+      active: employees.filter((e) => e.status === "Đang làm việc").length,
+      probation: employees.filter((e) => e.status === "Thử việc").length,
+      contracts: withContract.length,
+      fund: employees.reduce((s, e) => s + (e.base_salary || 0) + (e.allowance || 0), 0),
+      insurance: employees.reduce((s, e) => s + (e.insurance_salary || 0), 0),
     };
   }, [employees]);
-  const departments = useMemo(() => groupByDepartment(employees), [employees]);
-  const recent = useMemo(
-    () => [...employees].sort((a, b) => String(b.joined_at).localeCompare(String(a.joined_at))).slice(0, 5),
-    [employees],
-  );
-  const maxDept = Math.max(1, ...departments.map((d) => d.members.length));
-  const progress = current && stats.total ? Math.min(100, (current.items_count / stats.total) * 100) : 0;
+
+  if (employeesQuery.isLoading || periodsQuery.isLoading) return <LoadingState rows={4} />;
+  if (employeesQuery.error || periodsQuery.error) {
+    return (
+      <ErrorState
+        error={employeesQuery.error || periodsQuery.error}
+        onRetry={() => {
+          employeesQuery.refetch();
+          periodsQuery.refetch();
+        }}
+      />
+    );
+  }
+
+  const openEntered = openPeriod?.items_count ?? 0;
+  const openProgress = stats.total ? Math.min(100, (openEntered / stats.total) * 100) : 0;
+  const netTrend = latest && previous ? pctChange(latest.total_net, previous.total_net) : null;
+  const missingContracts = stats.total - stats.contracts;
 
   return (
-    <div className="space-y-12 md:space-y-16">
-      {/* Hero */}
-      <section className="flex flex-col gap-8 md:flex-row md:items-end md:justify-between">
-        <div className="space-y-4">
-          <Reveal offset={10}>
-            <p className="text-eyebrow">Tổng quan quản trị · <span className="normal-case tracking-normal">{today.format(new Date())}</span></p>
-          </Reveal>
-          <BlurIn delay={60}>
-            <h1 className="text-hero">
-              {greeting()}, {givenName(user?.full_name)}.
-            </h1>
-          </BlurIn>
-          <Reveal delay={160} offset={12}>
-            <p className="text-lead max-w-xl">Tình hình nhân sự, hợp đồng và kỳ lương — đọc trực tiếp từ cơ sở dữ liệu.</p>
-          </Reveal>
-        </div>
-        <Reveal delay={240} offset={12}>
+    <div className="space-y-6">
+      {/* Tiêu đề */}
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <Reveal offset={8}>
+          <div className="space-y-1">
+            <p className="text-[13px] text-muted-foreground first-letter:uppercase">{todayLabel.format(new Date())}</p>
+            <h1 className="font-display text-[26px] font-semibold tracking-[-0.025em] md:text-[30px]">Tổng quan quản trị</h1>
+            <p className="text-[14px] text-muted-foreground">Nhân sự, hợp đồng và tiền lương — số liệu đọc trực tiếp từ CSDL qlns.</p>
+          </div>
+        </Reveal>
+        <Reveal delay={80} offset={8}>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" asChild>
-              <Link to="/admin/bang-luong"><Calculator /> Tính lương</Link>
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/admin/nhan-vien">
+                <Users /> Nhân viên
+              </Link>
             </Button>
-            <Button asChild>
-              <Link to="/admin/nhan-vien?moi=1"><Plus /> Thêm nhân viên</Link>
+            <Button size="sm" asChild>
+              <Link to="/admin/cham-cong">
+                <ClipboardList /> Nhập công & OT
+              </Link>
             </Button>
           </div>
         </Reveal>
-      </section>
+      </header>
 
-      {/* Chỉ số */}
-      {employeesQuery.error ? (
-        <ErrorState error={employeesQuery.error} onRetry={employeesQuery.refetch} />
-      ) : employeesQuery.isPending ? (
-        <LoadingState rows={4} />
-      ) : (
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
-          <RevealGroup step={70} itemClassName="h-full">
-            <StatTile label="Tổng nhân sự" value={<Count value={stats.total} />} icon={Users} hint={`${departments.length} phòng ban`} />
-            <StatTile label="Đang làm việc" value={<Count value={stats.active} />} icon={UserCheck} hint={`${stats.leave} đang nghỉ phép`} />
-            <StatTile label="Thử việc" value={<Count value={stats.probation} />} icon={Clock} hint="Cần đánh giá chuyển chính thức" />
-            <StatTile label="Quỹ lương hợp đồng" value={<MoneyShort value={stats.fund} />} icon={Briefcase} hint="Lương cơ bản + phụ cấp / tháng" />
-          </RevealGroup>
-        </div>
-      )}
-
-      {/* Bento: kỳ lương (tile tối) + phòng ban */}
-      <div className="grid gap-3 lg:grid-cols-[1.35fr_1fr] lg:gap-4">
-        <Reveal className="h-full">
-          <section className="tile flex h-full flex-col justify-between gap-10 p-7 md:p-10">
-            {periodsQuery.error ? (
-              <p className="text-tile-muted">{periodsQuery.error.message}</p>
-            ) : !current ? (
-              <p className="text-tile-muted">{periodsQuery.isPending ? "Đang tải kỳ lương…" : "Chưa có kỳ lương nào."}</p>
-            ) : (
-              <>
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <p className="text-[14px] font-semibold text-tile-muted">Kỳ lương hiện tại</p>
-                    <PeriodStatusBadge status={current.status} onTile />
-                  </div>
-                  <p className="font-display text-[44px] leading-none font-semibold tracking-[-0.035em] md:text-[56px]">{formatPeriod(current.month_year)}</p>
-                  <p className="text-[15px] text-tile-muted">
-                    {current.standard_days} ngày công chuẩn · đã tính {current.items_count}/{stats.total} nhân viên
-                  </p>
-                </div>
-                <div className="space-y-6">
-                  <Progress value={progress} className="h-1.5 bg-white/12" aria-label="Tiến độ tính lương" />
-                  <div className="flex flex-wrap items-end justify-between gap-6">
-                    {lastPaid ? (
-                      <div>
-                        <p className="text-[13px] text-tile-muted">Đã chi {formatPeriod(lastPaid.month_year)}</p>
-                        <Money value={lastPaid.total_net} className="mt-1 font-display text-[28px] font-semibold tracking-[-0.025em]" />
-                      </div>
-                    ) : (
-                      <span />
-                    )}
-                    <Button variant="onTile" asChild>
-                      <Link to="/admin/bang-luong">Mở bảng lương <ArrowRight /></Link>
-                    </Button>
-                  </div>
-                </div>
-              </>
-            )}
-          </section>
+      {/* KPI */}
+      <section aria-label="Chỉ số chính" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Reveal delay={0} offset={14} className="h-full">
+          <KpiCard
+            label="Tổng nhân sự"
+            icon={Users}
+            value={formatNumber(stats.total)}
+            action={<Badge variant="secondary">{stats.active} đang làm</Badge>}
+            footer={`${stats.probation} thử việc · ${stats.total - stats.active - stats.probation} nghỉ phép`}
+            hint="Bảng users (mọi vai trò)"
+          />
         </Reveal>
-
-        <Reveal delay={100} className="h-full">
-          <section className="card flex h-full flex-col gap-6 p-7 md:p-8">
-            <SectionTitle
-              action={
-                <Link to="/admin/phong-ban" className="group inline-flex items-center text-[14px] text-link">
-                  Xem tất cả <ChevronRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+        <Reveal delay={60} offset={14} className="h-full">
+          <KpiCard
+            label="Quỹ lương hợp đồng / tháng"
+            icon={FileSignature}
+            value={formatMoneyShort(stats.fund)}
+            footer={`${stats.contracts} hợp đồng hiệu lực`}
+            hint={
+              missingContracts > 0
+                ? `${missingContracts} nhân viên chưa có hợp đồng`
+                : `Lương đóng BH: ${formatMoneyShort(stats.insurance)}`
+            }
+          />
+        </Reveal>
+        <Reveal delay={120} offset={14} className="h-full">
+          <KpiCard
+            label={latest ? `Thực nhận · ${formatPeriod(latest.month_year)}` : "Thực nhận kỳ gần nhất"}
+            icon={Wallet}
+            value={latest ? formatMoneyShort(latest.total_net) : "—"}
+            action={<TrendBadge value={netTrend} />}
+            footer={latest ? `Gross ${formatMoneyShort(latest.total_gross)}` : "Chưa có kỳ đã tính"}
+            hint={previous ? `So với ${formatPeriod(previous.month_year)}` : `${latest?.items_count ?? 0} phiếu lương`}
+          />
+        </Reveal>
+        <Reveal delay={180} offset={14} className="h-full">
+          <KpiCard
+            label={openPeriod ? `Nhập công · ${formatPeriod(openPeriod.month_year)}` : "Tiến độ nhập công"}
+            icon={CalendarClock}
+            value={
+              <span>
+                {openEntered}
+                <span className="text-[18px] text-muted-foreground">/{stats.total}</span>
+              </span>
+            }
+            action={openPeriod && <PeriodStatusBadge status={openPeriod.status} />}
+            hint={
+              openPeriod ? (
+                <Link to={`/admin/cham-cong?ky=${openPeriod.id}`} className="inline-flex items-center gap-1 text-primary hover:underline">
+                  {openEntered >= stats.total ? "Đã nhập đủ — xem lưới công" : "Tiếp tục nhập công"} <ArrowRight className="size-3.5" />
                 </Link>
-              }
-            >
-              Phòng ban
-            </SectionTitle>
-            <ul className="space-y-4">
-              {departments.map((d, i) => (
-                <li key={d.name} className="space-y-2">
-                  <div className="flex justify-between text-[14px]">
-                    <span className="text-foreground">{d.name}</span>
-                    <span className="tabular text-muted-foreground">{d.members.length}</span>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-muted">
-                    <motion.div
-                      className="h-full rounded-full bg-foreground"
-                      initial={{ width: 0 }}
-                      whileInView={{ width: `${(d.members.length / maxDept) * 100}%` }}
-                      viewport={{ once: true }}
-                      transition={{ ...SPRING, delay: 0.15 + i * 0.06 }}
-                    />
-                  </div>
-                </li>
-              ))}
-              {!departments.length && <li className="text-[14px] text-muted-foreground">Chưa có dữ liệu.</li>}
-            </ul>
-            {employees.length > 0 && (
-              <div className="mt-auto flex items-center justify-between gap-4 border-t border-border/70 pt-5">
-                <AvatarGroup className="h-9">
-                  {employees.slice(0, 7).map((e) => (
-                    <span key={e.id} className="rounded-full ring-2 ring-card">
-                      <PersonAvatar name={e.full_name} seed={e.employee_code} size="sm" />
-                      <AvatarGroupTooltip>{e.full_name}</AvatarGroupTooltip>
-                    </span>
-                  ))}
-                </AvatarGroup>
-                <span className="text-[13px] text-muted-foreground">{employees.length} người</span>
-              </div>
-            )}
-          </section>
-        </Reveal>
-      </div>
-
-      {/* Gia nhập gần đây */}
-      <section className="space-y-5">
-        <Reveal>
-          <SectionTitle
-            action={
-              <Link to="/admin/nhan-vien" className="group inline-flex items-center text-[14px] text-link">
-                Danh sách nhân viên <ChevronRight className="size-4 transition-transform group-hover:translate-x-0.5" />
-              </Link>
+              ) : (
+                <Link to="/admin/cham-cong" className="inline-flex items-center gap-1 text-primary hover:underline">
+                  Tạo kỳ lương đầu tiên <ArrowRight className="size-3.5" />
+                </Link>
+              )
             }
           >
-            Gia nhập gần đây
-          </SectionTitle>
-        </Reveal>
-        <Reveal delay={80}>
-          <ul className="card divide-y divide-border/70 overflow-hidden">
-            {recent.map((e, i) => (
-              <motion.li
-                key={e.id}
-                initial={{ opacity: 0, x: -12 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
-                transition={{ ...SPRING, delay: 0.05 * i }}
-              >
-                <Link
-                  to={`/admin/nhan-vien?xem=${e.id}`}
-                  className="flex items-center gap-4 px-5 py-4 transition-colors duration-200 hover:bg-muted/60"
-                >
-                  <PersonAvatar name={e.full_name} seed={e.employee_code} size="sm" />
-                  <span className="grid min-w-0 flex-1">
-                    <span className="truncate text-[15px] font-medium text-foreground">{e.full_name}</span>
-                    <span className="truncate text-[13px] text-muted-foreground">{e.position} · {e.department}</span>
-                  </span>
-                  <span className="tabular hidden text-[13px] text-muted-foreground sm:block">{formatDate(e.joined_at)}</span>
-                  <EmployeeStatusBadge status={e.status} />
-                  <ChevronRight className="size-4 text-muted-foreground/60" aria-hidden="true" />
-                </Link>
-              </motion.li>
-            ))}
-            {!recent.length && <li className="px-5 py-8 text-[14px] text-muted-foreground">Chưa có nhân viên.</li>}
-          </ul>
+            <Meter value={openProgress} label="Tiến độ nhập công" />
+          </KpiCard>
         </Reveal>
       </section>
+
+      {/* Biểu đồ */}
+      <section className="grid gap-4 lg:grid-cols-3">
+        <Reveal delay={120} offset={14} className="h-full lg:col-span-2">
+          <PeriodChart periods={periods} />
+        </Reveal>
+        <Reveal delay={180} offset={14} className="h-full">
+          <StatusDonut employees={employees} />
+        </Reveal>
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-3">
+        <Reveal offset={14} className="h-full lg:col-span-2">
+          <DepartmentChart employees={employees} />
+        </Reveal>
+        <Reveal delay={60} offset={14} className="h-full">
+          <PayoutStructure period={latest} items={latestItems} />
+        </Reveal>
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-3">
+        <Reveal offset={14} className="h-full lg:col-span-2">
+          <PeriodsTable periods={periods} headcount={stats.total} />
+        </Reveal>
+        <Reveal delay={60} offset={14} className="h-full">
+          <TopOvertime period={latest} items={latestItems} />
+        </Reveal>
+      </section>
+
+      <p className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
+        <Landmark className="size-3.5" /> Gross = lương theo ngày công + phụ cấp + OT; Net = Gross − BH (10,5%) − thuế TNCN.
+      </p>
     </div>
   );
 }

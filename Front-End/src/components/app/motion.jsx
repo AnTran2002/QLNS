@@ -2,7 +2,6 @@ import { Children } from "react";
 import { Fade } from "@/components/animate-ui/primitives/effects/fade";
 import { Slide } from "@/components/animate-ui/primitives/effects/slide";
 import { Blur } from "@/components/animate-ui/primitives/effects/blur";
-import { CountingNumber } from "@/components/animate-ui/primitives/texts/counting-number";
 import { formatMoneyShort, formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -41,18 +40,12 @@ export function BlurIn({ children, delay = 0, className }) {
   );
 }
 
-/**
- * Số nguyên đếm lên (Animate UI CountingNumber). Trình đọc màn hình nhận giá trị cuối cùng.
- */
+/** Số tĩnh (định dạng vi-VN) — không dùng hiệu ứng đếm / nhảy số. */
 export function Count({ value, className, suffix }) {
-  const n = Number(value) || 0;
   return (
     <span className={cn("tabular", className)}>
-      <span className="sr-only">{formatNumber(n)}{suffix}</span>
-      <span aria-hidden="true">
-        <CountingNumber number={n} inView inViewOnce transition={{ stiffness: 70, damping: 30 }} />
-        {suffix}
-      </span>
+      {formatNumber(value)}
+      {suffix}
     </span>
   );
 }
@@ -62,9 +55,12 @@ export function Money({ value, className, currencyClassName }) {
   const n = Math.round(Number(value) || 0);
   return (
     <span className={cn("tabular inline-flex items-baseline", className)}>
-      {n < 0 && "−"}
-      {formatNumber(Math.abs(n))}
-      <span className={cn("ml-[0.18em] opacity-60", currencyClassName)}>₫</span>
+      <span className="sr-only">{`${n < 0 ? "−" : ""}${formatNumber(Math.abs(n))} ₫`}</span>
+      <span aria-hidden="true" className="contents">
+        {n < 0 && "−"}
+        {formatNumber(Math.abs(n))}
+        <span className={cn("ml-[0.18em] opacity-60", currencyClassName)}>₫</span>
+      </span>
     </span>
   );
 }

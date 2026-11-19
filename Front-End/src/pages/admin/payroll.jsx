@@ -191,7 +191,7 @@ export default function PayrollPage() {
       ) : periodsQuery.isPending || employeesQuery.isPending ? (
         <LoadingState rows={4} />
       ) : !period ? (
-        <EmptyState icon={Wallet} title="Chưa có kỳ lương" description="Thêm một dòng vào bảng payroll_periods (VD: 2026-12, DRAFT) để bắt đầu." />
+        <EmptyState icon={Wallet} title="Chưa có kỳ lương" description="Vào mục Chấm công & OT để tạo kỳ lương mới (Tháng/Năm) và nhập ngày công." />
       ) : (
         <>
           <Reveal delay={80}>

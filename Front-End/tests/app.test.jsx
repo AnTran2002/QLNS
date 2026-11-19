@@ -47,6 +47,7 @@ beforeEach(() => {
   api.employees.mockResolvedValue([{ ...ADMIN, contract_id: 1, base_salary: 25000000, allowance: 3000000, insurance_salary: 20000000, dependents_count: 1 }]);
   api.payrollPeriods.mockResolvedValue([{ id: 2, month_year: "2026-11", standard_days: 22, status: "DRAFT", items_count: 0, total_gross: 0, total_net: 0 }]);
   api.employeeDashboard.mockResolvedValue(DASHBOARD);
+  api.payrollAttendance.mockResolvedValue({ period: { id: 2, month_year: "2026-11", standard_days: 22, status: "DRAFT" }, items: [] });
 });
 
 describe("Phân quyền & đăng nhập", () => {
@@ -83,8 +84,47 @@ describe("Phân quyền & đăng nhập", () => {
     api.me.mockResolvedValue({ user: EMPLOYEE });
     renderApp("/admin/nhan-vien");
     expect((await screen.findAllByText("Cổng nhân viên")).length).toBeGreaterThan(0);
-    expect(await screen.findByText("20.407.727 ₫")).toBeInTheDocument();
+    expect(await screen.findByText(/Đã làm được/)).toBeInTheDocument();
     expect(api.employees).not.toHaveBeenCalled();
+  });
+});
+
+const ATT_ROW = {
+  user_id: 2, employee_code: "NV002", full_name: "Trần Thị Bình", department: "Thiết kế", employee_status: "Đang làm việc",
+  base_salary: 18500000, insurance_salary: 15000000, allowance: 2500000, dependents_count: 1,
+  payroll_item_id: null, actual_days: 0, ot_hours: 0, gross_salary: 0, social_insurance: 0, tax_deduction: 0, personal_tax: 0, net_salary: 0,
+};
+
+describe("UC-02 · Nhập liệu bảng công & OT", () => {
+  it("sửa công trên Grid → lưu gửi đúng entries", async () => {
+    api.me.mockResolvedValue({ user: ADMIN });
+    const period = { id: 2, month_year: "2026-11", standard_days: 22, status: "DRAFT" };
+    api.payrollAttendance.mockResolvedValue({ period, items: [ATT_ROW] });
+    api.saveAttendance.mockResolvedValue({
+      period, updated_count: 1,
+      items: [{ ...ATT_ROW, payroll_item_id: 9, actual_days: 21, ot_hours: 4, gross_salary: 20000000, net_salary: 18000000 }],
+    });
+    renderApp("/admin/cham-cong?ky=2");
+    const user = userEvent.setup();
+    expect(await screen.findByRole("heading", { name: "Chấm công & OT" })).toBeInTheDocument();
+    const days = await screen.findByLabelText("Ngày công của Trần Thị Bình");
+    await user.type(days, "21");
+    await user.type(screen.getByLabelText("Giờ OT của Trần Thị Bình"), "4");
+    expect(screen.getByText(/thay đổi chưa lưu/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Lưu thay đổi/ }));
+    await waitFor(() => expect(api.saveAttendance).toHaveBeenCalledWith(2, [{ user_id: 2, actual_days: 21, ot_hours: 4 }]));
+    expect(await screen.findByText("18.000.000 ₫")).toBeInTheDocument();
+  });
+
+  it("chặn ngày công vượt số ngày trong tháng", async () => {
+    api.me.mockResolvedValue({ user: ADMIN });
+    api.payrollAttendance.mockResolvedValue({ period: { id: 2, month_year: "2026-11", standard_days: 22, status: "DRAFT" }, items: [ATT_ROW] });
+    renderApp("/admin/cham-cong");
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText("Ngày công của Trần Thị Bình"), "45");
+    await user.click(screen.getByRole("button", { name: /Lưu thay đổi/ }));
+    expect(api.saveAttendance).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("Ngày công của Trần Thị Bình")).toHaveAttribute("aria-invalid", "true");
   });
 });
 

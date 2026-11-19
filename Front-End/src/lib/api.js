@@ -17,21 +17,23 @@ export const http = axios.create({
 });
 
 export class ApiError extends Error {
-  constructor(message, status) {
+  constructor(message, status, details = null) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    /** `data` đi kèm lỗi (vd. danh sách dòng lỗi khi import Excel). */
+    this.details = details;
   }
 }
 
-export async function callApi(action, { method = "GET", data, params } = {}) {
+export async function callApi(action, { method = "GET", data, params, timeout } = {}) {
   try {
-    const res = await http.request({ url: "/", method, data, params: { action, ...params } });
+    const res = await http.request({ url: "/", method, data, params: { action, ...params }, ...(timeout ? { timeout } : {}) });
     const body = res.data;
     if (!body || typeof body !== "object" || !("success" in body)) {
       throw new ApiError("Phản hồi từ Back-End không phải JSON hợp lệ. Kiểm tra BACKEND_URL trong .env.", res.status);
     }
-    if (!body.success) throw new ApiError(body.message, res.status);
+    if (!body.success) throw new ApiError(body.message, res.status, body.data ?? null);
     return body.data;
   } catch (err) {
     if (err instanceof ApiError) throw err;
@@ -39,6 +41,7 @@ export async function callApi(action, { method = "GET", data, params } = {}) {
       throw new ApiError(
         err.response.data?.message || `Yêu cầu thất bại (HTTP ${err.response.status}).`,
         err.response.status,
+        err.response.data?.data ?? null,
       );
     }
     throw new ApiError("Không thể kết nối máy chủ. Hãy kiểm tra Back-End PHP đang chạy.", 0);
@@ -50,6 +53,7 @@ const MONEY_FIELDS = [
   "base_salary", "insurance_salary", "allowance", "dependents_count",
   "gross_salary", "social_insurance", "tax_deduction", "personal_tax", "net_salary",
   "actual_days", "ot_hours", "standard_days",
+  "items_count", "total_gross", "total_net",
 ];
 export function toNumbers(row) {
   if (!row || typeof row !== "object") return row;
@@ -119,8 +123,42 @@ export const api = {
     }).then(toNumbers),
 
   // ---- Bảng lương (PayrollController, ADMIN) ----
-  payrollPeriods: () => callApi("payroll/periods"),
+  payrollPeriods: () => callApi("payroll/periods").then(toNumberList),
   payrollItems: (periodId) => callApi("payroll/items", { params: { period_id: periodId } }),
+
+  // ---- UC-02: Nhập liệu bảng công & OT ----
+  /** Tạo kỳ lương mới (Tháng/Năm) — month_year dạng "YYYY-MM". */
+  createPayrollPeriod: ({ month_year, standard_days }) =>
+    callApi("payroll/periods", {
+      method: "POST",
+      data: { month_year, standard_days: Number(standard_days) },
+    }).then(toNumbers),
+  /** Lưới chấm công của một kỳ: mọi nhân viên + ngày công / giờ OT đã nhập (nếu có). */
+  payrollAttendance: (periodId) =>
+    callApi("payroll/attendance", { params: { period_id: periodId } }).then((d) => ({
+      period: toNumbers(d?.period),
+      items: toNumberList(d?.items),
+    })),
+  /** Lưu chỉnh sửa thủ công trên Grid: entries = [{ user_id, actual_days, ot_hours }]. */
+  saveAttendance: (periodId, entries) =>
+    callApi("payroll/attendance", {
+      method: "PUT",
+      data: {
+        period_id: periodId,
+        entries: entries.map((e) => ({
+          user_id: e.user_id,
+          actual_days: Number(e.actual_days),
+          ot_hours: Number(e.ot_hours),
+        })),
+      },
+    }),
+  /** Import file Excel công (.xlsx): cột Mã NV · Ngày công · Giờ OT. */
+  importAttendance: (periodId, file) => {
+    const form = new FormData();
+    form.append("period_id", String(periodId));
+    form.append("file", file);
+    return callApi("payroll/import", { method: "POST", data: form, timeout: 60000 });
+  },
   calculatePayroll: ({ user_id, period_id, actual_days, ot_hours }) =>
     callApi("payroll/calculate", {
       method: "POST",
