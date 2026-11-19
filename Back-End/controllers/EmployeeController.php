@@ -223,6 +223,9 @@ class EmployeeController
         if ($id === (int) $_SESSION['user_id']) {
             return json_response(409, null, 'Không thể xóa tài khoản đang đăng nhập');
         }
+        if ((new PayrollModel())->userHasPublishedPayroll($id)) {
+            return json_response(409, null, 'Không thể xóa nhân viên đã có kỳ lương khóa sổ hoặc đã thanh toán');
+        }
 
         if (!(new UserModel())->delete($id)) {
             return json_response(404, null, 'Không tìm thấy nhân viên');

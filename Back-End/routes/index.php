@@ -89,6 +89,11 @@ match ($action) {
     'payroll/import'     => (new PayrollController)->importAttendance(),
     'payroll/calculate'  => (new PayrollController)->calculateAndSave(),
     'payroll/run'        => (new PayrollController)->run(),
+    'payroll/lock'       => (new PayrollController)->lockPeriod(),
+    'payroll/bank-account' => (new PayrollController)->saveBankAccount(),
+    'payroll/export-bank-transfers' => (new PayrollController)->exportBankTransfers(),
+    'payroll/payslip' => (new PayrollController)->payslip(),
+    'payroll/payslip/download' => (new PayrollController)->downloadPayslip(),
 
     default              => json_response(404, null, 'Không tìm thấy API: ' . $action),
 };

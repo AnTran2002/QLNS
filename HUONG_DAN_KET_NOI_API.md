@@ -59,6 +59,8 @@ Migration thêm:
 
 Đối với UC-02, chạy thêm migration `Back-End/database/migrations/002_payroll_period_unique_month.sql` một lần để bảo đảm mỗi tháng chỉ có một kỳ lương. Nếu database đã có nhiều kỳ cùng `month_year`, cần xử lý dữ liệu trùng trước khi chạy migration này.
 
+Đối với UC-04, sau migration hồ sơ nhân viên (nếu database cũ), chạy `Back-End/database/migrations/003_user_bank_accounts.sql` một lần để thêm thông tin tài khoản nhận lương. Thông tin ngân hàng hiện chưa có trong schema cũ; Admin cần cập nhật dữ liệu trước khi xuất file chuyển khoản.
+
 ### 2.3. Đặt mật khẩu cho tài khoản mẫu
 
 Mật khẩu lưu dạng bcrypt. Sau khi import, chạy một lần:
@@ -169,17 +171,24 @@ Tất cả gọi tới `index.php?action=<tên>`. Các API có dấu 🔒 cần 
 | `employees/show` | GET | 🔒 ADMIN | `?id=2` | 1 nhân viên |
 | `employees/create` | POST | 🔒 ADMIN | Xem ví dụ bên dưới | Nhân viên vừa tạo (HTTP 201). Mật khẩu mặc định `123456` |
 | `employees/update` | PUT | 🔒 ADMIN | `?id=2` + body như create | Nhân viên sau khi sửa |
-| `employees/delete` | DELETE | 🔒 ADMIN | `?id=2` | `null` (không cho tự xoá chính mình) |
+| `employees/delete` | DELETE | 🔒 ADMIN | `?id=2` | `null` (không cho tự xoá hoặc xoá nhân viên đã có kỳ lương khóa sổ/đã trả) |
 | `payroll/periods` | POST | 🔒 ADMIN | `{ "month_year": "2026-12", "standard_days": 22 }` | Kỳ lương mới ở trạng thái `DRAFT` |
 | `payroll/attendance` | GET | 🔒 ADMIN | `?period_id=2` | Kỳ lương và danh sách nhân viên đầy đủ cùng ngày công/OT hiện tại |
 | `payroll/attendance` | PUT/POST | 🔒 ADMIN | `{ "period_id": 2, "entries": [{ "user_id": 2, "actual_days": 22, "ot_hours": 4 }] }` | Lưu lô ngày công/OT và tính lại lương trong cùng transaction |
 | `payroll/import` | POST | 🔒 ADMIN | `multipart/form-data`: `period_id`, `file` (.xlsx) | Kiểm tra toàn file rồi nhập nguyên tử, không lưu dở một phần |
 | `payroll/run` | POST | 🔒 ADMIN | `{ "period_id": 2 }` | Tính lại và lưu Gross, BHXH 10.5%, TNCN 7 bậc và Net cho toàn kỳ |
+| `payroll/lock` | POST | 🔒 ADMIN | `{ "period_id": 2 }` | Chuyển kỳ `DRAFT` sang `LOCKED` sau khi kiểm tra dữ liệu đầy đủ |
+| `payroll/bank-account` | PUT/POST | 🔒 ADMIN | `{ "user_id": 2, "bank_name": "...", "bank_account_name": "...", "bank_account_number": "..." }` | Cập nhật tài khoản nhận lương của nhân viên |
+| `payroll/export-bank-transfers` | GET | 🔒 ADMIN | `?period_id=2` | Tải workbook `.xlsx` chuyển khoản; chỉ cho kỳ `LOCKED` và đủ tài khoản ngân hàng |
+| `payroll/payslip` | GET | 🔒 EMPLOYEE | `?period_id=2` | Phiếu lương của chính nhân viên đăng nhập; chỉ kỳ `LOCKED`/`PAID` |
+| `payroll/payslip/download` | GET | 🔒 EMPLOYEE | `?period_id=2` | Tải phiếu lương HTML tự chứa để mở/in hoặc lưu thành PDF |
 | `payroll/calculate` | POST | 🔒 ADMIN | `{ user_id, period_id, actual_days, ot_hours }` | Kết quả tính lương (kỳ phải ở trạng thái `DRAFT`) |
 
 File Excel UC-02 cần có worksheet đầu tiên với hàng tiêu đề `employee_code`, `actual_days`, `ot_hours` (hoặc `Mã nhân viên`, `Ngày công`, `Giờ OT`). Mỗi mã nhân viên chỉ xuất hiện một lần; file tối đa 10 MB và 10.000 dòng. Backend yêu cầu bật PHP extension `zip` để đọc `.xlsx`; cấu hình PHP cần cho phép `upload_max_filesize=10M` và `post_max_size` lớn hơn 10 MB. Nhập Excel và chỉnh sửa grid đều chỉ ghi vào kỳ `DRAFT`, từ chối nhân viên không tồn tại/không có hợp đồng và rollback toàn bộ nếu có lỗi.
 
 UC-03 chỉ chạy trên kỳ `DRAFT`, yêu cầu mọi nhân viên đều có dòng công/OT và hợp đồng. Hệ thống tính lại toàn bộ kỳ trong một transaction; thiếu dữ liệu, công/OT ngoài giới hạn hoặc lỗi database sẽ không lưu kết quả dở dang. API trả `calculated_count`, tổng Gross/BHXH/TNCN/Net và các dòng lương đã tính. Engine dùng công thức prorate theo ngày công, OT hệ số 1.5, bảo hiểm 10.5% trên lương đóng bảo hiểm và biểu thuế lũy tiến 7 bậc hiện có trong `PayrollEngine`.
+
+UC-04 chỉ khóa sổ kỳ `DRAFT` sau khi tất cả nhân viên có dữ liệu công/OT, hợp đồng và kết quả khớp với công thức hiện tại; nếu có thay đổi sau lần tính lương, cần chạy lại UC-03 trước khi khóa. Khóa sổ được thực hiện nguyên tử và các API nhập/chỉnh sửa công tiếp tục từ chối kỳ `LOCKED`. API dashboard/lịch sử nhân viên chỉ trả phiếu của kỳ `LOCKED` hoặc `PAID`, không lộ số lương nháp. File chuyển khoản bao gồm mã nhân viên, tên, ngân hàng, chủ tài khoản, số tài khoản, số tiền Net và nội dung chuyển khoản; chỉ xuất kỳ `LOCKED` để tránh chi trùng. Nếu chưa có tài khoản của bất kỳ nhân viên nào, API trả mã nhân viên thiếu và không tạo file. Bật PHP extension `zip` để xuất `.xlsx`.
 
 Mỗi bản ghi nhân viên (`employees`, `employees/show`, `employees/create`, `employees/update`):
 
@@ -386,7 +395,7 @@ Thêm nhân viên trong phpMyAdmin:
 - Bảng `users`: `password` phải là chuỗi bcrypt. Dễ nhất là thêm qua giao diện ADMIN (mật khẩu mặc định `123456`), hoặc dùng hàm PHP `password_hash('123456', PASSWORD_DEFAULT)` để sinh chuỗi.
 - Bảng `contracts`: thêm một dòng với `user_id` tương ứng để có thông tin lương.
 
-> Những thông tin chưa có cột trong database (CCCD, số điện thoại, địa chỉ, mã số thuế, tài khoản ngân hàng, giờ check-in từng ngày) đang hiển thị **"Chưa cập nhật"**. Muốn lưu, thêm cột hoặc bảng mới, rồi trả thêm field trong `EmployeeController::dashboard()`.
+> Những thông tin chưa có cột trong database (CCCD, số điện thoại, địa chỉ, mã số thuế, giờ check-in từng ngày) chưa được lưu. Tài khoản ngân hàng được thêm qua migration UC-04 và cập nhật bằng API `payroll/bank-account`; trường này không được trả trong dữ liệu công khai của nhân viên hoặc response đăng nhập.
 
 ---
 

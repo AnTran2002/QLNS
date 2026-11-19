@@ -120,6 +120,65 @@ class PayrollModel extends BaseModel {
         return $stmt->fetchAll();
     }
 
+    public function getBankTransferRows(int $periodId): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT u.id AS user_id, u.employee_code, u.full_name,
+                    u.bank_name, u.bank_account_name, u.bank_account_number,
+                    pi.net_salary
+             FROM payroll_items pi
+             INNER JOIN users u ON u.id = pi.user_id
+             WHERE pi.period_id = :period_id
+             ORDER BY u.employee_code"
+        );
+        $stmt->execute(['period_id' => $periodId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function userHasPublishedPayroll(int $userId): bool
+    {
+        $stmt = $this->db->prepare(
+            "SELECT 1
+             FROM payroll_items pi
+             INNER JOIN payroll_periods pp ON pp.id = pi.period_id
+             WHERE pi.user_id = :user_id
+               AND pp.status IN ('LOCKED', 'PAID')
+             LIMIT 1"
+        );
+        $stmt->execute(['user_id' => $userId]);
+        return $stmt->fetchColumn() !== false;
+    }
+
+    public function updateBankAccount(int $userId, array $data): void
+    {
+        $stmt = $this->db->prepare(
+            "UPDATE users
+             SET bank_name = :bank_name,
+                 bank_account_name = :bank_account_name,
+                 bank_account_number = :bank_account_number
+             WHERE id = :user_id"
+        );
+        $stmt->execute([
+            'user_id' => $userId,
+            'bank_name' => $data['bank_name'],
+            'bank_account_name' => $data['bank_account_name'],
+            'bank_account_number' => $data['bank_account_number'],
+        ]);
+    }
+
+    public function getBankAccount(int $userId): ?array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT id, employee_code, full_name, bank_name, bank_account_name, bank_account_number
+             FROM users
+             WHERE id = :user_id
+             LIMIT 1"
+        );
+        $stmt->execute(['user_id' => $userId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
     // Lấy chi tiết bảng lương theo kỳ và nhân viên để trả về JSON cho React
     public function getByPeriodAndUser($periodId, $userId) {
         $sql = "SELECT pi.*, p.month_year, p.standard_days, u.full_name, u.employee_code 
@@ -130,6 +189,27 @@ class PayrollModel extends BaseModel {
         $stmt = $this->db->prepare($sql);
         $stmt->execute(['period_id' => $periodId, 'user_id' => $userId]);
         return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
+    public function getPublishedPayslip(int $periodId, int $userId): ?array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT pi.*, pp.month_year, pp.standard_days, pp.status AS period_status,
+                    u.employee_code, u.full_name, u.department
+             FROM payroll_items pi
+             INNER JOIN payroll_periods pp ON pp.id = pi.period_id
+             INNER JOIN users u ON u.id = pi.user_id
+             WHERE pi.period_id = :period_id
+               AND pi.user_id = :user_id
+               AND pp.status IN ('LOCKED', 'PAID')
+             LIMIT 1"
+        );
+        $stmt->execute([
+            'period_id' => $periodId,
+            'user_id' => $userId,
+        ]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
     }
 
     // Lưu hoặc cập nhật kết quả tính lương real-time vào CSDL
@@ -212,12 +292,28 @@ class PayrollModel extends BaseModel {
         return $period ?: null;
     }
 
+    public function changePeriodStatus(int $periodId, string $from, string $to): bool
+    {
+        $stmt = $this->db->prepare(
+            "UPDATE payroll_periods
+             SET status = :to_status
+             WHERE id = :period_id AND status = :from_status"
+        );
+        $stmt->execute([
+            'period_id' => $periodId,
+            'from_status' => $from,
+            'to_status' => $to,
+        ]);
+        return $stmt->rowCount() === 1;
+    }
+
     public function getItemsByUserId($userId)
     {
         $sql = "SELECT pi.*, pp.month_year, pp.standard_days, pp.status AS period_status
                 FROM payroll_items pi
                 INNER JOIN payroll_periods pp ON pi.period_id = pp.id
                 WHERE pi.user_id = :user_id
+                  AND pp.status IN ('LOCKED', 'PAID')
                 ORDER BY pp.month_year DESC";
         $stmt = $this->db->prepare($sql);
         $stmt->execute(['user_id' => $userId]);

@@ -45,8 +45,13 @@ class AuthController
         $_SESSION['role']    = $user['role'];
         $_SESSION['token']   = bin2hex(random_bytes(32));
 
-        // Remove password from response
-        unset($user['password']);
+        // Never expose credentials or bank-account information in the login response.
+        unset(
+            $user['password'],
+            $user['bank_name'],
+            $user['bank_account_name'],
+            $user['bank_account_number']
+        );
 
         http_response_code(200);
         echo json_encode([
