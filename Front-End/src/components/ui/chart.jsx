@@ -130,13 +130,13 @@ function ChartLegendContent({ className, hideIcon = false, payload, verticalAlig
 export { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent, ChartStyle };
 
 /**
- * Chuyển động chung cho cột biểu đồ: mọc lên mượt, các chuỗi nối tiếp nhau (stagger).
- * Recharts tự tắt animation khi người dùng bật "giảm chuyển động" thông qua isAnimationActive bên dưới.
+ * Chuyển động chung cho chuỗi dữ liệu: vẽ dần từ trái sang, các chuỗi nối tiếp nhau (stagger).
+ * Tự tắt khi người dùng bật "giảm chuyển động".
  */
 const prefersReducedMotion = () =>
   typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
-export function barMotion(index = 0, step = 140) {
+export function seriesMotion(index = 0, step = 140) {
   return {
     isAnimationActive: !prefersReducedMotion(),
     animationBegin: 120 + index * step,
@@ -146,20 +146,20 @@ export function barMotion(index = 0, step = 140) {
 }
 
 /**
- * Biểu đồ cột: đầu cột bo 4px neo vào trục, các chuỗi mọc lên nối tiếp nhau.
- * - Cột đứng riêng / nhóm cạnh nhau: `columnProps(key, i)`.
- * - Cột chồng: cùng `stackId`, chỉ đoạn trên cùng bo góc (`top: true`); viền 2px màu nền tách các đoạn.
+ * Biểu đồ đường (line chart): nét 2px thẳng giữa các điểm, chấm rỗng tại mỗi điểm dữ liệu,
+ * chấm đặc có viền nền khi rê chuột. Nhiều điểm (vd. theo ngày) → `dots: false` cho gọn.
  */
-export function columnProps(key, index = 0, { stackId, top = !stackId } = {}) {
+export function lineProps(key, index = 0, { dots = true } = {}) {
   return {
     dataKey: key,
-    fill: `var(--color-${key})`,
-    radius: top ? [4, 4, 0, 0] : 0,
-    maxBarSize: 34,
-    ...(stackId ? { stackId, stroke: "var(--card)", strokeWidth: 1.5 } : {}),
-    ...barMotion(index),
+    type: "linear",
+    stroke: `var(--color-${key})`,
+    strokeWidth: 2,
+    dot: dots ? { r: 3.5, strokeWidth: 2, fill: "var(--card)" } : false,
+    activeDot: { r: 5, strokeWidth: 2, stroke: "var(--card)", fill: `var(--color-${key})` },
+    ...seriesMotion(index),
   };
 }
 
-/** Nền mờ phía sau cột đang rê chuột (tooltip). */
-export const columnCursor = { fill: "var(--muted)", fillOpacity: 0.7, radius: 6 };
+/** Đường dóng dọc tại kỳ đang rê chuột (tooltip). */
+export const lineCursor = { stroke: "var(--border)", strokeWidth: 1, strokeDasharray: "4 4" };

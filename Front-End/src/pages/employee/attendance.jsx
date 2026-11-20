@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
 import { CalendarCheck, CalendarX2, ChevronLeft, ChevronRight, Clock, Clock3, DatabaseZap, Timer } from "lucide-react";
 import { KpiCard } from "@/components/admin/kpi-card";
 import { Button } from "@/components/animate-ui/components/buttons/button";
@@ -22,8 +22,8 @@ import {
   ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
-  columnCursor,
-  columnProps,
+  lineCursor,
+  lineProps,
 } from "@/components/ui/chart";
 import { Meter } from "@/components/ui/meter";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -343,7 +343,7 @@ function Item({ label, value, wide }) {
   );
 }
 
-/** Cột chồng giờ làm + làm thêm từng ngày trong tháng (cùng đơn vị giờ → một trục). */
+/** Đường giờ làm và giờ làm thêm từng ngày trong tháng (cùng đơn vị giờ → một trục). */
 function DailyHoursChart({ data, month }) {
   return (
     <Reveal delay={140} offset={14}>
@@ -354,18 +354,18 @@ function DailyHoursChart({ data, month }) {
         </CardHeader>
         <CardContent className="px-3 sm:px-6">
           <ChartContainer config={DAILY_CHART} className="aspect-auto h-[220px] w-full">
-            <BarChart data={data} margin={{ left: 0, right: 8, top: 8 }} barCategoryGap="22%">
+            <LineChart data={data} margin={{ left: 0, right: 12, top: 8 }}>
               <CartesianGrid vertical={false} />
-              <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} minTickGap={12} />
+              <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} minTickGap={12} padding={{ left: 6, right: 6 }} />
               <YAxis tickLine={false} axisLine={false} width={28} domain={[0, 10]} ticks={[0, 2, 4, 6, 8, 10]} />
               <ChartTooltip
-                cursor={columnCursor}
+                cursor={lineCursor}
                 content={<ChartTooltipContent labelFormatter={(l) => `Ngày ${l}`} valueFormatter={(v) => hours(v)} />}
               />
               <ChartLegend content={<ChartLegendContent />} />
-              <Bar {...columnProps("work", 0, { stackId: "d" })} maxBarSize={16} />
-              <Bar {...columnProps("ot", 1, { stackId: "d", top: true })} maxBarSize={16} />
-            </BarChart>
+              <Line {...lineProps("work", 0, { dots: data.length <= 12 })} />
+              <Line {...lineProps("ot", 1, { dots: data.length <= 12 })} />
+            </LineChart>
           </ChartContainer>
         </CardContent>
       </Card>
@@ -387,15 +387,15 @@ function PeriodSection({ history, data }) {
               </CardHeader>
               <CardContent className="px-3 sm:px-6">
                 <ChartContainer config={PERIOD_CHART} className="aspect-auto h-[240px] w-full">
-                  <BarChart data={data} margin={{ left: 0, right: 8, top: 8 }} barGap={2} barCategoryGap="24%">
+                  <LineChart data={data} margin={{ left: 0, right: 12, top: 8 }}>
                     <CartesianGrid vertical={false} />
-                    <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
+                    <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} padding={{ left: 10, right: 10 }} />
                     <YAxis tickLine={false} axisLine={false} width={32} allowDecimals={false} />
-                    <ChartTooltip cursor={columnCursor} content={<ChartTooltipContent valueFormatter={(v) => `${formatNumber(v)} ngày`} />} />
+                    <ChartTooltip cursor={lineCursor} content={<ChartTooltipContent valueFormatter={(v) => `${formatNumber(v)} ngày`} />} />
                     <ChartLegend content={<ChartLegendContent />} />
-                    <Bar {...columnProps("standard", 0)} />
-                    <Bar {...columnProps("actual", 1)} />
-                  </BarChart>
+                    <Line {...lineProps("standard", 0)} strokeDasharray="5 4" />
+                    <Line {...lineProps("actual", 1)} />
+                  </LineChart>
                 </ChartContainer>
               </CardContent>
             </Card>
@@ -408,13 +408,13 @@ function PeriodSection({ history, data }) {
               </CardHeader>
               <CardContent className="px-3 sm:px-6">
                 <ChartContainer config={OT_CHART} className="aspect-auto h-[240px] w-full">
-                  <BarChart data={data} margin={{ left: 0, right: 8, top: 8 }} barCategoryGap="30%">
+                  <LineChart data={data} margin={{ left: 0, right: 12, top: 8 }}>
                     <CartesianGrid vertical={false} />
-                    <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
+                    <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} padding={{ left: 10, right: 10 }} />
                     <YAxis tickLine={false} axisLine={false} width={32} allowDecimals={false} />
-                    <ChartTooltip cursor={columnCursor} content={<ChartTooltipContent valueFormatter={(v) => hours(v)} />} />
-                    <Bar {...columnProps("ot", 0)} />
-                  </BarChart>
+                    <ChartTooltip cursor={lineCursor} content={<ChartTooltipContent valueFormatter={(v) => hours(v)} />} />
+                    <Line {...lineProps("ot", 0)} />
+                  </LineChart>
                 </ChartContainer>
               </CardContent>
             </Card>

@@ -29,7 +29,7 @@ QLNS/
 | **Chữ** | `SF Pro Text` cho nội dung, `SF Pro Display` cho tiêu đề (như apple.com); máy không phải Apple dùng Inter / Segoe UI. Cỡ chữ co giãn theo màn hình bằng `clamp()` |
 | **Số liệu tĩnh** | Bỏ hiệu ứng nhảy số (counting/sliding number), số hiển thị cố định |
 | **Thanh chọn trên dashboard** | Ô được chọn có màu tương phản với nền và **trượt** giữa các mục (motion `layoutId`), không nhấp nháy mất/hiện |
-| **Biểu đồ cột** | Mọi biểu đồ dùng `BarChart` (Recharts): thu nhập (cột chồng thực nhận / BHXH / thuế), tổng lương theo kỳ (cột đôi gross / net), giờ làm & OT theo ngày, ngày công theo kỳ. Helper chung `columnProps` / `columnCursor` trong `components/ui/chart.jsx` |
+| **Biểu đồ đường** | Các biểu đồ theo thời gian dùng `LineChart` (Recharts, nét thẳng, không tô nền): thu nhập (Gross / thực nhận), quỹ lương theo kỳ (Gross / Net), giờ làm & OT theo ngày, ngày công theo kỳ (công chuẩn nét đứt), OT theo kỳ. Helper chung `lineProps` / `lineCursor` trong `components/ui/chart.jsx`. Quỹ lương theo phòng ban vẫn là thanh ngang (so sánh giữa các phòng) |
 | **Logo mới** | Ô vuông xanh với 3 cột tăng dần, mỗi cột đội một "cái đầu" tròn (đội ngũ đi lên). Rê chuột: ô nghiêng nhẹ, các cột lần lượt thụt xuống rồi bật lên (`components/app/brand.jsx`); màn hình chờ lặp hiệu ứng liên tục; `favicon.svg` cùng hình |
 | **Bỏ nhãn UC-02** | Mục "Chấm công & OT" ở trang quản trị không còn nhãn UC-02 trên menu và tiêu đề trang |
 | **Lịch chấm công theo tháng** | Lịch 7 cột từ Thứ Hai: ngày đi làm, ca làm, giờ vào/ra, đi muộn, nghỉ phép, vắng; tổng số buổi đi làm, buổi nghỉ, giờ làm, giờ OT, phút đi muộn |

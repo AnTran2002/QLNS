@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ChartContainer,
@@ -7,8 +7,8 @@ import {
   ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
-  columnCursor,
-  columnProps,
+  lineCursor,
+  lineProps,
 } from "@/components/ui/chart";
 import { formatMoney, formatMoneyShort, formatPeriod } from "@/lib/format";
 
@@ -18,11 +18,16 @@ const CONFIG = {
   insurance: { label: "BHXH · BHYT · BHTN", color: "var(--chart-2)" },
   tax: { label: "Thuế TNCN", color: "var(--chart-3)" },
 };
+/* Biểu đồ đường: Gross (xám, mốc trên) và Thực nhận; khoảng cách giữa hai đường = khấu trừ. */
+const LINE_CONFIG = {
+  gross: { label: "Tổng thu nhập (Gross)", color: "var(--chart-5)" },
+  net: CONFIG.net,
+};
 
 const shortPeriod = (m) => formatPeriod(m).replace("Tháng ", "T");
 
 /**
- * Cột chồng theo kỳ: chiều cao cột = Gross = Thực nhận + BH + Thuế. Một trục; mỗi đoạn một màu.
+ * Đường theo kỳ: Gross và Thực nhận trên cùng một trục; tooltip ghi rõ BH và thuế đã trừ.
  */
 export function EarningsChart({ history = [], limit = 12, className, title = "Thu nhập theo kỳ", description }) {
   const data = useMemo(
@@ -45,7 +50,7 @@ export function EarningsChart({ history = [], limit = 12, className, title = "Th
     <Card className={className ?? "h-full gap-4"}>
       <CardHeader>
         <CardTitle>{title}</CardTitle>
-        <CardDescription>{description ?? "Tổng thu nhập (Gross) tách thành thực nhận và các khoản khấu trừ"}</CardDescription>
+        <CardDescription>{description ?? "Tổng thu nhập (Gross) và thực nhận qua từng kỳ lương"}</CardDescription>
       </CardHeader>
       <CardContent className="px-3 sm:px-6">
         {data.length === 0 ? (
@@ -53,28 +58,27 @@ export function EarningsChart({ history = [], limit = 12, className, title = "Th
         ) : data.length === 1 ? (
           <SinglePeriod row={data[0]} />
         ) : (
-          <ChartContainer config={CONFIG} className="aspect-auto h-[260px] w-full">
-            <BarChart data={data} margin={{ left: 4, right: 8, top: 10 }} barCategoryGap="28%">
+          <ChartContainer config={LINE_CONFIG} className="aspect-auto h-[260px] w-full">
+            <LineChart data={data} margin={{ left: 4, right: 12, top: 10 }}>
               <CartesianGrid vertical={false} />
-              <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
+              <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} padding={{ left: 12, right: 12 }} />
               <YAxis tickLine={false} axisLine={false} width={56} tickFormatter={(v) => formatMoneyShort(v)} />
               <ChartTooltip
-                cursor={columnCursor}
+                cursor={lineCursor}
                 content={
                   <ChartTooltipContent
                     labelFormatter={(_, payload) => {
                       const row = payload?.[0]?.payload;
-                      return row ? `${row.period} · Gross ${formatMoney(row.gross)}` : "";
+                      return row ? `${row.period} · BH ${formatMoney(row.insurance)} · Thuế ${formatMoney(row.tax)}` : "";
                     }}
                     valueFormatter={formatMoney}
                   />
                 }
               />
               <ChartLegend content={<ChartLegendContent />} />
-              <Bar {...columnProps("net", 0, { stackId: "g" })} />
-              <Bar {...columnProps("insurance", 1, { stackId: "g" })} />
-              <Bar {...columnProps("tax", 2, { stackId: "g", top: true })} />
-            </BarChart>
+              <Line {...lineProps("gross", 0)} />
+              <Line {...lineProps("net", 1)} />
+            </LineChart>
           </ChartContainer>
         )}
       </CardContent>
@@ -125,7 +129,7 @@ function SinglePeriod({ row }) {
           </div>
         ))}
       </dl>
-      <p className="text-[12px] text-muted-foreground">Biểu đồ cột theo kỳ hiển thị khi có từ 2 kỳ lương trở lên.</p>
+      <p className="text-[12px] text-muted-foreground">Biểu đồ đường theo kỳ hiển thị khi có từ 2 kỳ lương trở lên.</p>
     </div>
   );
 }

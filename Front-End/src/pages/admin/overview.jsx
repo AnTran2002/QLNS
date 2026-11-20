@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Link, useNavigate } from "react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Bar, BarChart, CartesianGrid, Cell, LabelList, Pie, PieChart, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, LabelList, Line, LineChart, Pie, PieChart, XAxis, YAxis } from "recharts";
 import { ArrowRight, ArrowUpRight, CalendarClock, ClipboardList, Clock, FileSignature, Landmark, Users, Wallet } from "lucide-react";
 import { Button } from "@/components/animate-ui/components/buttons/button";
 import { KpiCard, TrendBadge } from "@/components/admin/kpi-card";
@@ -15,9 +15,9 @@ import {
   ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
-  barMotion,
-  columnCursor,
-  columnProps,
+  lineCursor,
+  lineProps,
+  seriesMotion,
 } from "@/components/ui/chart";
 import { Meter } from "@/components/ui/meter";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -87,19 +87,19 @@ function PeriodChart({ periods }) {
                 </div>
               ))}
             </dl>
-            <p className="text-[12px] text-muted-foreground">Biểu đồ cột hiển thị khi có từ 2 kỳ lương trở lên.</p>
+            <p className="text-[12px] text-muted-foreground">Biểu đồ đường hiển thị khi có từ 2 kỳ lương trở lên.</p>
           </div>
         ) : (
           <ChartContainer config={PERIOD_CHART} className="aspect-auto h-[260px] w-full">
-            <BarChart data={data} margin={{ left: 4, right: 8, top: 10 }} barGap={2} barCategoryGap="24%">
+            <LineChart data={data} margin={{ left: 4, right: 12, top: 10 }}>
               <CartesianGrid vertical={false} strokeDasharray="0" />
-              <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
+              <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} padding={{ left: 12, right: 12 }} />
               <YAxis tickLine={false} axisLine={false} width={56} tickFormatter={(v) => formatMoneyShort(v)} />
-              <ChartTooltip cursor={columnCursor} content={<ChartTooltipContent valueFormatter={formatMoney} />} />
+              <ChartTooltip cursor={lineCursor} content={<ChartTooltipContent valueFormatter={formatMoney} />} />
               <ChartLegend content={<ChartLegendContent />} />
-              <Bar {...columnProps("gross", 0)} />
-              <Bar {...columnProps("net", 1)} />
-            </BarChart>
+              <Line {...lineProps("gross", 0)} />
+              <Line {...lineProps("net", 1)} />
+            </LineChart>
           </ChartContainer>
         )}
       </CardContent>
@@ -205,7 +205,7 @@ function DepartmentChart({ employees }) {
                   />
                 }
               />
-              <Bar dataKey="payroll" {...barMotion(0)} fill="var(--color-payroll)" radius={4} maxBarSize={26}>
+              <Bar dataKey="payroll" {...seriesMotion(0)} fill="var(--color-payroll)" radius={4} maxBarSize={26}>
                 <LabelList
                   dataKey="payroll"
                   position="right"
