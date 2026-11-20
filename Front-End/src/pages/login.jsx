@@ -1,15 +1,7 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router";
 import { ArrowRight, Eye, EyeOff, KeyRound, Loader2, ShieldCheck, UserRound } from "lucide-react";
-import {
-  AnimatePresence,
-  motion,
-  useAnimate,
-  useMotionTemplate,
-  useMotionValue,
-  useReducedMotion,
-  useSpring,
-} from "motion/react";
+import { AnimatePresence, motion, useAnimate } from "motion/react";
 import { toast } from "sonner";
 import { Button } from "@/components/animate-ui/components/buttons/button";
 import { Brand } from "@/components/app/brand";
@@ -21,48 +13,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { homeFor, useAuth } from "@/hooks/use-auth";
 
-/**
- * Nền tương tác: một quầng sáng nhoè lớn bám theo con trỏ (lò xo nên hơi trễ, mềm),
- * và lưới chấm sáng rõ hơn ngay dưới con trỏ. Tắt chuyển động khi người dùng chọn giảm chuyển động.
- */
-function PointerBackdrop() {
-  const reduce = useReducedMotion();
-  const x = useMotionValue(typeof window !== "undefined" ? window.innerWidth / 2 : 0);
-  const y = useMotionValue(typeof window !== "undefined" ? window.innerHeight * 0.42 : 0);
-  const sx = useSpring(x, { stiffness: 60, damping: 18, mass: 0.6 });
-  const sy = useSpring(y, { stiffness: 60, damping: 18, mass: 0.6 });
-  // Quầng thứ hai chậm hơn → cảm giác chiều sâu
-  const lx = useSpring(x, { stiffness: 25, damping: 20, mass: 1 });
-  const ly = useSpring(y, { stiffness: 25, damping: 20, mass: 1 });
-  const spot = useMotionTemplate`radial-gradient(260px circle at ${sx}px ${sy}px, #000 0%, transparent 70%)`;
-
-  useEffect(() => {
-    if (reduce) return undefined;
-    const onMove = (e) => {
-      x.set(e.clientX);
-      y.set(e.clientY);
-    };
-    window.addEventListener("pointermove", onMove, { passive: true });
-    return () => window.removeEventListener("pointermove", onMove);
-  }, [reduce, x, y]);
-
+/** Nền tĩnh: lưới chấm + hai quầng sáng trôi chậm (CSS) — không bám theo con trỏ. */
+function AmbientBackdrop() {
   return (
     <div aria-hidden="true" className="pointer-events-none fixed inset-0 overflow-hidden">
-      <div className="login-grid absolute inset-0 opacity-70" />
-      <motion.div
-        className="absolute size-[560px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/25 blur-[110px] dark:bg-primary/30"
-        style={{ left: sx, top: sy }}
-      />
-      <motion.div
-        className="absolute size-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-chart-4/20 blur-[120px] dark:bg-chart-4/15"
-        style={{ left: lx, top: ly, x: 140, y: 90 }}
-      />
-      {/* Lưới chấm đậm hơn, chỉ lộ ra quanh con trỏ */}
-      <motion.div
-        className="absolute inset-0 [background-image:radial-gradient(color-mix(in_srgb,var(--primary)_55%,transparent)_1.2px,transparent_1.2px)] [background-size:22px_22px]"
-        style={{ maskImage: spot, WebkitMaskImage: spot }}
-      />
-      {/* Ánh mờ phía dưới cho chiều sâu */}
+      <div className="login-grid absolute inset-0 opacity-60" />
+      <div className="login-aurora absolute top-[8%] left-[55%] size-[520px] rounded-full bg-primary/15 blur-[120px]" />
+      <div className="login-aurora login-aurora-alt absolute bottom-[-10%] left-[-8%] size-[420px] rounded-full bg-chart-3/10 blur-[120px]" />
       <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-background to-transparent" />
     </div>
   );
@@ -122,7 +79,7 @@ export default function LoginPage() {
 
   return (
     <div className="relative isolate flex min-h-svh flex-col bg-background">
-      <PointerBackdrop />
+      <AmbientBackdrop />
 
       <header className="relative z-10 flex items-center justify-between px-5 py-4 sm:px-8">
         <Brand />

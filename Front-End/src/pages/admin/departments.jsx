@@ -78,7 +78,7 @@ export default function DepartmentsPage() {
                 <AvatarGroup className="h-10">
                   {g.members.slice(0, 8).map((m) => (
                     <span key={m.id} className="rounded-full ring-2 ring-card">
-                      <PersonAvatar name={m.full_name} seed={m.employee_code} size="sm" />
+                      <PersonAvatar name={m.full_name} seed={m.employee_code} src={m.avatar} size="sm" />
                       <AvatarGroupTooltip>{m.full_name}</AvatarGroupTooltip>
                     </span>
                   ))}

@@ -74,6 +74,10 @@ match ($action) {
 
     // Nhân viên (EMPLOYEE)
     'employee/dashboard' => (new EmployeeController)->dashboard(),
+    'employee/attendance' => (new EmployeeController)->attendance(),
+
+    // Hồ sơ của chính mình (ADMIN + EMPLOYEE)
+    'profile/avatar'     => (new ProfileController)->updateAvatar(),
 
     // Quản lý nhân viên + hợp đồng (ADMIN)
     'employees'          => (new EmployeeController)->index(),

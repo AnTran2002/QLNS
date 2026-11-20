@@ -120,7 +120,7 @@ export function PeriodStatusBadge({ status, onTile = false, className }) {
 
 const AVATAR_HUES = [211, 262, 330, 24, 145, 190, 45];
 
-export function PersonAvatar({ name, seed, size = "md", className }) {
+export function PersonAvatar({ name, seed, src, size = "md", className }) {
   const key = String(seed ?? name ?? "");
   let hash = 0;
   for (const ch of key) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
@@ -130,17 +130,18 @@ export function PersonAvatar({ name, seed, size = "md", className }) {
       aria-hidden="true"
       style={{ "--h": hue }}
       className={cn(
-        "inline-flex shrink-0 items-center justify-center rounded-full font-semibold tracking-[-0.01em] select-none",
+        "relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full font-semibold tracking-[-0.01em] select-none",
         "bg-[hsl(var(--h)_40%_92%)] text-[hsl(var(--h)_45%_32%)] dark:bg-[hsl(var(--h)_20%_22%)] dark:text-[hsl(var(--h)_60%_82%)]",
         size === "xs" && "size-7 text-[11px]",
         size === "sm" && "size-9 text-[12px]",
         size === "md" && "size-11 text-[14px]",
         size === "lg" && "size-16 text-[20px]",
         size === "xl" && "size-24 text-[30px]",
+        size === "2xl" && "size-28 text-[36px] sm:size-32 sm:text-[40px]",
         className,
       )}
     >
-      {initials(name)}
+      {src ? <img src={src} alt="" draggable={false} className="size-full object-cover" /> : initials(name)}
     </span>
   );
 }

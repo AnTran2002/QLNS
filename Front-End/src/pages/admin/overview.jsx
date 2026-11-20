@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Link, useNavigate } from "react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Bar, BarChart, CartesianGrid, Cell, LabelList, Pie, PieChart, XAxis, YAxis } from "recharts";
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, LabelList, Pie, PieChart, XAxis, YAxis } from "recharts";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -25,6 +25,11 @@ import {
   ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
+  barMotion,
+  WaveGradients,
+  useWaveIds,
+  waveCursor,
+  waveProps,
 } from "@/components/ui/chart";
 import { Meter } from "@/components/ui/meter";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -59,6 +64,7 @@ const sum = (rows, key) => rows.reduce((s, r) => s + (Number(r[key]) || 0), 0);
 /* ------------------------------------------------------------------ */
 
 function PeriodChart({ periods }) {
+  const gid = useWaveIds();
   const data = useMemo(
     () =>
       [...periods]
@@ -82,15 +88,16 @@ function PeriodChart({ periods }) {
           </p>
         ) : (
           <ChartContainer config={PERIOD_CHART} className="aspect-auto h-[260px] w-full">
-            <BarChart data={data} margin={{ left: 4, right: 4, top: 8 }} barGap={2}>
+            <AreaChart data={data} margin={{ left: 4, right: 8, top: 10 }}>
+              <WaveGradients id={gid} keys={["gross", "net"]} />
               <CartesianGrid vertical={false} strokeDasharray="0" />
               <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
               <YAxis tickLine={false} axisLine={false} width={56} tickFormatter={(v) => formatMoneyShort(v)} />
-              <ChartTooltip cursor={{ radius: 6 }} content={<ChartTooltipContent valueFormatter={formatMoney} />} />
+              <ChartTooltip cursor={waveCursor} content={<ChartTooltipContent valueFormatter={formatMoney} />} />
               <ChartLegend content={<ChartLegendContent />} />
-              <Bar dataKey="gross" fill="var(--color-gross)" radius={[4, 4, 0, 0]} maxBarSize={36} />
-              <Bar dataKey="net" fill="var(--color-net)" radius={[4, 4, 0, 0]} maxBarSize={36} />
-            </BarChart>
+              <Area {...waveProps(gid, "gross", 0)} />
+              <Area {...waveProps(gid, "net", 1)} />
+            </AreaChart>
           </ChartContainer>
         )}
       </CardContent>
@@ -205,7 +212,7 @@ function DepartmentChart({ employees }) {
                   />
                 }
               />
-              <Bar dataKey="payroll" fill="var(--color-payroll)" radius={4} maxBarSize={26}>
+              <Bar dataKey="payroll" {...barMotion(0)} fill="var(--color-payroll)" radius={4} maxBarSize={26}>
                 <LabelList
                   dataKey="payroll"
                   position="right"
@@ -299,7 +306,7 @@ function TopOvertime({ period, items }) {
           <ul className="grid gap-4">
             {top.map((t) => (
               <li key={t.user_id} className="flex items-center gap-3">
-                <PersonAvatar name={t.full_name} seed={t.employee_code} size="xs" />
+                <PersonAvatar name={t.full_name} seed={t.employee_code} src={t.avatar} size="xs" />
                 <div className="min-w-0 flex-1 space-y-1.5">
                   <div className="flex items-baseline justify-between gap-2 text-[13px]">
                     <span className="truncate font-medium">{t.full_name}</span>
@@ -340,9 +347,9 @@ function PeriodsTable({ periods, headcount }) {
               <TableRow className="hover:bg-transparent">
                 <TableHead>Kỳ</TableHead>
                 <TableHead>Trạng thái</TableHead>
-                <TableHead className="text-right">Công chuẩn</TableHead>
-                <TableHead className="text-right">Đã nhập</TableHead>
-                <TableHead className="text-right">Gross</TableHead>
+                <TableHead className="text-right max-md:hidden">Công chuẩn</TableHead>
+                <TableHead className="text-right max-sm:hidden">Đã nhập</TableHead>
+                <TableHead className="text-right max-sm:hidden">Gross</TableHead>
                 <TableHead className="text-right">Net</TableHead>
               </TableRow>
             </TableHeader>
@@ -357,12 +364,12 @@ function PeriodsTable({ periods, headcount }) {
                   <TableCell>
                     <PeriodStatusBadge status={p.status} />
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">{p.standard_days} ngày</TableCell>
-                  <TableCell className="text-right tabular-nums">
+                  <TableCell className="text-right tabular-nums max-md:hidden">{p.standard_days} ngày</TableCell>
+                  <TableCell className="text-right tabular-nums max-sm:hidden">
                     {p.items_count}
                     <span className="text-muted-foreground">/{headcount}</span>
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">{formatMoneyShort(p.total_gross)}</TableCell>
+                  <TableCell className="text-right tabular-nums max-sm:hidden">{formatMoneyShort(p.total_gross)}</TableCell>
                   <TableCell className="text-right font-medium tabular-nums">{formatMoneyShort(p.total_net)}</TableCell>
                 </TableRow>
               ))}
@@ -432,7 +439,7 @@ export default function AdminOverview() {
         <Reveal offset={8}>
           <div className="space-y-1">
             <p className="text-[13px] text-muted-foreground first-letter:uppercase">{todayLabel.format(new Date())}</p>
-            <h1 className="font-display text-[26px] font-semibold tracking-[-0.025em] md:text-[30px]">Tổng quan quản trị</h1>
+            <h1 className="page-title">Tổng quan quản trị</h1>
             <p className="text-[14px] text-muted-foreground">Nhân sự, hợp đồng và tiền lương — số liệu đọc trực tiếp từ CSDL qlns.</p>
           </div>
         </Reveal>
@@ -516,7 +523,7 @@ export default function AdminOverview() {
       </section>
 
       {/* Biểu đồ */}
-      <section className="grid gap-4 lg:grid-cols-3">
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3 [&>*]:min-w-0">
         <Reveal delay={120} offset={14} className="h-full lg:col-span-2">
           <PeriodChart periods={periods} />
         </Reveal>
@@ -525,7 +532,7 @@ export default function AdminOverview() {
         </Reveal>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-3">
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3 [&>*]:min-w-0">
         <Reveal offset={14} className="h-full lg:col-span-2">
           <DepartmentChart employees={employees} />
         </Reveal>
@@ -534,7 +541,7 @@ export default function AdminOverview() {
         </Reveal>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-3">
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3 [&>*]:min-w-0">
         <Reveal offset={14} className="h-full lg:col-span-2">
           <PeriodsTable periods={periods} headcount={stats.total} />
         </Reveal>

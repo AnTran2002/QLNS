@@ -376,7 +376,7 @@ function AttendanceGrid({ period, rows, onDirtyChange }) {
                 <TableRow key={r.user_id} className={cn(dirty && "bg-primary/[0.025]", error && "bg-destructive/[0.03]")}>
                   <TableCell className="pl-4 sm:pl-5">
                     <div className="flex min-w-[180px] items-center gap-2.5">
-                      <PersonAvatar name={r.full_name} seed={r.employee_code} size="xs" />
+                      <PersonAvatar name={r.full_name} seed={r.employee_code} src={r.avatar} size="xs" />
                       <div className="grid min-w-0 leading-tight">
                         <span className="truncate text-[13.5px] font-medium">{r.full_name}</span>
                         <span className="truncate text-[12px] text-muted-foreground">
@@ -508,7 +508,7 @@ export default function AttendancePage() {
             <p className="flex items-center gap-2 text-[13px] text-muted-foreground">
               <Badge variant="outline" className="font-mono">UC-02</Badge> Admin · Kế toán C&B
             </p>
-            <h1 className="font-display text-[26px] font-semibold tracking-[-0.025em] md:text-[30px]">Chấm công & OT</h1>
+            <h1 className="page-title">Chấm công & OT</h1>
             <p className="text-[14px] text-muted-foreground">Tạo kỳ lương theo tháng, nhập ngày công và giờ làm thêm — lương được tính ngay khi lưu.</p>
           </div>
         </Reveal>

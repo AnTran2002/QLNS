@@ -38,7 +38,7 @@ export function PayoutBar({ item, className }) {
   const gross = Number(item?.gross_salary) || 0;
   return (
     <div className={cn("space-y-2.5", className)}>
-      <div className="flex h-2.5 w-full gap-[2px] overflow-hidden rounded-full bg-muted" aria-hidden="true">
+      <div className="grow-x flex h-2.5 w-full gap-[2px] overflow-hidden rounded-full bg-muted" aria-hidden="true">
         {gross > 0 &&
           PAYOUT_PARTS.map((p) => (
             <div

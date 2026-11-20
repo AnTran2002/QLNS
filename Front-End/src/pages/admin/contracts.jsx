@@ -169,10 +169,10 @@ export default function ContractsPage() {
                     >
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          <PersonAvatar name={c.full_name} seed={c.employee_code} size="sm" />
-                          <span className="grid">
-                            <span className="text-[15px] font-medium text-foreground">{c.full_name}</span>
-                            <span className="text-[13px] text-muted-foreground">
+                          <PersonAvatar name={c.full_name} seed={c.employee_code} src={c.avatar} size="sm" />
+                          <span className="grid min-w-0">
+                            <span className="text-[15px] font-medium text-foreground max-sm:whitespace-normal">{c.full_name}</span>
+                            <span className="text-[13px] text-muted-foreground max-sm:whitespace-normal">
                               <span className="font-mono text-[12px]">HĐ-{String(c.id).padStart(3, "0")}</span> · {c.department}
                             </span>
                           </span>

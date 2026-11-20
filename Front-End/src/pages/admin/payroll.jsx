@@ -260,12 +260,12 @@ export default function PayrollPage() {
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
                       <TableHead>Nhân viên</TableHead>
-                      <TableHead className="text-right">Công / OT</TableHead>
+                      <TableHead className="hidden text-right sm:table-cell md:hidden lg:table-cell">Công / OT</TableHead>
                       <TableHead className="hidden text-right md:table-cell">Gross</TableHead>
                       <TableHead className="hidden text-right lg:table-cell">BHXH</TableHead>
                       <TableHead className="hidden text-right lg:table-cell">Thuế TNCN</TableHead>
                       <TableHead className="text-right">Net</TableHead>
-                      <TableHead className="w-32 text-right"><span className="sr-only">Thao tác</span></TableHead>
+                      <TableHead className="w-12 text-right sm:w-32"><span className="sr-only">Thao tác</span></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -283,9 +283,9 @@ export default function PayrollPage() {
                           <TableCell>
                             <div className="flex items-center gap-3">
                               <PersonAvatar name={name} seed={code} size="sm" />
-                              <span className="grid">
-                                <span className="text-[15px] font-medium text-foreground">{name}</span>
-                                <span className="text-[13px] text-muted-foreground">
+                              <span className="grid min-w-0">
+                                <span className="text-[15px] font-medium text-foreground max-sm:whitespace-normal">{name}</span>
+                                <span className="text-[13px] text-muted-foreground max-sm:whitespace-normal">
                                   <span className="font-mono text-[12px]">{code}</span> · {employee?.department ?? item?.department}
                                 </span>
                               </span>
@@ -293,14 +293,14 @@ export default function PayrollPage() {
                           </TableCell>
                           {item ? (
                             <>
-                              <TableCell className="tabular text-right text-foreground/85">{formatNumber(item.actual_days)} · {formatNumber(item.ot_hours)}h</TableCell>
+                              <TableCell className="tabular hidden text-right text-foreground/85 sm:table-cell md:hidden lg:table-cell">{formatNumber(item.actual_days)} · {formatNumber(item.ot_hours)}h</TableCell>
                               <TableCell className="tabular hidden text-right text-foreground/85 md:table-cell">{formatMoney(item.gross_salary)}</TableCell>
                               <TableCell className="tabular hidden text-right text-foreground/85 lg:table-cell">{formatMoney(item.social_insurance)}</TableCell>
                               <TableCell className="tabular hidden text-right text-foreground/85 lg:table-cell">{formatMoney(item.personal_tax)}</TableCell>
                               <TableCell className="tabular text-right font-semibold text-foreground">{formatMoney(item.net_salary)}</TableCell>
                             </>
                           ) : (
-                            <TableCell colSpan={5} className="text-right text-[13px] text-muted-foreground">Chưa tính lương kỳ này</TableCell>
+                            <TableCell colSpan={5} className="text-right whitespace-normal text-[13px] text-muted-foreground">Chưa tính lương kỳ này</TableCell>
                           )}
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-1">
@@ -317,7 +317,7 @@ export default function PayrollPage() {
                                   title={employee.contract_id ? undefined : "Nhân viên chưa có hợp đồng"}
                                   onClick={() => setTarget({ employee, item })}
                                 >
-                                  <Calculator /> {item ? "Tính lại" : "Tính"}
+                                  <Calculator /> <span className="max-sm:sr-only">{item ? "Tính lại" : "Tính"}</span>
                                 </Button>
                               )}
                             </div>

@@ -36,7 +36,7 @@ export default function EmployeePayslips() {
     <div className="space-y-6">
       <header className="space-y-1">
         <Reveal offset={8}>
-          <h1 className="font-display text-[26px] font-semibold tracking-[-0.025em] md:text-[30px]">Phiếu lương</h1>
+          <h1 className="page-title">Phiếu lương</h1>
           <p className="text-[14px] text-muted-foreground">
             Lịch sử các kỳ lương đã tính. Phiếu lương được phát hành và tải về được khi kỳ đã chốt.
           </p>
@@ -74,7 +74,7 @@ export default function EmployeePayslips() {
               <CardHeader className="border-b border-border/70 px-4 py-4 sm:px-5 [.border-b]:pb-4">
                 <CardTitle>Các kỳ lương</CardTitle>
                 <CardDescription>Chọn một dòng để xem chi tiết phiếu lương</CardDescription>
-                <CardAction className="max-sm:hidden">
+                <CardAction className="max-md:col-span-2 max-md:col-start-1 max-md:row-start-3 max-md:mt-3 max-md:justify-self-stretch">
                   <Segmented
                     value={filter}
                     onValueChange={setFilter}
@@ -95,7 +95,7 @@ export default function EmployeePayslips() {
                     <TableHead className="text-right max-lg:hidden">Gross</TableHead>
                     <TableHead className="text-right max-lg:hidden">Khấu trừ</TableHead>
                     <TableHead className="text-right">Thực nhận</TableHead>
-                    <TableHead className="w-24 pr-4 text-right sm:pr-5">
+                    <TableHead className="w-12 pr-3 text-right sm:w-24 sm:pr-5">
                       <span className="sr-only">Thao tác</span>
                     </TableHead>
                   </TableRow>
@@ -113,8 +113,8 @@ export default function EmployeePayslips() {
                     return (
                       <TableRow key={i.id} className="cursor-pointer" onClick={() => setPayslip(i)}>
                         <TableCell className="pl-4 sm:pl-5">
-                          <div className="flex items-center gap-2.5">
-                            <span className="font-medium">{formatPeriod(i.month_year)}</span>
+                          <div className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-2.5">
+                            <span className="font-medium whitespace-nowrap">{formatPeriod(i.month_year)}</span>
                             <PeriodStatusBadge status={i.period_status} />
                           </div>
                         </TableCell>
@@ -126,9 +126,9 @@ export default function EmployeePayslips() {
                           − {formatMoney(i.social_insurance + i.personal_tax)}
                         </TableCell>
                         <TableCell className="text-right font-semibold tabular-nums">{formatMoney(i.net_salary)}</TableCell>
-                        <TableCell className="pr-4 sm:pr-5" onClick={(e) => e.stopPropagation()}>
+                        <TableCell className="pr-3 sm:pr-5" onClick={(e) => e.stopPropagation()}>
                           <div className="flex justify-end gap-1">
-                            <Button variant="ghost" size="icon-sm" onClick={() => setPayslip(i)} aria-label={`Xem phiếu lương ${formatPeriod(i.month_year)}`}>
+                            <Button variant="ghost" size="icon-sm" className="max-sm:hidden" onClick={() => setPayslip(i)} aria-label={`Xem phiếu lương ${formatPeriod(i.month_year)}`}>
                               <Eye />
                             </Button>
                             {pub ? (

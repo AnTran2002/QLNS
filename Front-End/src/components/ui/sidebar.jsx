@@ -9,12 +9,14 @@ import { cn } from "@/lib/utils";
 
 /**
  * shadcn/ui Sidebar (bản JS rút gọn, kiểu "inset"):
- * - Desktop: thanh bên co giãn 16rem ↔ 3.5rem (chỉ còn icon), nhớ trạng thái trong localStorage.
- * - Mobile (< 768px): mở dạng Sheet trượt từ trái.
+ * - Màn lớn (≥ 1280px): thanh bên co giãn 16rem ↔ 3.5rem (chỉ còn icon), nhớ trạng thái trong localStorage.
+ * - Màn vừa (1024–1279px): mặc định chỉ còn icon để nhường chỗ cho nội dung (không ghi đè lựa chọn đã lưu).
+ * - Mobile / tablet (< 1024px): mở dạng Sheet trượt từ trái.
  * - Phím tắt ⌘/Ctrl + B để thu gọn / mở rộng.
  */
 const STORAGE_KEY = "qlns.sidebar";
-const MOBILE_QUERY = "(max-width: 767px)";
+const MOBILE_QUERY = "(max-width: 1023px)";
+const COMPACT_QUERY = "(min-width: 1024px) and (max-width: 1279px)";
 
 const SidebarContext = React.createContext(null);
 
@@ -32,27 +34,38 @@ function readStored() {
   }
 }
 
-function useIsMobile() {
+function useMediaQuery(query) {
   const [mobile, setMobile] = React.useState(() =>
-    typeof window !== "undefined" && window.matchMedia ? window.matchMedia(MOBILE_QUERY).matches : false,
+    typeof window !== "undefined" && window.matchMedia ? window.matchMedia(query).matches : false,
   );
   React.useEffect(() => {
     if (!window.matchMedia) return undefined;
-    const mql = window.matchMedia(MOBILE_QUERY);
+    const mql = window.matchMedia(query);
     const onChange = () => setMobile(mql.matches);
     onChange();
     mql.addEventListener?.("change", onChange);
     return () => mql.removeEventListener?.("change", onChange);
-  }, []);
+  }, [query]);
   return mobile;
 }
 
 function SidebarProvider({ children, className, ...props }) {
-  const isMobile = useIsMobile();
-  const [open, setOpenState] = React.useState(readStored);
+  const isMobile = useMediaQuery(MOBILE_QUERY);
+  const isCompact = useMediaQuery(COMPACT_QUERY);
+  const [stored, setOpenState] = React.useState(readStored);
+  const [openCompact, setOpenCompact] = React.useState(false);
   const [openMobile, setOpenMobile] = React.useState(false);
+  const open = isCompact ? openCompact : stored;
+
+  // Đổi kích thước màn hình → đóng menu trượt / thu gọn lại cho màn vừa.
+  React.useEffect(() => setOpenMobile(false), [isMobile]);
+  React.useEffect(() => setOpenCompact(false), [isCompact]);
 
   const setOpen = React.useCallback((value) => {
+    if (isCompact) {
+      setOpenCompact((prev) => (typeof value === "function" ? value(prev) : value));
+      return;
+    }
     setOpenState((prev) => {
       const next = typeof value === "function" ? value(prev) : value;
       try {
@@ -62,7 +75,7 @@ function SidebarProvider({ children, className, ...props }) {
       }
       return next;
     });
-  }, []);
+  }, [isCompact]);
 
   const toggleSidebar = React.useCallback(() => {
     if (isMobile) setOpenMobile((v) => !v);
@@ -125,7 +138,7 @@ function Sidebar({ className, children }) {
       data-slot="sidebar"
       data-state={state}
       className={cn(
-        "group/sidebar sticky top-0 hidden h-svh shrink-0 flex-col text-sidebar-foreground md:flex",
+        "group/sidebar sticky top-0 hidden h-svh shrink-0 flex-col text-sidebar-foreground lg:flex",
         "w-64 transition-[width] duration-300 ease-[cubic-bezier(.32,.72,0,1)] data-[state=collapsed]:w-14",
         className,
       )}
@@ -158,7 +171,7 @@ function SidebarInset({ className, ...props }) {
       data-slot="sidebar-inset"
       className={cn(
         "relative flex min-h-svh min-w-0 flex-1 flex-col bg-inset",
-        "md:my-2 md:mr-2 md:min-h-[calc(100svh-1rem)] md:rounded-2xl md:border md:border-sidebar-border md:shadow-xs",
+        "lg:my-2 lg:mr-2 lg:min-h-[calc(100svh-1rem)] lg:rounded-2xl lg:border lg:border-sidebar-border lg:shadow-xs",
         className,
       )}
       {...props}
@@ -223,22 +236,24 @@ function SidebarMenuButton({ asChild = false, isActive = false, tooltip, classNa
       data-slot="sidebar-menu-button"
       data-active={isActive || undefined}
       className={cn(
-        "peer/menu-button relative flex h-9 w-full items-center gap-2.5 overflow-hidden rounded-lg px-2.5 text-left text-[13.5px] outline-none",
-        "text-sidebar-foreground/75 transition-colors hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-ring",
-        "data-[active]:font-medium data-[active]:text-sidebar-foreground",
-        "[&>svg]:relative [&>svg]:size-4 [&>svg]:shrink-0 [&>span]:relative [&>span]:truncate",
+        "peer/menu-button relative flex h-9 w-full min-w-0 items-center gap-2.5 rounded-lg px-2.5 text-left text-[13.5px] outline-none",
+        // Không overflow-hidden: nền nổi phải bay ra ngoài nút khi trượt sang mục khác.
+        "text-sidebar-foreground/75 transition-[color] duration-300 ease-out hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-ring",
+        "data-[active]:font-medium data-[active]:text-sidebar-active-foreground data-[active]:hover:text-sidebar-active-foreground",
+        "[&>svg]:relative [&>svg]:z-10 [&>svg]:size-4 [&>svg]:shrink-0 [&>span]:relative [&>span]:z-10 [&>span]:min-w-0 [&>span]:truncate",
         "group-data-[state=collapsed]/sidebar:w-10 group-data-[state=collapsed]/sidebar:px-3",
-        "before:absolute before:inset-0 before:rounded-lg before:bg-sidebar-accent before:opacity-0 before:transition-opacity hover:before:opacity-60",
+        "before:absolute before:inset-0 before:rounded-lg before:bg-sidebar-accent before:opacity-0 before:transition-opacity before:duration-300 hover:before:opacity-70 data-[active]:before:hidden",
         className,
       )}
       {...props}
     >
       {isActive && (
-        <motion.span
+        <motion.div
           layoutId="sidebar-active"
           aria-hidden="true"
-          className="absolute inset-0 rounded-lg bg-inset shadow-xs ring-1 ring-sidebar-border"
-          transition={{ type: "spring", stiffness: 500, damping: 40 }}
+          data-sidebar-indicator=""
+          className="pointer-events-none absolute inset-0 rounded-lg bg-sidebar-active shadow-[0_6px_16px_-8px_rgb(0_0_0/0.45)]"
+          transition={{ type: "spring", stiffness: 360, damping: 32, mass: 0.85 }}
         />
       )}
       {asChild ? <Slot.Slottable>{children}</Slot.Slottable> : children}

@@ -50,12 +50,12 @@ function UserMenu() {
           className="flex items-center rounded-full p-0.5 transition-transform duration-200 outline-none hover:scale-105 focus-visible:ring-2 focus-visible:ring-tile-link active:scale-95"
           aria-label={`Tài khoản: ${user?.full_name ?? ""}`}
         >
-          <PersonAvatar name={user?.full_name} seed={user?.employee_code} size="xs" />
+          <PersonAvatar name={user?.full_name} seed={user?.employee_code} src={user?.avatar} size="xs" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" sideOffset={10} className="w-64">
         <DropdownMenuLabel className="flex items-center gap-3 font-normal">
-          <PersonAvatar name={user?.full_name} seed={user?.employee_code} size="sm" />
+          <PersonAvatar name={user?.full_name} seed={user?.employee_code} src={user?.avatar} size="sm" />
           <span className="grid min-w-0">
             <span className="truncate text-[14px] font-semibold text-foreground">{user?.full_name}</span>
             <span className="truncate text-[12px] text-muted-foreground">

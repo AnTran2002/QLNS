@@ -47,6 +47,16 @@ beforeEach(() => {
   api.employees.mockResolvedValue([{ ...ADMIN, contract_id: 1, base_salary: 25000000, allowance: 3000000, insurance_salary: 20000000, dependents_count: 1 }]);
   api.payrollPeriods.mockResolvedValue([{ id: 2, month_year: "2026-11", standard_days: 22, status: "DRAFT", items_count: 0, total_gross: 0, total_net: 0 }]);
   api.employeeDashboard.mockResolvedValue(DASHBOARD);
+  api.employeeAttendance.mockResolvedValue({
+    available: true,
+    month: "2026-11",
+    months: ["2026-11", "2026-10"],
+    records: [
+      { id: 1, work_date: "2026-11-02", shift: "Ca hành chính", shift_start: "08:30", shift_end: "17:30", check_in: "08:25", check_out: "17:40", status: "PRESENT", work_hours: 8, ot_hours: 0, note: null },
+      { id: 2, work_date: "2026-11-03", shift: "Ca hành chính", shift_start: "08:30", shift_end: "17:30", check_in: "08:45", check_out: "19:00", status: "LATE", work_hours: 7.75, ot_hours: 1.5, note: null },
+      { id: 3, work_date: "2026-11-04", shift: "Ca hành chính", shift_start: "08:30", shift_end: "17:30", check_in: null, check_out: null, status: "LEAVE", work_hours: 0, ot_hours: 0, note: "Nghỉ phép năm" },
+    ],
+  });
   api.payrollAttendance.mockResolvedValue({ period: { id: 2, month_year: "2026-11", standard_days: 22, status: "DRAFT" }, items: [] });
 });
 
@@ -155,6 +165,7 @@ describe("Cổng nhân viên", () => {
   it.each([
     ["/nhan-vien/phieu-luong", "Phiếu lương", "Các kỳ lương"],
     ["/nhan-vien/cham-cong", "Chấm công", "Chi tiết theo kỳ"],
+    ["/nhan-vien/cham-cong", "Chấm công", "Lịch đi làm"],
     ["/nhan-vien/ho-so", "Hồ sơ", "Hợp đồng lao động"],
     ["/nhan-vien/dong-nghiep", "Phòng Thiết kế", "(bạn)"],
   ])("%s hiển thị đúng nội dung", async (path, heading, text) => {

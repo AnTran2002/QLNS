@@ -63,6 +63,7 @@ class EmployeeController
                 'position'      => $user['position'],
                 'status'        => $user['status'],
                 'joined_at'     => $user['joined_at'],
+                'avatar'        => $user['avatar'] ?? null,
             ],
             'contract' => $contract ? [
                 'id'               => (int) $contract['id'],
@@ -87,8 +88,59 @@ class EmployeeController
                 'position'      => $m['position'],
                 'status'        => $m['status'],
                 'joined_at'     => $m['joined_at'],
+                'avatar'        => $m['avatar'] ?? null,
             ], $team),
         ], 'Lấy dữ liệu dashboard thành công');
+    }
+
+    /**
+     * GET ?action=employee/attendance&month=YYYY-MM — Chấm công theo ngày của nhân viên đang đăng nhập.
+     * Không truyền month → tháng mới nhất có dữ liệu (hoặc tháng hiện tại).
+     */
+    public function attendance()
+    {
+        if (!require_auth('EMPLOYEE')) {
+            return;
+        }
+
+        $userId = (int) $_SESSION['user_id'];
+        $model  = new AttendanceRecordModel();
+
+        if (!$model->tableExists()) {
+            return json_response(200, [
+                'available' => false,
+                'month'     => date('Y-m'),
+                'months'    => [],
+                'records'   => [],
+            ], 'Chưa có bảng chấm công theo ngày — hãy chạy migration 004_avatar_daily_attendance.sql');
+        }
+
+        $months = $model->monthsByUser($userId);
+        $month  = $_GET['month'] ?? null;
+        if (!is_string($month) || !preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $month)) {
+            $month = $months[0] ?? date('Y-m');
+        }
+
+        $records = array_map(fn ($r) => [
+            'id'          => (int) $r['id'],
+            'work_date'   => $r['work_date'],
+            'shift'       => $r['shift'],
+            'shift_start' => substr($r['shift_start'], 0, 5),
+            'shift_end'   => substr($r['shift_end'], 0, 5),
+            'check_in'    => $r['check_in'] !== null ? substr($r['check_in'], 0, 5) : null,
+            'check_out'   => $r['check_out'] !== null ? substr($r['check_out'], 0, 5) : null,
+            'status'      => $r['status'],
+            'work_hours'  => (float) $r['work_hours'],
+            'ot_hours'    => (float) $r['ot_hours'],
+            'note'        => $r['note'],
+        ], $model->findByUserAndMonth($userId, $month));
+
+        json_response(200, [
+            'available' => true,
+            'month'     => $month,
+            'months'    => $months,
+            'records'   => $records,
+        ], 'Lấy chấm công theo ngày thành công');
     }
 
     /* =====================================================================
@@ -319,6 +371,7 @@ class EmployeeController
             'position'         => $row['position'],
             'status'           => $row['status'],
             'joined_at'        => $row['joined_at'],
+            'avatar'           => $row['avatar'] ?? null,
             'contract_id'      => $row['contract_id'] !== null ? (int) $row['contract_id'] : null,
             'base_salary'      => (float) ($row['base_salary'] ?? 0),
             'insurance_salary' => (float) ($row['insurance_salary'] ?? 0),

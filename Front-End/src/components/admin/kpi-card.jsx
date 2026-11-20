@@ -25,7 +25,7 @@ export function KpiCard({ label, value, icon: Icon, action, footer, hint, childr
   return (
     <Card
       className={cn(
-        "@container/card h-full gap-4 bg-gradient-to-b from-primary/[0.035] to-card py-5 transition-[transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:shadow-md dark:from-primary/[0.06]",
+        "@container/card h-full gap-4 bg-gradient-to-b from-primary/[0.035] to-card py-5 dark:from-primary/[0.06]",
         className,
       )}
     >

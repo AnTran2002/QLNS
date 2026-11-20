@@ -5,9 +5,34 @@ class UserModel extends BaseModel
     protected $table = 'users';
 
     /** Các cột an toàn để trả về Front-End (không bao giờ có password). */
-    private const PUBLIC_COLUMNS = "u.id, u.employee_code, u.full_name, u.email, u.role,
+    private const BASE_COLUMNS = "u.id, u.employee_code, u.full_name, u.email, u.role,
         u.department, u.position, u.status,
         COALESCE(u.joined_at, DATE(u.created_at)) AS joined_at, u.created_at";
+
+    private static ?bool $hasAvatar = null;
+
+    /** true khi đã chạy migration 004 (cột users.avatar). */
+    public function hasAvatarColumn(): bool
+    {
+        if (self::$hasAvatar === null) {
+            $stmt = $this->db->query("SHOW COLUMNS FROM {$this->table} LIKE 'avatar'");
+            self::$hasAvatar = (bool) $stmt->fetch();
+        }
+        return self::$hasAvatar;
+    }
+
+    /** Cột công khai + ảnh đại diện (nếu DB đã có cột). */
+    private function publicColumns(): string
+    {
+        return self::BASE_COLUMNS . ($this->hasAvatarColumn() ? ", u.avatar" : ", NULL AS avatar");
+    }
+
+    /** Cập nhật ảnh đại diện (data URL) hoặc xoá (null). */
+    public function updateAvatar(int $id, ?string $avatar): void
+    {
+        $stmt = $this->db->prepare("UPDATE {$this->table} SET avatar = :avatar WHERE id = :id");
+        $stmt->execute(['id' => $id, 'avatar' => $avatar]);
+    }
 
     /**
      * Tìm user theo email hoặc mã nhân viên (employee_code) — dùng khi đăng nhập (có password).
@@ -34,7 +59,7 @@ class UserModel extends BaseModel
      */
     public function findById($id)
     {
-        $stmt = $this->db->prepare("SELECT " . self::PUBLIC_COLUMNS . " FROM {$this->table} u WHERE u.id = :id LIMIT 1");
+        $stmt = $this->db->prepare("SELECT " . $this->publicColumns() . " FROM {$this->table} u WHERE u.id = :id LIMIT 1");
         $stmt->execute(['id' => $id]);
         return $stmt->fetch();
     }
@@ -44,7 +69,7 @@ class UserModel extends BaseModel
      */
     public function getAll()
     {
-        $stmt = $this->db->query("SELECT " . self::PUBLIC_COLUMNS . " FROM {$this->table} u ORDER BY u.id ASC");
+        $stmt = $this->db->query("SELECT " . $this->publicColumns() . " FROM {$this->table} u ORDER BY u.id ASC");
         return $stmt->fetchAll();
     }
 
@@ -53,7 +78,7 @@ class UserModel extends BaseModel
      */
     public function getAllWithContract()
     {
-        $sql = "SELECT " . self::PUBLIC_COLUMNS . ",
+        $sql = "SELECT " . $this->publicColumns() . ",
                        c.id AS contract_id, c.base_salary, c.insurance_salary, c.allowance, c.dependents_count
                 FROM {$this->table} u
                 LEFT JOIN contracts c ON c.id = (
@@ -71,7 +96,7 @@ class UserModel extends BaseModel
      */
     public function findWithContract($id)
     {
-        $sql = "SELECT " . self::PUBLIC_COLUMNS . ",
+        $sql = "SELECT " . $this->publicColumns() . ",
                        c.id AS contract_id, c.base_salary, c.insurance_salary, c.allowance, c.dependents_count
                 FROM {$this->table} u
                 LEFT JOIN contracts c ON c.id = (
@@ -92,7 +117,7 @@ class UserModel extends BaseModel
      */
     public function findByDepartment(string $department)
     {
-        $stmt = $this->db->prepare("SELECT " . self::PUBLIC_COLUMNS . " FROM {$this->table} u WHERE u.department = :department ORDER BY u.id ASC");
+        $stmt = $this->db->prepare("SELECT " . $this->publicColumns() . " FROM {$this->table} u WHERE u.department = :department ORDER BY u.id ASC");
         $stmt->execute(['department' => $department]);
         return $stmt->fetchAll();
     }

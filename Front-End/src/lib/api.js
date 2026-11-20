@@ -104,6 +104,16 @@ export const api = {
 
   // ---- Nhân viên (EMPLOYEE) ----
   employeeDashboard: () => callApi("employee/dashboard"),
+  /** Chấm công theo ngày của tháng `YYYY-MM` (bỏ trống → tháng mới nhất có dữ liệu). */
+  employeeAttendance: (month) =>
+    callApi("employee/attendance", { params: month ? { month } : undefined }).then((d) => ({
+      ...d,
+      records: (d.records ?? []).map((r) => ({ ...r, work_hours: Number(r.work_hours) || 0, ot_hours: Number(r.ot_hours) || 0 })),
+    })),
+
+  // ---- Hồ sơ của chính mình ----
+  /** `avatar` là data URL (đã thu nhỏ) hoặc null để xoá. */
+  updateAvatar: (avatar) => callApi("profile/avatar", { method: "POST", data: { avatar } }),
 
   // ---- Quản lý nhân viên (ADMIN) ----
   employees: () => callApi("employees").then(toNumberList),

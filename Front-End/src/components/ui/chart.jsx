@@ -35,7 +35,7 @@ function ChartContainer({ id, className, children, config, ...props }) {
         {...props}
       >
         <ChartStyle id={chartId} config={config} />
-        <RechartsPrimitive.ResponsiveContainer>{children}</RechartsPrimitive.ResponsiveContainer>
+        <RechartsPrimitive.ResponsiveContainer debounce={80}>{children}</RechartsPrimitive.ResponsiveContainer>
       </div>
     </ChartContext.Provider>
   );
@@ -128,3 +128,59 @@ function ChartLegendContent({ className, hideIcon = false, payload, verticalAlig
 }
 
 export { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent, ChartStyle };
+
+/**
+ * Chuyển động chung cho cột biểu đồ: mọc lên mượt, các chuỗi nối tiếp nhau (stagger).
+ * Recharts tự tắt animation khi người dùng bật "giảm chuyển động" thông qua isAnimationActive bên dưới.
+ */
+const prefersReducedMotion = () =>
+  typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+export function barMotion(index = 0, step = 140) {
+  return {
+    isAnimationActive: !prefersReducedMotion(),
+    animationBegin: 120 + index * step,
+    animationDuration: 850,
+    animationEasing: "ease-out",
+  };
+}
+
+/**
+ * Biểu đồ sóng (area): đường cong mềm `natural`, nét 2px, nền gradient mờ dần xuống trục.
+ * `useWaveIds()` cấp id gradient riêng cho từng biểu đồ (tránh trùng id giữa các thẻ cùng trang).
+ */
+export function useWaveIds() {
+  return React.useId().replace(/[^a-zA-Z0-9_-]/g, "");
+}
+
+export function WaveGradients({ id, keys, from = 0.32, to = 0.02 }) {
+  return (
+    <defs>
+      {keys.map((k) => (
+        <linearGradient key={k} id={`${id}-${k}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={`var(--color-${k})`} stopOpacity={from} />
+          <stop offset="100%" stopColor={`var(--color-${k})`} stopOpacity={to} />
+        </linearGradient>
+      ))}
+    </defs>
+  );
+}
+
+export function waveProps(id, key, index = 0, { dots = true } = {}) {
+  return {
+    dataKey: key,
+    type: "natural",
+    stroke: `var(--color-${key})`,
+    strokeWidth: 2,
+    fill: `url(#${id}-${key})`,
+    dot: dots ? { r: 3, strokeWidth: 2, stroke: "var(--card)", fill: `var(--color-${key})` } : false,
+    activeDot: { r: 5, strokeWidth: 2, stroke: "var(--card)", fill: `var(--color-${key})` },
+    isAnimationActive: !prefersReducedMotion(),
+    animationBegin: 100 + index * 160,
+    animationDuration: 1100,
+    animationEasing: "ease-out",
+  };
+}
+
+/** Con trỏ dọc của tooltip cho biểu đồ đường/sóng. */
+export const waveCursor = { stroke: "var(--border)", strokeWidth: 1, strokeDasharray: "3 3" };

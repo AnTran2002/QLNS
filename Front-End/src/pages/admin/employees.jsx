@@ -53,7 +53,7 @@ function EmployeeSheet({ employee, onOpenChange, onEdit }) {
           <>
             <SheetHeader className="items-center gap-3 px-6 pt-10 pb-6 text-center">
               <motion.div initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ ...SPRING, delay: 0.1 }}>
-                <PersonAvatar name={employee.full_name} seed={employee.employee_code} size="xl" />
+                <PersonAvatar name={employee.full_name} seed={employee.employee_code} src={employee.avatar} size="xl" />
               </motion.div>
               <div className="space-y-1">
                 <SheetTitle>{employee.full_name}</SheetTitle>
@@ -234,10 +234,10 @@ export default function EmployeesPage() {
                     >
                       <TableCell>
                         <button className="flex items-center gap-3 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setViewing(e)}>
-                          <PersonAvatar name={e.full_name} seed={e.employee_code} size="sm" />
-                          <span className="grid">
-                            <span className="text-[15px] font-medium text-foreground">{e.full_name}</span>
-                            <span className="text-[13px] text-muted-foreground">
+                          <PersonAvatar name={e.full_name} seed={e.employee_code} src={e.avatar} size="sm" />
+                          <span className="grid min-w-0">
+                            <span className="text-[15px] font-medium text-foreground max-sm:whitespace-normal">{e.full_name}</span>
+                            <span className="text-[13px] text-muted-foreground max-sm:whitespace-normal">
                               <span className="font-mono text-[12px]">{e.employee_code}</span> · {e.position}
                             </span>
                           </span>

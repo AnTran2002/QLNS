@@ -17,7 +17,7 @@ export function WeekSchedule({ schedule = {}, className }) {
             title={`${d.label}: ${value}`}
             aria-current={today ? "date" : undefined}
             className={cn(
-              "relative flex flex-col items-center gap-1 rounded-xl border px-1 py-3 text-center transition-[transform,background-color] duration-200 hover:-translate-y-0.5",
+              "relative flex flex-col items-center gap-1 rounded-xl border px-1 py-3 text-center transition-colors duration-300",
               today
                 ? "border-primary/40 bg-primary/[0.07] text-foreground"
                 : off

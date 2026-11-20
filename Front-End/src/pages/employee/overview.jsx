@@ -99,7 +99,7 @@ function TeamPreview({ team, me }) {
           <ul className="grid gap-1">
             {others.slice(0, 4).map((m) => (
               <li key={m.id} className="flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-muted/60">
-                <PersonAvatar name={m.full_name} seed={m.employee_code} size="xs" />
+                <PersonAvatar name={m.full_name} seed={m.employee_code} src={m.avatar} size="xs" />
                 <span className="grid min-w-0 flex-1 leading-tight">
                   <span className="truncate text-[13.5px] font-medium">{m.full_name}</span>
                   <span className="truncate text-[12px] text-muted-foreground">{m.position}</span>
@@ -133,7 +133,7 @@ export default function EmployeeOverview() {
         <Reveal offset={8}>
           <div className="space-y-1">
             <p className="text-[13px] text-muted-foreground first-letter:uppercase">{todayLabel.format(now)}</p>
-            <h1 className="font-display text-[26px] font-semibold tracking-[-0.025em] md:text-[30px]">
+            <h1 className="page-title">
               {greeting(now)}, {givenName(user.full_name)}
             </h1>
             <p className="text-[14px] text-muted-foreground">
@@ -215,7 +215,7 @@ export default function EmployeeOverview() {
         </Reveal>
       </section>
 
-      <div className="grid gap-3 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3 [&>*]:min-w-0">
         <Reveal delay={120} offset={14} className="h-full lg:col-span-2">
           <EarningsChart history={history} />
         </Reveal>
@@ -224,7 +224,7 @@ export default function EmployeeOverview() {
         </Reveal>
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3 [&>*]:min-w-0">
         <Reveal delay={120} offset={14} className="h-full lg:col-span-2">
           <Card className="h-full gap-5">
             <CardHeader>

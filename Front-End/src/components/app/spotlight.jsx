@@ -112,7 +112,7 @@ function SpotlightBody({ items, onClose }) {
                       className="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5"
                     >
                       {r.person ? (
-                        <PersonAvatar name={r.person.full_name} seed={r.person.employee_code} size="xs" />
+                        <PersonAvatar name={r.person.full_name} seed={r.person.employee_code} src={r.person.avatar} size="xs" />
                       ) : (
                         <span className={on ? "flex size-7 items-center justify-center rounded-lg bg-white/20 text-white" : "flex size-7 items-center justify-center rounded-lg bg-muted text-foreground/70"}>
                           <r.icon className="size-4" />

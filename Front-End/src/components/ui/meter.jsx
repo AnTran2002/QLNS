@@ -16,7 +16,7 @@ function Meter({ value = 0, className, indicatorClassName, label }) {
       className={cn("relative h-2 w-full overflow-hidden rounded-full bg-muted", className)}
     >
       <div
-        className={cn("h-full rounded-full bg-primary transition-[width] duration-500 ease-out", indicatorClassName)}
+        className={cn("grow-x h-full rounded-full bg-primary transition-[width] duration-700 ease-[cubic-bezier(.22,1,.36,1)]", indicatorClassName)}
         style={{ width: `${pct}%` }}
       />
     </div>

@@ -1,5 +1,6 @@
 import { BadgeCheck, Briefcase, CalendarDays, FileSignature, Info, Mail } from "lucide-react";
-import { ErrorState, EmployeeStatusBadge, LoadingState, PersonAvatar } from "@/components/app/kit";
+import { ErrorState, EmployeeStatusBadge, LoadingState } from "@/components/app/kit";
+import { AvatarEditor } from "@/components/employee/avatar-editor";
 import { Reveal } from "@/components/app/motion";
 import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEmployeeDashboard } from "@/hooks/use-employee-dashboard";
@@ -10,9 +11,11 @@ import { cn } from "@/lib/utils";
 /** Một dòng nhãn — giá trị, căn hai bên như bảng thông tin của shadcn dashboard. */
 function Field({ label, children, mono, className }) {
   return (
-    <div className={cn("flex items-baseline justify-between gap-4 py-2.5", className)}>
+    <div className={cn("flex items-baseline justify-between gap-x-4 gap-y-0.5 py-2.5 max-[380px]:flex-col", className)}>
       <dt className="shrink-0 text-[13px] text-muted-foreground">{label}</dt>
-      <dd className={cn("min-w-0 truncate text-right text-[13.5px] font-medium", mono && "font-mono text-[13px]")}>{children ?? "Chưa cập nhật"}</dd>
+      <dd className={cn("min-w-0 text-right text-[13.5px] font-medium break-words tabular-nums max-[380px]:text-left", mono && "font-mono text-[13px]")}>
+        {children ?? "Chưa cập nhật"}
+      </dd>
     </div>
   );
 }
@@ -31,7 +34,7 @@ function IncomeStructure({ base, allowance }) {
         <p className="text-[12.5px] text-muted-foreground">Thu nhập cố định / tháng</p>
         <p className="font-display text-[20px] font-semibold tracking-[-0.02em] tabular-nums">{formatMoney(total)}</p>
       </div>
-      <div className="flex h-2 gap-0.5 overflow-hidden rounded-full" role="img" aria-label="Cơ cấu thu nhập cố định">
+      <div className="grow-x flex h-2 gap-0.5 overflow-hidden rounded-full" role="img" aria-label="Cơ cấu thu nhập cố định">
         {parts.map((p) => (
           <span key={p.key} className="h-full first:rounded-l-full last:rounded-r-full" style={{ width: `${(p.value / total) * 100}%`, background: p.color }} />
         ))}
@@ -63,35 +66,41 @@ export default function EmployeeProfile() {
     <div className="space-y-6">
       <header>
         <Reveal offset={8}>
-          <h1 className="font-display text-[26px] font-semibold tracking-[-0.025em] md:text-[30px]">Hồ sơ</h1>
+          <h1 className="page-title">Hồ sơ</h1>
           <p className="mt-1 text-[14px] text-muted-foreground">Thông tin cá nhân và hợp đồng lao động hiện hành.</p>
         </Reveal>
       </header>
 
       <Reveal delay={60} offset={12}>
-        <Card className="overflow-hidden py-0">
-          <div className="h-20 bg-gradient-to-r from-primary/15 via-primary/5 to-transparent" aria-hidden="true" />
-          <CardContent className="-mt-10 flex flex-col gap-4 pb-6 sm:flex-row sm:items-end">
-            <PersonAvatar name={user.full_name} seed={user.employee_code} size="xl" className="ring-4 ring-card" />
-            <div className="min-w-0 flex-1 space-y-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="font-display text-[22px] leading-tight font-semibold tracking-[-0.02em]">{user.full_name}</h2>
-                <EmployeeStatusBadge status={user.status} />
-              </div>
+        <Card className="py-8 sm:py-10">
+          <CardContent className="flex flex-col items-center gap-5 text-center">
+            <AvatarEditor user={user} />
+            <div className="min-w-0 space-y-1.5">
+              <h2 className="font-display text-[clamp(1.375rem,1.15rem+0.8vw,1.75rem)] leading-tight font-semibold tracking-[-0.022em] break-words">
+                {user.full_name}
+              </h2>
               <p className="text-[14px] text-muted-foreground">
                 {user.position || "Chưa cập nhật chức danh"} · {user.department}
               </p>
+              <div className="pt-1">
+                <EmployeeStatusBadge status={user.status} />
+              </div>
             </div>
-            <dl className="flex flex-wrap gap-x-6 gap-y-2 text-[13px]">
+            <dl className="grid w-full max-w-xl grid-cols-1 gap-2 pt-1 min-[460px]:grid-cols-3 min-[460px]:gap-0 min-[460px]:divide-x min-[460px]:divide-border/70">
               {[
-                [BadgeCheck, "Mã NV", <span key="c" className="font-mono">{user.employee_code}</span>],
-                [CalendarDays, "Vào làm", formatDate(user.joined_at)],
+                [BadgeCheck, "Mã nhân viên", <span key="c" className="font-mono">{user.employee_code}</span>],
+                [CalendarDays, "Ngày vào làm", formatDate(user.joined_at)],
                 [Briefcase, "Thâm niên", tenureLabel(user.joined_at)],
               ].map(([Icon, k, v]) => (
-                <div key={k} className="flex items-center gap-2">
-                  <Icon className="size-4 text-muted-foreground" aria-hidden="true" />
-                  <dt className="text-muted-foreground">{k}</dt>
-                  <dd className="font-medium">{v}</dd>
+                <div
+                  key={k}
+                  className="flex min-w-0 items-center justify-between gap-3 rounded-lg bg-muted/50 px-3.5 py-2.5 min-[460px]:flex-col min-[460px]:justify-start min-[460px]:gap-1 min-[460px]:rounded-none min-[460px]:bg-transparent min-[460px]:px-3 min-[460px]:py-0"
+                >
+                  <dt className="flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
+                    <Icon className="size-3.5" aria-hidden="true" />
+                    {k}
+                  </dt>
+                  <dd className="truncate text-[14px] font-medium tabular-nums">{v}</dd>
                 </div>
               ))}
             </dl>
@@ -99,7 +108,7 @@ export default function EmployeeProfile() {
         </Card>
       </Reveal>
 
-      <div className="grid gap-3 lg:grid-cols-5">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-5 [&>*]:min-w-0">
         <Reveal delay={110} offset={14} className="h-full lg:col-span-2">
           <Card className="h-full gap-3">
             <CardHeader>
@@ -111,7 +120,7 @@ export default function EmployeeProfile() {
                 <Field label="Họ và tên">{user.full_name}</Field>
                 <Field label="Mã nhân viên" mono>{user.employee_code}</Field>
                 <Field label="Email công ty">
-                  <a href={`mailto:${user.email}`} className="inline-flex items-center gap-1.5 hover:underline">
+                  <a href={`mailto:${user.email}`} className="inline-flex max-w-full items-center gap-1.5 break-all hover:underline">
                     <Mail className="size-3.5 text-muted-foreground" aria-hidden="true" />
                     {user.email}
                   </a>
@@ -143,9 +152,9 @@ export default function EmployeeProfile() {
               <>
                 <CardContent className="space-y-5">
                   <IncomeStructure base={Number(contract.base_salary) || 0} allowance={Number(contract.allowance) || 0} />
-                  <dl className="grid divide-y divide-border/70 sm:grid-cols-2 sm:gap-x-8 sm:divide-y-0">
-                    <Field label="Lương cơ bản" className="sm:border-b sm:border-border/70">{formatMoney(contract.base_salary)}</Field>
-                    <Field label="Phụ cấp cố định" className="sm:border-b sm:border-border/70">{formatMoney(contract.allowance)}</Field>
+                  <dl className="grid divide-y divide-border/70 xl:grid-cols-2 xl:gap-x-8 xl:divide-y-0">
+                    <Field label="Lương cơ bản" className="xl:border-b xl:border-border/70">{formatMoney(contract.base_salary)}</Field>
+                    <Field label="Phụ cấp cố định" className="xl:border-b xl:border-border/70">{formatMoney(contract.allowance)}</Field>
                     <Field label="Lương đóng BHXH">{formatMoney(contract.insurance_salary)}</Field>
                     <Field label="Người phụ thuộc">{contract.dependents_count} người</Field>
                   </dl>

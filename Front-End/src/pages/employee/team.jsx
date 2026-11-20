@@ -58,7 +58,7 @@ export default function EmployeeTeam() {
     <div className="space-y-6">
       <header>
         <Reveal offset={8}>
-          <h1 className="font-display text-[26px] font-semibold tracking-[-0.025em] md:text-[30px]">
+          <h1 className="page-title">
             Phòng {me.department}
           </h1>
           <p className="mt-1 text-[14px] text-muted-foreground">
@@ -110,7 +110,7 @@ export default function EmployeeTeam() {
                     >
                       <Card
                         className={cn(
-                          "h-full gap-0 py-0 transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-md",
+                          "h-full gap-0 py-0",
                           isMe && "border-primary/50 ring-1 ring-primary/30",
                         )}
                       >
@@ -118,6 +118,7 @@ export default function EmployeeTeam() {
                           <PersonAvatar
                             name={m.full_name}
                             seed={m.employee_code}
+                            src={m.avatar}
                             size="md"
                           />
                           <div className="min-w-0 flex-1">
