@@ -76,6 +76,12 @@ match ($action) {
     'employee/dashboard' => (new EmployeeController)->dashboard(),
     'employee/attendance' => (new EmployeeController)->attendance(),
 
+    // Nghỉ phép (migration 005)
+    'employee/leave'        => ($_SERVER['REQUEST_METHOD'] === 'POST' ? (new LeaveController)->store() : (new LeaveController)->mine()),
+    'employee/leave/cancel' => (new LeaveController)->cancel(),
+    'leave/requests'        => (new LeaveController)->index(),
+    'leave/review'          => (new LeaveController)->review(),
+
     // Hồ sơ của chính mình (ADMIN + EMPLOYEE)
     'profile/avatar'     => (new ProfileController)->updateAvatar(),
 

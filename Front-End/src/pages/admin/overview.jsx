@@ -1,18 +1,8 @@
 import { useMemo } from "react";
 import { Link, useNavigate } from "react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, LabelList, Pie, PieChart, XAxis, YAxis } from "recharts";
-import {
-  ArrowRight,
-  ArrowUpRight,
-  CalendarClock,
-  ClipboardList,
-  Clock,
-  FileSignature,
-  Landmark,
-  Users,
-  Wallet,
-} from "lucide-react";
+import { Bar, BarChart, CartesianGrid, Cell, LabelList, Pie, PieChart, XAxis, YAxis } from "recharts";
+import { ArrowRight, ArrowUpRight, CalendarClock, ClipboardList, Clock, FileSignature, Landmark, Users, Wallet } from "lucide-react";
 import { Button } from "@/components/animate-ui/components/buttons/button";
 import { KpiCard, TrendBadge } from "@/components/admin/kpi-card";
 import { ErrorState, LoadingState, PeriodStatusBadge, PersonAvatar } from "@/components/app/kit";
@@ -26,10 +16,8 @@ import {
   ChartTooltip,
   ChartTooltipContent,
   barMotion,
-  WaveGradients,
-  useWaveIds,
-  waveCursor,
-  waveProps,
+  columnCursor,
+  columnProps,
 } from "@/components/ui/chart";
 import { Meter } from "@/components/ui/meter";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -64,13 +52,12 @@ const sum = (rows, key) => rows.reduce((s, r) => s + (Number(r[key]) || 0), 0);
 /* ------------------------------------------------------------------ */
 
 function PeriodChart({ periods }) {
-  const gid = useWaveIds();
   const data = useMemo(
     () =>
       [...periods]
         .filter((p) => p.items_count > 0)
         .reverse()
-        .slice(-8)
+        .slice(-12)
         .map((p) => ({ label: formatPeriod(p.month_year).replace("Tháng ", "T"), gross: p.total_gross, net: p.total_net })),
     [periods],
   );
@@ -83,21 +70,36 @@ function PeriodChart({ periods }) {
       </CardHeader>
       <CardContent className="px-3 sm:px-6">
         {data.length === 0 ? (
-          <p className="flex h-[240px] items-center justify-center text-[13px] text-muted-foreground">
-            Chưa có kỳ lương nào được tính.
-          </p>
+          <p className="flex h-[240px] items-center justify-center text-[13px] text-muted-foreground">Chưa có kỳ lương nào được tính.</p>
+        ) : data.length === 1 ? (
+          <div className="flex h-[240px] flex-col justify-center gap-4 px-1">
+            <p className="text-[12.5px] text-muted-foreground">Kỳ {data[0].label.replace("T", "")} — kỳ duy nhất đã tính</p>
+            <dl className="grid grid-cols-2 gap-4">
+              {["gross", "net"].map((k) => (
+                <div key={k}>
+                  <dt className="flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
+                    <span className="size-2 rounded-full" style={{ background: PERIOD_CHART[k].color }} aria-hidden="true" />
+                    {PERIOD_CHART[k].label}
+                  </dt>
+                  <dd className="mt-1 font-display text-[24px] font-semibold tracking-[-0.02em] tabular-nums">
+                    {formatMoneyShort(data[0][k])}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            <p className="text-[12px] text-muted-foreground">Biểu đồ cột hiển thị khi có từ 2 kỳ lương trở lên.</p>
+          </div>
         ) : (
           <ChartContainer config={PERIOD_CHART} className="aspect-auto h-[260px] w-full">
-            <AreaChart data={data} margin={{ left: 4, right: 8, top: 10 }}>
-              <WaveGradients id={gid} keys={["gross", "net"]} />
+            <BarChart data={data} margin={{ left: 4, right: 8, top: 10 }} barGap={2} barCategoryGap="24%">
               <CartesianGrid vertical={false} strokeDasharray="0" />
               <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
               <YAxis tickLine={false} axisLine={false} width={56} tickFormatter={(v) => formatMoneyShort(v)} />
-              <ChartTooltip cursor={waveCursor} content={<ChartTooltipContent valueFormatter={formatMoney} />} />
+              <ChartTooltip cursor={columnCursor} content={<ChartTooltipContent valueFormatter={formatMoney} />} />
               <ChartLegend content={<ChartLegendContent />} />
-              <Area {...waveProps(gid, "gross", 0)} />
-              <Area {...waveProps(gid, "net", 1)} />
-            </AreaChart>
+              <Bar {...columnProps("gross", 0)} />
+              <Bar {...columnProps("net", 1)} />
+            </BarChart>
           </ChartContainer>
         )}
       </CardContent>
@@ -152,9 +154,7 @@ function StatusDonut({ employees }) {
               <span className="size-2.5 shrink-0 rounded-[3px]" style={{ background: d.fill }} aria-hidden="true" />
               <span className="flex-1 text-muted-foreground">{d.status}</span>
               <span className="font-medium tabular-nums">{d.value}</span>
-              <span className="w-10 text-right text-muted-foreground tabular-nums">
-                {total ? Math.round((d.value / total) * 100) : 0}%
-              </span>
+              <span className="w-10 text-right text-muted-foreground tabular-nums">{total ? Math.round((d.value / total) * 100) : 0}%</span>
             </li>
           ))}
         </ul>
@@ -185,14 +185,7 @@ function DepartmentChart({ employees }) {
           <ChartContainer config={DEPT_CHART} className="aspect-auto w-full" style={{ height: Math.max(140, data.length * 46 + 16) }}>
             <BarChart data={data} layout="vertical" margin={{ left: 0, right: 56 }} barCategoryGap={10}>
               <XAxis type="number" hide />
-              <YAxis
-                type="category"
-                dataKey="name"
-                tickLine={false}
-                axisLine={false}
-                width={96}
-                tick={{ fontSize: 12 }}
-              />
+              <YAxis type="category" dataKey="name" tickLine={false} axisLine={false} width={96} tick={{ fontSize: 12 }} />
               <ChartTooltip
                 cursor={false}
                 content={
@@ -244,7 +237,9 @@ function PayoutStructure({ period, items }) {
     <Card className="h-full gap-4">
       <CardHeader>
         <CardTitle>Cơ cấu chi trả</CardTitle>
-        <CardDescription>{period ? `${formatPeriod(period.month_year)} · ${entered.length} phiếu lương` : "Chưa có kỳ đã tính"}</CardDescription>
+        <CardDescription>
+          {period ? `${formatPeriod(period.month_year)} · ${entered.length} phiếu lương` : "Chưa có kỳ đã tính"}
+        </CardDescription>
         {period && (
           <CardAction>
             <PeriodStatusBadge status={period.status} />
@@ -355,11 +350,7 @@ function PeriodsTable({ periods, headcount }) {
             </TableHeader>
             <TableBody>
               {periods.slice(0, 6).map((p) => (
-                <TableRow
-                  key={p.id}
-                  className="cursor-pointer"
-                  onClick={() => navigate(`/admin/cham-cong?ky=${p.id}`)}
-                >
+                <TableRow key={p.id} className="cursor-pointer" onClick={() => navigate(`/admin/cham-cong?ky=${p.id}`)}>
                   <TableCell className="font-medium">{formatPeriod(p.month_year)}</TableCell>
                   <TableCell>
                     <PeriodStatusBadge status={p.status} />

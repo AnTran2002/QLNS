@@ -56,11 +56,6 @@ function NavGroups({ groups }) {
                 <NavLink to={item.to} end={item.end} onClick={() => isMobile && setOpenMobile(false)}>
                   <Icon />
                   <span>{item.label}</span>
-                  {item.badge && (
-                    <span className="ml-auto rounded-md bg-primary/10 px-1.5 py-px text-[10.5px] font-semibold text-primary group-data-[state=collapsed]/sidebar:hidden">
-                      {item.badge}
-                    </span>
-                  )}
                 </NavLink>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -241,13 +236,13 @@ export function AdminShell({
 
       <Sidebar>
         <SidebarHeader className="pt-3">
-          <div className="flex h-10 items-center gap-2.5 overflow-hidden px-1.5">
-            <BrandMark className="size-7" />
+          <motion.div initial="rest" animate="rest" whileHover="hover" className="flex h-10 items-center gap-2.5 px-1.5">
+            <BrandMark className="size-7" hoverFromParent />
             <span className="grid leading-tight whitespace-nowrap group-data-[state=collapsed]/sidebar:hidden">
               <span className="font-display text-[15px] font-semibold tracking-[-0.02em]">QLNS</span>
               <span className="text-[11.5px] text-sidebar-foreground/60">{subtitle}</span>
             </span>
-          </div>
+          </motion.div>
         </SidebarHeader>
         <SidebarContent>
           <NavGroups groups={groups} />

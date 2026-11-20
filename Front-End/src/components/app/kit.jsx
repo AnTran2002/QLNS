@@ -41,16 +41,6 @@ export function PageHeader({ eyebrow, title, description, actions, className }) 
   );
 }
 
-/** Tiêu đề khối nội dung + liên kết phụ. */
-export function SectionTitle({ children, action, className }) {
-  return (
-    <div className={cn("flex items-baseline justify-between gap-4", className)}>
-      <h2 className="text-title">{children}</h2>
-      {action}
-    </div>
-  );
-}
-
 /* ------------------------------------------------------------------ */
 /* Ô số liệu                                                           */
 /* ------------------------------------------------------------------ */

@@ -7,9 +7,9 @@ import axios from "axios";
  *   { success: boolean, data: any, message: string }
  * `callApi` trả về `data`, hoặc ném `ApiError` mang đúng `message` của Back-End.
  */
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 
-export const http = axios.create({
+const http = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: true, // gửi cookie phiên PHPSESSID
   headers: { Accept: "application/json" },
@@ -26,7 +26,7 @@ export class ApiError extends Error {
   }
 }
 
-export async function callApi(action, { method = "GET", data, params, timeout } = {}) {
+async function callApi(action, { method = "GET", data, params, timeout } = {}) {
   try {
     const res = await http.request({ url: "/", method, data, params: { action, ...params }, ...(timeout ? { timeout } : {}) });
     const body = res.data;
@@ -48,7 +48,7 @@ export async function callApi(action, { method = "GET", data, params, timeout } 
   }
 }
 
-/** Link tải phiếu lương HTML (UC-03) — chỉ kỳ LOCKED/PAID, gửi kèm cookie phiên vì cùng origin. */
+/** Link tải phiếu lương HTML — chỉ kỳ LOCKED/PAID, gửi kèm cookie phiên vì cùng origin. */
 export const payslipDownloadUrl = (periodId) =>
   `${API_BASE_URL.replace(/\/$/, "")}/?action=payroll/payslip/download&period_id=${encodeURIComponent(periodId)}`;
 
@@ -59,7 +59,7 @@ const MONEY_FIELDS = [
   "actual_days", "ot_hours", "standard_days",
   "items_count", "total_gross", "total_net",
 ];
-export function toNumbers(row) {
+function toNumbers(row) {
   if (!row || typeof row !== "object") return row;
   const out = { ...row };
   for (const key of MONEY_FIELDS) {
@@ -111,6 +111,16 @@ export const api = {
       records: (d.records ?? []).map((r) => ({ ...r, work_hours: Number(r.work_hours) || 0, ot_hours: Number(r.ot_hours) || 0 })),
     })),
 
+  // ---- Nghỉ phép (LeaveController, migration 005) ----
+  /** { available, balance: { year, quota, used, pending, remaining }, requests } */
+  myLeave: () => callApi("employee/leave"),
+  createLeave: ({ type, start_date, end_date, reason }) =>
+    callApi("employee/leave", { method: "POST", data: { type, start_date, end_date, reason } }),
+  cancelLeave: (id) => callApi("employee/leave/cancel", { method: "POST", params: { id } }),
+  leaveRequests: (status) => callApi("leave/requests", { params: status ? { status } : undefined }),
+  /** decision: "APPROVED" | "REJECTED" (từ chối bắt buộc có ghi chú). */
+  reviewLeave: (id, decision, note) => callApi("leave/review", { method: "POST", params: { id }, data: { decision, note } }),
+
   // ---- Hồ sơ của chính mình ----
   /** `avatar` là data URL (đã thu nhỏ) hoặc null để xoá. */
   updateAvatar: (avatar) => callApi("profile/avatar", { method: "POST", data: { avatar } }),
@@ -140,7 +150,7 @@ export const api = {
   payrollPeriods: () => callApi("payroll/periods").then(toNumberList),
   payrollItems: (periodId) => callApi("payroll/items", { params: { period_id: periodId } }),
 
-  // ---- UC-02: Nhập liệu bảng công & OT ----
+  // ---- Chấm công & OT ----
   /** Tạo kỳ lương mới (Tháng/Năm) — month_year dạng "YYYY-MM". */
   createPayrollPeriod: ({ month_year, standard_days }) =>
     callApi("payroll/periods", {

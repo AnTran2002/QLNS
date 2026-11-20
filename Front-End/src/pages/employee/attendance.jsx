@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { CalendarCheck, CalendarX2, ChevronLeft, ChevronRight, Clock, Clock3, DatabaseZap, Timer } from "lucide-react";
 import { KpiCard } from "@/components/admin/kpi-card";
 import { Button } from "@/components/animate-ui/components/buttons/button";
@@ -22,10 +22,8 @@ import {
   ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
-  WaveGradients,
-  useWaveIds,
-  waveCursor,
-  waveProps,
+  columnCursor,
+  columnProps,
 } from "@/components/ui/chart";
 import { Meter } from "@/components/ui/meter";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -85,11 +83,23 @@ export default function EmployeeAttendance() {
       [...history]
         .reverse()
         .slice(-12)
-        .map((i) => ({ label: shortPeriod(i.month_year), actual: i.actual_days, standard: i.standard_days, ot: i.ot_hours })),
+        .map((i) => ({
+          label: shortPeriod(i.month_year),
+          actual: i.actual_days,
+          standard: i.standard_days,
+          ot: i.ot_hours,
+        })),
     [history],
   );
   const dailyData = useMemo(
-    () => cells.filter((c) => c?.record).map((c) => ({ label: String(c.day), work: c.record.work_hours, ot: c.record.ot_hours })),
+    () =>
+      cells
+        .filter((c) => c?.record)
+        .map((c) => ({
+          label: String(c.day),
+          work: c.record.work_hours,
+          ot: c.record.ot_hours,
+        })),
     [cells],
   );
 
@@ -107,7 +117,9 @@ export default function EmployeeAttendance() {
   const selectedCell = cells.find((c) => c?.key === selected) ?? null;
   const attendRate = stats.elapsed ? (stats.worked / stats.elapsed) * 100 : 0;
   const shiftRecord = att.data?.records?.[0];
-  const shiftText = shiftRecord ? `${shiftRecord.shift} · ${shiftRecord.shift_start}–${shiftRecord.shift_end}` : "Ca hành chính · 08:30–17:30";
+  const shiftText = shiftRecord
+    ? `${shiftRecord.shift} · ${shiftRecord.shift_start}–${shiftRecord.shift_end}`
+    : "Ca hành chính · 08:30–17:30";
 
   return (
     <div className="space-y-6">
@@ -167,7 +179,13 @@ export default function EmployeeAttendance() {
                   <CardTitle>Lịch đi làm</CardTitle>
                   <CardDescription>{shiftText}</CardDescription>
                   <CardAction className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon-sm" onClick={() => go(-1)} disabled={idx < 0 || idx >= months.length - 1} aria-label="Tháng trước">
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => go(-1)}
+                      disabled={idx < 0 || idx >= months.length - 1}
+                      aria-label="Tháng trước"
+                    >
                       <ChevronLeft />
                     </Button>
                     <span className="min-w-[96px] text-center text-[13.5px] font-medium tabular-nums" aria-live="polite">
@@ -180,7 +198,11 @@ export default function EmployeeAttendance() {
                 </CardHeader>
                 <CardContent className="space-y-4 px-3 sm:px-6">
                   {months.length === 0 ? (
-                    <EmptyState icon={CalendarCheck} title="Chưa có dữ liệu chấm công" description="Lịch sẽ hiện khi có bản ghi chấm công đầu tiên." />
+                    <EmptyState
+                      icon={CalendarCheck}
+                      title="Chưa có dữ liệu chấm công"
+                      description="Lịch sẽ hiện khi có bản ghi chấm công đầu tiên."
+                    />
                   ) : (
                     <div className="overflow-hidden">
                       <AnimatePresence mode="wait" initial={false} custom={direction}>
@@ -195,9 +217,17 @@ export default function EmployeeAttendance() {
                           initial="enter"
                           animate="center"
                           exit="exit"
-                          transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+                          transition={{
+                            duration: 0.28,
+                            ease: [0.22, 1, 0.36, 1],
+                          }}
                         >
-                          <MonthCalendar cells={cells} selected={selected} onSelect={setSelected} layoutKey={`calendar-selected-${activeMonth}`} />
+                          <MonthCalendar
+                            cells={cells}
+                            selected={selected}
+                            onSelect={setSelected}
+                            layoutKey={`calendar-selected-${activeMonth}`}
+                          />
                         </motion.div>
                       </AnimatePresence>
                     </div>
@@ -313,9 +343,8 @@ function Item({ label, value, wide }) {
   );
 }
 
-/** Biểu đồ sóng giờ làm + làm thêm từng ngày trong tháng (cùng đơn vị giờ → một trục). */
+/** Cột chồng giờ làm + làm thêm từng ngày trong tháng (cùng đơn vị giờ → một trục). */
 function DailyHoursChart({ data, month }) {
-  const gid = useWaveIds();
   return (
     <Reveal delay={140} offset={14}>
       <Card className="gap-4">
@@ -325,19 +354,18 @@ function DailyHoursChart({ data, month }) {
         </CardHeader>
         <CardContent className="px-3 sm:px-6">
           <ChartContainer config={DAILY_CHART} className="aspect-auto h-[220px] w-full">
-            <AreaChart data={data} margin={{ left: 0, right: 8, top: 8 }}>
-              <WaveGradients id={gid} keys={["work", "ot"]} />
+            <BarChart data={data} margin={{ left: 0, right: 8, top: 8 }} barCategoryGap="22%">
               <CartesianGrid vertical={false} />
               <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} minTickGap={12} />
               <YAxis tickLine={false} axisLine={false} width={28} domain={[0, 10]} ticks={[0, 2, 4, 6, 8, 10]} />
               <ChartTooltip
-                cursor={waveCursor}
+                cursor={columnCursor}
                 content={<ChartTooltipContent labelFormatter={(l) => `Ngày ${l}`} valueFormatter={(v) => hours(v)} />}
               />
               <ChartLegend content={<ChartLegendContent />} />
-              <Area {...waveProps(gid, "work", 0, { dots: false })} />
-              <Area {...waveProps(gid, "ot", 1, { dots: false })} />
-            </AreaChart>
+              <Bar {...columnProps("work", 0, { stackId: "d" })} maxBarSize={16} />
+              <Bar {...columnProps("ot", 1, { stackId: "d", top: true })} maxBarSize={16} />
+            </BarChart>
           </ChartContainer>
         </CardContent>
       </Card>
@@ -347,54 +375,52 @@ function DailyHoursChart({ data, month }) {
 
 /** Ngày công / OT theo kỳ lương (dữ liệu phòng nhân sự chốt khi tính lương). */
 function PeriodSection({ history, data }) {
-  const daysId = useWaveIds();
-  const otId = useWaveIds();
   return (
     <>
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3 [&>*]:min-w-0">
-        <Reveal delay={140} offset={14} className="h-full lg:col-span-2">
-          <Card className="h-full gap-4">
-            <CardHeader>
-              <CardTitle>Ngày công theo kỳ lương</CardTitle>
-              <CardDescription>Thực tế so với công chuẩn của từng kỳ</CardDescription>
-            </CardHeader>
-            <CardContent className="px-3 sm:px-6">
-              <ChartContainer config={PERIOD_CHART} className="aspect-auto h-[240px] w-full">
-                <AreaChart data={data} margin={{ left: 0, right: 8, top: 8 }}>
-                  <WaveGradients id={daysId} keys={["standard", "actual"]} from={0.24} />
-                  <CartesianGrid vertical={false} />
-                  <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
-                  <YAxis tickLine={false} axisLine={false} width={32} allowDecimals={false} />
-                  <ChartTooltip cursor={waveCursor} content={<ChartTooltipContent valueFormatter={(v) => `${formatNumber(v)} ngày`} />} />
-                  <ChartLegend content={<ChartLegendContent />} />
-                  <Area {...waveProps(daysId, "standard", 0)} strokeDasharray="4 4" />
-                  <Area {...waveProps(daysId, "actual", 1)} />
-                </AreaChart>
-              </ChartContainer>
-            </CardContent>
-          </Card>
-        </Reveal>
-        <Reveal delay={190} offset={14} className="h-full">
-          <Card className="h-full gap-4">
-            <CardHeader>
-              <CardTitle>Giờ làm thêm</CardTitle>
-              <CardDescription>Theo từng kỳ lương</CardDescription>
-            </CardHeader>
-            <CardContent className="px-3 sm:px-6">
-              <ChartContainer config={OT_CHART} className="aspect-auto h-[240px] w-full">
-                <AreaChart data={data} margin={{ left: 0, right: 8, top: 8 }}>
-                  <WaveGradients id={otId} keys={["ot"]} />
-                  <CartesianGrid vertical={false} />
-                  <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
-                  <YAxis tickLine={false} axisLine={false} width={32} allowDecimals={false} />
-                  <ChartTooltip cursor={waveCursor} content={<ChartTooltipContent valueFormatter={(v) => hours(v)} />} />
-                  <Area {...waveProps(otId, "ot", 0)} />
-                </AreaChart>
-              </ChartContainer>
-            </CardContent>
-          </Card>
-        </Reveal>
-      </div>
+      {data.length >= 2 && (
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-3 [&>*]:min-w-0">
+          <Reveal delay={140} offset={14} className="h-full lg:col-span-2">
+            <Card className="h-full gap-4">
+              <CardHeader>
+                <CardTitle>Ngày công theo kỳ lương</CardTitle>
+                <CardDescription>Thực tế so với công chuẩn của từng kỳ</CardDescription>
+              </CardHeader>
+              <CardContent className="px-3 sm:px-6">
+                <ChartContainer config={PERIOD_CHART} className="aspect-auto h-[240px] w-full">
+                  <BarChart data={data} margin={{ left: 0, right: 8, top: 8 }} barGap={2} barCategoryGap="24%">
+                    <CartesianGrid vertical={false} />
+                    <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
+                    <YAxis tickLine={false} axisLine={false} width={32} allowDecimals={false} />
+                    <ChartTooltip cursor={columnCursor} content={<ChartTooltipContent valueFormatter={(v) => `${formatNumber(v)} ngày`} />} />
+                    <ChartLegend content={<ChartLegendContent />} />
+                    <Bar {...columnProps("standard", 0)} />
+                    <Bar {...columnProps("actual", 1)} />
+                  </BarChart>
+                </ChartContainer>
+              </CardContent>
+            </Card>
+          </Reveal>
+          <Reveal delay={190} offset={14} className="h-full">
+            <Card className="h-full gap-4">
+              <CardHeader>
+                <CardTitle>Giờ làm thêm</CardTitle>
+                <CardDescription>Theo từng kỳ lương</CardDescription>
+              </CardHeader>
+              <CardContent className="px-3 sm:px-6">
+                <ChartContainer config={OT_CHART} className="aspect-auto h-[240px] w-full">
+                  <BarChart data={data} margin={{ left: 0, right: 8, top: 8 }} barCategoryGap="30%">
+                    <CartesianGrid vertical={false} />
+                    <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
+                    <YAxis tickLine={false} axisLine={false} width={32} allowDecimals={false} />
+                    <ChartTooltip cursor={columnCursor} content={<ChartTooltipContent valueFormatter={(v) => hours(v)} />} />
+                    <Bar {...columnProps("ot", 0)} />
+                  </BarChart>
+                </ChartContainer>
+              </CardContent>
+            </Card>
+          </Reveal>
+        </div>
+      )}
 
       <Reveal delay={160} offset={14}>
         <Card className="gap-0 py-0">

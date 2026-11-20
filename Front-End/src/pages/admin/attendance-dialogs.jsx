@@ -21,7 +21,7 @@ import { formatPeriod } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /** Số ngày làm việc (Thứ 2 – Thứ 6) trong tháng — gợi ý cho "công chuẩn". */
-export function weekdaysIn(year, month) {
+function weekdaysIn(year, month) {
   const days = new Date(year, month, 0).getDate();
   let count = 0;
   for (let d = 1; d <= days; d++) {

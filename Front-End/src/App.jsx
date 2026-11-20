@@ -9,6 +9,7 @@ import {
   FileSignature,
   FileText,
   LayoutDashboard,
+  Plane,
   UserRound,
   Users,
   UsersRound,
@@ -30,11 +31,13 @@ const DepartmentsPage = lazy(() => import("@/pages/admin/departments"));
 const ContractsPage = lazy(() => import("@/pages/admin/contracts"));
 const PayrollPage = lazy(() => import("@/pages/admin/payroll"));
 const AttendancePage = lazy(() => import("@/pages/admin/attendance"));
+const LeaveRequestsPage = lazy(() => import("@/pages/admin/leave"));
 const EmployeeOverview = lazy(() => import("@/pages/employee/overview"));
 const EmployeeProfile = lazy(() => import("@/pages/employee/profile"));
 const EmployeePayslips = lazy(() => import("@/pages/employee/payslips"));
 const EmployeeAttendance = lazy(() => import("@/pages/employee/attendance"));
 const EmployeeTeam = lazy(() => import("@/pages/employee/team"));
+const EmployeeLeave = lazy(() => import("@/pages/employee/leave"));
 
 const ADMIN_NAV = [
   {
@@ -46,12 +49,13 @@ const ADMIN_NAV = [
     items: [
       { to: "/admin/nhan-vien", label: "Nhân viên", icon: Users },
       { to: "/admin/phong-ban", label: "Phòng ban", icon: Building2 },
+      { to: "/admin/nghi-phep", label: "Nghỉ phép", icon: Plane },
     ],
   },
   {
     label: "Tiền lương",
     items: [
-      { to: "/admin/cham-cong", label: "Chấm công & OT", icon: ClipboardList, badge: "UC-02" },
+      { to: "/admin/cham-cong", label: "Chấm công & OT", icon: ClipboardList },
       { to: "/admin/hop-dong", label: "Hợp đồng", icon: FileSignature },
       { to: "/admin/bang-luong", label: "Bảng lương", icon: Wallet },
     ],
@@ -71,6 +75,7 @@ const EMPLOYEE_NAV = [
     items: [
       { to: "/nhan-vien/phieu-luong", label: "Phiếu lương", icon: FileText },
       { to: "/nhan-vien/cham-cong", label: "Chấm công", icon: CalendarCheck },
+      { to: "/nhan-vien/nghi-phep", label: "Nghỉ phép", icon: Plane },
       { to: "/nhan-vien/dong-nghiep", label: "Đồng nghiệp", icon: UsersRound },
     ],
   },
@@ -79,7 +84,7 @@ const EMPLOYEE_NAV = [
 function FullScreenLoader() {
   return (
     <div className="flex min-h-svh flex-col items-center justify-center gap-5" aria-busy="true">
-      <BrandMark className="size-12 animate-pulse" />
+      <BrandMark className="size-12" playing />
       <ShimmeringText
         text="Đang kiểm tra phiên đăng nhập…"
         className="text-[14px]"
@@ -129,6 +134,7 @@ export function AppRoutes() {
         <Route index element={<AdminOverview />} />
         <Route path="nhan-vien" element={<EmployeesPage />} />
         <Route path="phong-ban" element={<DepartmentsPage />} />
+        <Route path="nghi-phep" element={<LeaveRequestsPage />} />
         <Route path="cham-cong" element={<AttendancePage />} />
         <Route path="hop-dong" element={<ContractsPage />} />
         <Route path="bang-luong" element={<PayrollPage />} />
@@ -139,6 +145,7 @@ export function AppRoutes() {
         <Route path="ho-so" element={<EmployeeProfile />} />
         <Route path="phieu-luong" element={<EmployeePayslips />} />
         <Route path="cham-cong" element={<EmployeeAttendance />} />
+        <Route path="nghi-phep" element={<EmployeeLeave />} />
         <Route path="dong-nghiep" element={<EmployeeTeam />} />
       </Route>
 

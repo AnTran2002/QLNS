@@ -28,6 +28,13 @@ const DASHBOARD = {
   team_members: [EMPLOYEE],
 };
 
+const LEAVE_BALANCE = { year: 2026, quota: 12, used: 3, pending: 2, remaining: 7 };
+const LEAVE_REQ = {
+  id: 7, user_id: 2, employee_code: "NV002", full_name: "Trần Thị Bình", department: "Thiết kế", avatar: null,
+  type: "ANNUAL", start_date: "2026-12-07", end_date: "2026-12-08", days: 2, reason: "Về quê giải quyết việc gia đình",
+  status: "PENDING", reviewer_name: null, review_note: null, created_at: "2026-11-20 09:00:00",
+};
+
 function renderApp(path) {
   return render(
     <ThemeProvider>
@@ -58,6 +65,8 @@ beforeEach(() => {
     ],
   });
   api.payrollAttendance.mockResolvedValue({ period: { id: 2, month_year: "2026-11", standard_days: 22, status: "DRAFT" }, items: [] });
+  api.myLeave.mockResolvedValue({ available: true, balance: LEAVE_BALANCE, requests: [LEAVE_REQ] });
+  api.leaveRequests.mockResolvedValue({ available: true, requests: [LEAVE_REQ, { ...LEAVE_REQ, id: 8, status: "APPROVED", reason: "Khám sức khoẻ", type: "SICK" }] });
 });
 
 describe("Phân quyền & đăng nhập", () => {
@@ -105,7 +114,7 @@ const ATT_ROW = {
   payroll_item_id: null, actual_days: 0, ot_hours: 0, gross_salary: 0, social_insurance: 0, tax_deduction: 0, personal_tax: 0, net_salary: 0,
 };
 
-describe("UC-02 · Nhập liệu bảng công & OT", () => {
+describe("Chấm công & OT", () => {
   it("sửa công trên Grid → lưu gửi đúng entries", async () => {
     api.me.mockResolvedValue({ user: ADMIN });
     const period = { id: 2, month_year: "2026-11", standard_days: 22, status: "DRAFT" };
@@ -180,5 +189,56 @@ describe("Cổng nhân viên", () => {
     renderApp("/nhan-vien/phieu-luong");
     const link = await screen.findByRole("link", { name: /Tải phiếu lương Tháng 10/ });
     expect(link.getAttribute("href")).toContain("action=payroll/payslip/download&period_id=1");
+  });
+});
+
+describe("Nghỉ phép", () => {
+  it("nhân viên thấy quỹ phép và đơn của mình", async () => {
+    api.me.mockResolvedValue({ user: EMPLOYEE });
+    renderApp("/nhan-vien/nghi-phep");
+    expect(await screen.findByRole("heading", { level: 1, name: "Nghỉ phép" })).toBeInTheDocument();
+    expect((await screen.findAllByText("Về quê giải quyết việc gia đình")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Chờ duyệt").length).toBeGreaterThan(0);
+  });
+
+  it("nhân viên huỷ đơn đang chờ duyệt", async () => {
+    api.me.mockResolvedValue({ user: EMPLOYEE });
+    api.cancelLeave.mockResolvedValue({ ...LEAVE_REQ, status: "CANCELLED" });
+    renderApp("/nhan-vien/nghi-phep");
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /Huỷ đơn/ }));
+    const buttons = await screen.findAllByRole("button", { name: /Huỷ đơn/ });
+    await user.click(buttons[buttons.length - 1]);
+    await waitFor(() => expect(api.cancelLeave).toHaveBeenCalledWith(7));
+  });
+
+  it("chưa chạy migration 005 → hiện hướng dẫn", async () => {
+    api.me.mockResolvedValue({ user: EMPLOYEE });
+    api.myLeave.mockResolvedValue({ available: false, balance: null, requests: [] });
+    renderApp("/nhan-vien/nghi-phep");
+    expect(await screen.findByText(/005_leave_requests\.sql/)).toBeInTheDocument();
+  });
+
+  it("admin duyệt đơn chờ", async () => {
+    api.me.mockResolvedValue({ user: ADMIN });
+    api.reviewLeave.mockResolvedValue({ ...LEAVE_REQ, status: "APPROVED" });
+    renderApp("/admin/nghi-phep");
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Duyệt đơn của Trần Thị Bình" }));
+    await waitFor(() => expect(api.reviewLeave).toHaveBeenCalledWith(7, "APPROVED", undefined));
+  });
+
+  it("admin từ chối phải ghi lý do", async () => {
+    api.me.mockResolvedValue({ user: ADMIN });
+    api.reviewLeave.mockResolvedValue({ ...LEAVE_REQ, status: "REJECTED" });
+    renderApp("/admin/nghi-phep");
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Từ chối đơn của Trần Thị Bình" }));
+    await user.click(await screen.findByRole("button", { name: /Từ chối đơn$/ }));
+    expect(await screen.findByText(/Hãy ghi lý do từ chối/)).toBeInTheDocument();
+    expect(api.reviewLeave).not.toHaveBeenCalled();
+    await user.type(screen.getByLabelText("Lý do từ chối"), "Trùng lịch bàn giao");
+    await user.click(screen.getByRole("button", { name: /Từ chối đơn$/ }));
+    await waitFor(() => expect(api.reviewLeave).toHaveBeenCalledWith(7, "REJECTED", "Trùng lịch bàn giao"));
   });
 });

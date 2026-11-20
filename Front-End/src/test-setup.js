@@ -31,3 +31,6 @@ if (!globalThis.IntersectionObserver) {
     takeRecords() { return []; }
   };
 }
+
+// jsdom không có window.scrollTo (router cuộn lên đầu khi đổi trang)
+window.scrollTo = () => {};

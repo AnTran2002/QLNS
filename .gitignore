@@ -53,3 +53,25 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# ------------------------------------------------------------------
+# File sinh ra theo từng máy — đưa lên sẽ làm hỏng việc chạy/test trên máy khác
+# (Windows ⇄ macOS). Mỗi máy tự sinh lại bằng `npm install`.
+# ------------------------------------------------------------------
+# package-lock.json tạo trên macOS thiếu binding native của Windows (rolldown, lightningcss,
+# @tailwindcss/oxide…) → máy kia báo "Cannot find module …" hoặc vite không khởi động.
+package-lock.json
+**/package-lock.json
+yarn.lock
+pnpm-lock.yaml
+# Cache của Vite / Vitest, kết quả coverage
+.vite/
+**/node_modules/.vite/
+coverage/
+*.tsbuildinfo
+# Rác hệ điều hành
+Thumbs.db
+ehthumbs.db
+desktop.ini
+$RECYCLE.BIN/
+._*

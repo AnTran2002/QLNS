@@ -32,7 +32,7 @@ import { cn } from "@/lib/utils";
 import { CreatePeriodDialog, daysInMonthOf, ImportDialog } from "./attendance-dialogs";
 
 /*
- * UC-02 · Nhập liệu bảng công & OT (Actor: Admin / Kế toán C&B)
+ * Chấm công & OT (Admin / Kế toán C&B)
  *   <<use>>    Tạo Kỳ lương mới (Tháng/Năm)         → CreatePeriodDialog
  *   <<use>>    Nhập liệu Ngày công & OT             → AttendanceGrid
  *   <<extend>> Import file Excel công (.xlsx)       → ImportDialog
@@ -505,9 +505,7 @@ export default function AttendancePage() {
       <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <Reveal offset={8}>
           <div className="space-y-1">
-            <p className="flex items-center gap-2 text-[13px] text-muted-foreground">
-              <Badge variant="outline" className="font-mono">UC-02</Badge> Admin · Kế toán C&B
-            </p>
+            <p className="text-eyebrow">Tiền lương</p>
             <h1 className="page-title">Chấm công & OT</h1>
             <p className="text-[14px] text-muted-foreground">Tạo kỳ lương theo tháng, nhập ngày công và giờ làm thêm — lương được tính ngay khi lưu.</p>
           </div>
