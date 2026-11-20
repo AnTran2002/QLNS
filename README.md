@@ -23,19 +23,19 @@ QLNS/
 
 ### 1.1 Giao diện (Front-End)
 
-| Hạng mục | Chi tiết |
-|---|---|
-| **Làm lại toàn bộ giao diện** quản trị và cổng nhân viên | Theo ngôn ngữ thiết kế Apple: nền sáng / tile tối, một màu nhấn xanh, nút pill, chế độ **sáng / tối** |
-| **Chữ** | `SF Pro Text` cho nội dung, `SF Pro Display` cho tiêu đề (như apple.com); máy không phải Apple dùng Inter / Segoe UI. Cỡ chữ co giãn theo màn hình bằng `clamp()` |
-| **Số liệu tĩnh** | Bỏ hiệu ứng nhảy số (counting/sliding number), số hiển thị cố định |
-| **Thanh chọn trên dashboard** | Ô được chọn có màu tương phản với nền và **trượt** giữa các mục (motion `layoutId`), không nhấp nháy mất/hiện |
-| **Biểu đồ đường** | Các biểu đồ theo thời gian dùng `LineChart` (Recharts, nét thẳng, không tô nền): thu nhập (Gross / thực nhận), quỹ lương theo kỳ (Gross / Net), giờ làm & OT theo ngày, ngày công theo kỳ (công chuẩn nét đứt), OT theo kỳ. Helper chung `lineProps` / `lineCursor` trong `components/ui/chart.jsx`. Quỹ lương theo phòng ban vẫn là thanh ngang (so sánh giữa các phòng) |
-| **Logo mới** | Ô vuông xanh với 3 cột tăng dần, mỗi cột đội một "cái đầu" tròn (đội ngũ đi lên). Rê chuột: ô nghiêng nhẹ, các cột lần lượt thụt xuống rồi bật lên (`components/app/brand.jsx`); màn hình chờ lặp hiệu ứng liên tục; `favicon.svg` cùng hình |
-| **Bỏ nhãn UC-02** | Mục "Chấm công & OT" ở trang quản trị không còn nhãn UC-02 trên menu và tiêu đề trang |
-| **Lịch chấm công theo tháng** | Lịch 7 cột từ Thứ Hai: ngày đi làm, ca làm, giờ vào/ra, đi muộn, nghỉ phép, vắng; tổng số buổi đi làm, buổi nghỉ, giờ làm, giờ OT, phút đi muộn |
-| **Đổi ảnh đại diện** | Hồ sơ nhân viên: chọn ảnh → thu nhỏ trên trình duyệt → lưu vào cột `users.avatar`; ảnh đặt giữa, không ảnh nền |
-| **Responsive** | Sửa lỗi bố cục ở khung 773×817 (trang hồ sơ) và các màn hẹp; bảng ẩn cột phụ trên mobile |
-| **Bỏ motion graphic** ở trang đăng nhập | Theo yêu cầu, giữ giao diện tối giản |
+| Hạng mục                                                 | Chi tiết                                                                                                                                                                                                                                                                                                                                                                  |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Làm lại toàn bộ giao diện** quản trị và cổng nhân viên | Theo ngôn ngữ thiết kế Apple: nền sáng / tile tối, một màu nhấn xanh, nút pill, chế độ **sáng / tối**                                                                                                                                                                                                                                                                     |
+| **Chữ**                                                  | `SF Pro Text` cho nội dung, `SF Pro Display` cho tiêu đề (như apple.com); máy không phải Apple dùng Inter / Segoe UI. Cỡ chữ co giãn theo màn hình bằng `clamp()`                                                                                                                                                                                                         |
+| **Số liệu tĩnh**                                         | Bỏ hiệu ứng nhảy số (counting/sliding number), số hiển thị cố định                                                                                                                                                                                                                                                                                                        |
+| **Thanh chọn trên dashboard**                            | Ô được chọn có màu tương phản với nền và **trượt** giữa các mục (motion `layoutId`), không nhấp nháy mất/hiện                                                                                                                                                                                                                                                             |
+| **Biểu đồ đường**                                        | Các biểu đồ theo thời gian dùng `LineChart` (Recharts, nét thẳng, không tô nền): thu nhập (Gross / thực nhận), quỹ lương theo kỳ (Gross / Net), giờ làm & OT theo ngày, ngày công theo kỳ (công chuẩn nét đứt), OT theo kỳ. Helper chung `lineProps` / `lineCursor` trong `components/ui/chart.jsx`. Quỹ lương theo phòng ban vẫn là thanh ngang (so sánh giữa các phòng) |
+| **Logo mới**                                             | Ô vuông xanh với 3 cột tăng dần, mỗi cột đội một "cái đầu" tròn (đội ngũ đi lên). Rê chuột: ô nghiêng nhẹ, các cột lần lượt thụt xuống rồi bật lên (`components/app/brand.jsx`); màn hình chờ lặp hiệu ứng liên tục; `favicon.svg` cùng hình                                                                                                                              |
+| **Bỏ nhãn UC-02**                                        | Mục "Chấm công & OT" ở trang quản trị không còn nhãn UC-02 trên menu và tiêu đề trang                                                                                                                                                                                                                                                                                     |
+| **Lịch chấm công theo tháng**                            | Lịch 7 cột từ Thứ Hai: ngày đi làm, ca làm, giờ vào/ra, đi muộn, nghỉ phép, vắng; tổng số buổi đi làm, buổi nghỉ, giờ làm, giờ OT, phút đi muộn                                                                                                                                                                                                                           |
+| **Đổi ảnh đại diện**                                     | Hồ sơ nhân viên: chọn ảnh → thu nhỏ trên trình duyệt → lưu vào cột `users.avatar`; ảnh đặt giữa, không ảnh nền                                                                                                                                                                                                                                                            |
+| **Responsive**                                           | Sửa lỗi bố cục ở khung 773×817 (trang hồ sơ) và các màn hẹp; bảng ẩn cột phụ trên mobile                                                                                                                                                                                                                                                                                  |
+| **Bỏ motion graphic** ở trang đăng nhập                  | Theo yêu cầu, giữ giao diện tối giản                                                                                                                                                                                                                                                                                                                                      |
 
 ### 1.2 Chức năng nhân sự mới: **Nghỉ phép**
 
@@ -82,7 +82,7 @@ Cấu hình Vitest nằm ngay trong `Front-End/vite.config.js` (khối `test`). 
 
 Kết quả lần chạy gần nhất: **Front-End 26/26 · Back-End 36/36**.
 
-### 1.6 Chạy trên nhiều máy (Windows + macOS)
+### 1.6 Chạy trên nhiều máy (Windows + macOS) a
 
 - **Lỗi HTTP 502** khi mở Front-End: Node 18+ phân giải `localhost` thành IPv6 `::1`, còn PHP / XAMPP thường chỉ nghe `127.0.0.1` → proxy của Vite không kết nối được. Đã đổi mặc định sang `http://127.0.0.1:8000`, và `vite.config.js` tự đổi `localhost` trong `BACKEND_URL` thành `127.0.0.1`.
 - `package-lock.json` tạo trên macOS thiếu binary native cho Windows (rolldown, lightningcss, tailwind oxide) → đã đưa mọi lock file vào `.gitignore`; mỗi máy tự `npm install`.
@@ -130,18 +130,18 @@ npm run test:backend   # kiểm thử PHP thuần (= php ../test-backend.php)
 
 ## 3. Đã dùng những gì
 
-| Nhóm | Công cụ |
-|---|---|
-| Front-End | React 19, Vite 8 (rolldown), React Router 8, TanStack Query 5, axios |
-| Giao diện | Tailwind CSS v4, [shadcn/ui](https://ui.shadcn.com), [Animate UI](https://animate-ui.com) (Radix + Motion), lucide-react, sonner (toast) |
-| Biểu đồ | [Recharts](https://recharts.org) 2.15 qua `components/ui/chart.jsx` của shadcn |
-| Hiệu ứng | [Motion](https://motion.dev) (`layoutId` cho khối trượt, `AnimatePresence` cho danh sách) |
-| Back-End | PHP 8 thuần, PDO prepared statements, phiên `PHPSESSID` |
-| CSDL | MySQL 8 (MAMP cổng 8889) |
-| Kiểm thử | Vitest 5, jsdom, Testing Library, PHP CLI |
-| Dọn code | [knip](https://knip.dev) (tìm tệp/export không dùng), Prettier |
-| Trình duyệt | Claude in Chrome để chụp và kiểm tra giao diện thật ở localhost |
-| Kỹ năng AI | Tìm qua [skills.sh](https://skills.sh) (`npx skills find`): HR, code review, refactor, vitest, README |
+| Nhóm        | Công cụ                                                                                                                                  |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Front-End   | React 19, Vite 8 (rolldown), React Router 8, TanStack Query 5, axios                                                                     |
+| Giao diện   | Tailwind CSS v4, [shadcn/ui](https://ui.shadcn.com), [Animate UI](https://animate-ui.com) (Radix + Motion), lucide-react, sonner (toast) |
+| Biểu đồ     | [Recharts](https://recharts.org) 2.15 qua `components/ui/chart.jsx` của shadcn                                                           |
+| Hiệu ứng    | [Motion](https://motion.dev) (`layoutId` cho khối trượt, `AnimatePresence` cho danh sách)                                                |
+| Back-End    | PHP 8 thuần, PDO prepared statements, phiên `PHPSESSID`                                                                                  |
+| CSDL        | MySQL 8 (MAMP cổng 8889)                                                                                                                 |
+| Kiểm thử    | Vitest 5, jsdom, Testing Library, PHP CLI                                                                                                |
+| Dọn code    | [knip](https://knip.dev) (tìm tệp/export không dùng), Prettier                                                                           |
+| Trình duyệt | Claude in Chrome để chụp và kiểm tra giao diện thật ở localhost                                                                          |
+| Kỹ năng AI  | Tìm qua [skills.sh](https://skills.sh) (`npx skills find`): HR, code review, refactor, vitest, README                                    |
 
 ---
 
