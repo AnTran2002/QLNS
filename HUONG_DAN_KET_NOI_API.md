@@ -72,6 +72,24 @@ php Back-End/database/seed_passwords.php
 
 Đăng nhập bằng `NV001` (ADMIN) hoặc `NV002`–`NV005` (EMPLOYEE), mật khẩu `123456`.
 
+### 2.4. Khởi tạo dữ liệu demo nhất quán
+
+Sau khi import `QLNS-Database.sql`, chạy các migration cần thiết (đặc biệt migration `003_user_bank_accounts.sql`), xem trước bộ dữ liệu:
+
+```bash
+php Back-End/database/seed_demo_data.php
+```
+
+Chỉ khi đúng database demo có **chính xác 5 tài khoản NV001–NV005** với tên/email mẫu, xác nhận ghi dữ liệu:
+
+```bash
+php Back-End/database/seed_demo_data.php --apply
+```
+
+Script không xóa bản ghi. Nó chuẩn hóa hồ sơ, hợp đồng và tài khoản ngân hàng của 5 tài khoản demo; tạo/cập nhật kỳ `2026-10` (`PAID`) và `2026-11` (`DRAFT`); tạo đủ 10 dòng công/lương. Mỗi khoản lương được tính lại bằng `PayrollEngine` từ hợp đồng, ngày công và OT tương ứng. Nếu database có thêm tài khoản hoặc không khớp danh tính mẫu, script từ chối chạy.
+
+> Đây là dữ liệu giả lập, đặc biệt số tài khoản bắt đầu bằng `000`; không dùng file chuyển khoản demo để thanh toán thật. Script cập nhật dữ liệu demo cho NV001–NV005 và đặt lại trạng thái hai kỳ nêu trên. Không chạy `--apply` trên database production.
+
 ---
 
 ## 3. Cấu hình và chạy backend
