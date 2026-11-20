@@ -6,7 +6,9 @@ import { defineConfig, loadEnv } from "vite";
 export default defineConfig(({ mode }) => {
   // Đọc Front-End/.env (xem .env.example). BACKEND_URL là nơi chạy Back-End PHP.
   const env = loadEnv(mode, process.cwd(), "");
-  const backendUrl = env.BACKEND_URL || "http://localhost:8000";
+  // Luôn dùng 127.0.0.1 thay cho "localhost": Node 17+ trên macOS hay phân giải localhost → ::1 (IPv6),
+  // còn `php -S` / XAMPP trên Windows chỉ nghe 127.0.0.1 (IPv4) → proxy báo HTTP 502. Đổi luôn cả .env cũ.
+  const backendUrl = (env.BACKEND_URL || "http://127.0.0.1:8000").replace(/\/\/localhost(?=[:/]|$)/i, "//127.0.0.1");
 
   return {
     plugins: [react(), tailwindcss()],
@@ -22,6 +24,12 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
+    // Kiểm thử (Vitest): file *.test.js(x) nằm cạnh mã nguồn trong src/.
+    test: {
+      environment: "jsdom",
+      setupFiles: ["./src/test-setup.js"],
+      css: false,
+    },
     build: {
       rolldownOptions: {
         output: {
@@ -36,11 +44,6 @@ export default defineConfig(({ mode }) => {
           },
         },
       },
-    },
-    test: {
-      environment: "jsdom",
-      setupFiles: ["./tests/setup.js"],
-      css: false,
     },
   };
 });

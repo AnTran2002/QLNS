@@ -4,17 +4,47 @@ import { cn } from "@/lib/utils";
 
 /* Trạng thái chấm công (attendance_records.status). Màu luôn đi kèm biểu tượng + nhãn — không chỉ dựa vào màu. */
 export const ATTENDANCE_STATUS = {
-  PRESENT: { label: "Đúng giờ", icon: CalendarCheck2, dot: "bg-success", chip: "bg-success/10 text-success", worked: true },
-  LATE: { label: "Đi muộn", icon: Clock3, dot: "bg-warning", chip: "bg-warning/12 text-warning", worked: true },
-  REMOTE: { label: "Làm từ xa", icon: House, dot: "bg-chart-3", chip: "bg-chart-3/12 text-foreground", worked: true },
-  LEAVE: { label: "Nghỉ phép", icon: Plane, dot: "bg-link", chip: "bg-link/10 text-link", worked: false },
-  ABSENT: { label: "Nghỉ không phép", icon: Ban, dot: "bg-destructive", chip: "bg-destructive/10 text-destructive", worked: false },
+  PRESENT: {
+    label: "Đúng giờ",
+    icon: CalendarCheck2,
+    dot: "bg-success",
+    chip: "bg-success/10 text-success",
+    worked: true,
+  },
+  LATE: {
+    label: "Đi muộn",
+    icon: Clock3,
+    dot: "bg-warning",
+    chip: "bg-warning/12 text-warning",
+    worked: true,
+  },
+  REMOTE: {
+    label: "Làm từ xa",
+    icon: House,
+    dot: "bg-chart-3",
+    chip: "bg-chart-3/12 text-foreground",
+    worked: true,
+  },
+  LEAVE: {
+    label: "Nghỉ phép",
+    icon: Plane,
+    dot: "bg-link",
+    chip: "bg-link/10 text-link",
+    worked: false,
+  },
+  ABSENT: {
+    label: "Nghỉ không phép",
+    icon: Ban,
+    dot: "bg-destructive",
+    chip: "bg-destructive/10 text-destructive",
+    worked: false,
+  },
 };
 export const STATUS_ORDER = ["PRESENT", "LATE", "REMOTE", "LEAVE", "ABSENT"];
 
 const WEEK_HEAD = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
 const pad = (n) => String(n).padStart(2, "0");
-export const dateKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const dateKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 export const todayKey = () => dateKey(new Date());
 
 /** Ô lịch của tháng `YYYY-MM`, bắt đầu từ Thứ Hai; ô trống ở đầu/cuối là null. */
@@ -61,10 +91,20 @@ export function summarizeMonth(cells) {
   const off = count.LEAVE + count.ABSENT;
   const standard = days.filter((c) => !c.weekend).length;
   const elapsed = days.filter((c) => !c.weekend && !c.future).length;
-  return { count, worked, off, hours, ot, lateMinutes, standard, elapsed, recorded: records.length };
+  return {
+    count,
+    worked,
+    off,
+    hours,
+    ot,
+    lateMinutes,
+    standard,
+    elapsed,
+    recorded: records.length,
+  };
 }
 
-export const minutes = (hhmm) => {
+const minutes = (hhmm) => {
   const [h, m] = String(hhmm).split(":").map(Number);
   return h * 60 + (m || 0);
 };
@@ -101,7 +141,9 @@ export function MonthCalendar({ cells, selected, onSelect, layoutKey = "calendar
               className={cn(
                 "group/day relative flex aspect-square min-w-0 flex-col items-center justify-center gap-1 rounded-lg border text-center outline-none sm:aspect-auto sm:h-[76px] sm:items-start sm:justify-between sm:p-2 sm:text-left",
                 "transition-[border-color,background-color,color] duration-300 focus-visible:ring-2 focus-visible:ring-ring",
-                c.weekend || c.future ? "border-transparent bg-muted/30 text-muted-foreground" : "border-border/70 bg-card hover:border-foreground/25",
+                c.weekend || c.future
+                  ? "border-transparent bg-muted/30 text-muted-foreground"
+                  : "border-border/70 bg-card hover:border-foreground/25",
                 isSel && "text-background hover:border-transparent",
               )}
             >
@@ -110,26 +152,43 @@ export function MonthCalendar({ cells, selected, onSelect, layoutKey = "calendar
                   layoutId={layoutKey}
                   aria-hidden="true"
                   className="absolute inset-[-1px] rounded-lg bg-foreground shadow-[0_8px_20px_-10px_rgb(0_0_0/0.5)]"
-                  transition={{ type: "spring", stiffness: 380, damping: 32, mass: 0.8 }}
+                  transition={{
+                    type: "spring",
+                    stiffness: 380,
+                    damping: 32,
+                    mass: 0.8,
+                  }}
                 />
               )}
               <span className="relative z-10 flex w-full items-center justify-center gap-1 sm:justify-between">
                 <span
                   className={cn(
                     "text-[13px] leading-none font-semibold tabular-nums sm:text-[13.5px]",
-                    c.today && !isSel && "flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground sm:size-[22px]",
+                    c.today &&
+                      !isSel &&
+                      "flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground sm:size-[22px]",
                   )}
                 >
                   {c.day}
                 </span>
-                {meta && <span className={cn("size-1.5 rounded-full max-sm:hidden", meta.dot, isSel && "ring-2 ring-foreground")} aria-hidden="true" />}
+                {meta && (
+                  <span
+                    className={cn("size-1.5 rounded-full max-sm:hidden", meta.dot, isSel && "ring-2 ring-foreground")}
+                    aria-hidden="true"
+                  />
+                )}
               </span>
               {meta ? (
                 <>
                   <span className={cn("relative z-10 size-1.5 rounded-full sm:hidden", meta.dot)} aria-hidden="true" />
                   <span className="relative z-10 hidden w-full space-y-0.5 sm:block">
                     {c.record.check_in ? (
-                      <span className={cn("block text-[11px] leading-tight tabular-nums", isSel ? "text-background/80" : "text-muted-foreground")}>
+                      <span
+                        className={cn(
+                          "block text-[11px] leading-tight tabular-nums",
+                          isSel ? "text-background/80" : "text-muted-foreground",
+                        )}
+                      >
                         {c.record.check_in}–{c.record.check_out}
                       </span>
                     ) : null}
@@ -144,7 +203,12 @@ export function MonthCalendar({ cells, selected, onSelect, layoutKey = "calendar
                   </span>
                 </>
               ) : (
-                <span className={cn("relative z-10 hidden text-[10.5px] leading-tight sm:block", isSel ? "text-background/70" : "text-muted-foreground/70")}>
+                <span
+                  className={cn(
+                    "relative z-10 hidden text-[10.5px] leading-tight sm:block",
+                    isSel ? "text-background/70" : "text-muted-foreground/70",
+                  )}
+                >
                   {c.weekend ? "Nghỉ tuần" : c.future ? "" : "—"}
                 </span>
               )}

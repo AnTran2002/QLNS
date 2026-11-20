@@ -117,13 +117,13 @@ define('FRONTEND_ORIGIN', 'http://localhost:5173');
 
 ```bash
 cd Back-End
-php -S localhost:8000 index.php
+php -S 127.0.0.1:8000 index.php
 ```
 
 > Dùng cổng **8000**. Cổng 8888 thường đã bị Apache của MAMP chiếm.
-> Trên macOS có MAMP, có thể gọi trực tiếp: `/Applications/MAMP/bin/php/php8.3.x/bin/php -S localhost:8000 index.php`.
+> Trên macOS có MAMP, có thể gọi trực tiếp: `/Applications/MAMP/bin/php/php8.3.x/bin/php -S 127.0.0.1:8000 index.php`.
 
-Kiểm tra: mở <http://localhost:8000/?action=/>
+Kiểm tra: mở <http://127.0.0.1:8000/?action=/>
 
 ```json
 { "success": true, "data": { "backend": "ok", "database": "qlns", "users": 5 }, "message": "Backend đang chạy và đã kết nối database" }
@@ -141,12 +141,12 @@ Nếu thấy `users` đúng bằng số dòng trong bảng `users` ở phpMyAdmi
 
 ```bash
 cd Front-End
-cp .env.example .env.local   # tuỳ chọn, chỉ cần khi backend không ở localhost:8000
+cp .env.example .env   # tuỳ chọn, chỉ cần khi backend không ở 127.0.0.1:8000
 ```
 
 | Biến | Mặc định | Ý nghĩa |
 | --- | --- | --- |
-| `BACKEND_URL` | `http://localhost:8000` | Địa chỉ backend thật mà Vite proxy chuyển tới (chỉ dùng khi dev) |
+| `BACKEND_URL` | `http://127.0.0.1:8000` | Địa chỉ backend thật mà Vite proxy chuyển tới (chỉ dùng khi dev) |
 | `VITE_API_BASE_URL` | `/api` | Đường dẫn axios gọi. Khi build production và backend ở domain khác, đặt URL đầy đủ, ví dụ `https://api.congty.vn` |
 
 ### 4.2. Chạy
@@ -162,7 +162,7 @@ Proxy trong `Front-End/vite.config.js`:
 server: {
   proxy: {
     "/api": {
-      target: env.BACKEND_URL || "http://localhost:8000",
+      target: env.BACKEND_URL || "http://127.0.0.1:8000",
       changeOrigin: true,
       rewrite: (p) => p.replace(/^\/api/, "") || "/",
     },
@@ -170,7 +170,7 @@ server: {
 },
 ```
 
-Nghĩa là `http://localhost:5173/api/?action=employees` được chuyển tới `http://localhost:8000/?action=employees`.
+Nghĩa là `http://localhost:5173/api/?action=employees` được chuyển tới `http://127.0.0.1:8000/?action=employees`.
 
 ---
 
@@ -265,9 +265,9 @@ Thử nhanh bằng `curl` (lưu cookie vào file `cj`):
 ```bash
 curl -c cj -H 'Content-Type: application/json' \
      -d '{"employee_code":"NV001","password":"123456"}' \
-     'http://localhost:8000/?action=login'
+     'http://127.0.0.1:8000/?action=login'
 
-curl -b cj 'http://localhost:8000/?action=employees'
+curl -b cj 'http://127.0.0.1:8000/?action=employees'
 ```
 
 ---
@@ -372,7 +372,7 @@ public function periods()
 'payroll/periods' => (new PayrollController)->periods(),
 ```
 
-Kiểm tra: `curl -b cj 'http://localhost:8000/?action=payroll/periods'`
+Kiểm tra: `curl -b cj 'http://127.0.0.1:8000/?action=payroll/periods'`
 
 **④ API frontend**: tạo `Front-End/src/lib/payroll-api.js`
 
@@ -421,12 +421,13 @@ Thêm nhân viên trong phpMyAdmin:
 
 | Triệu chứng | Nguyên nhân và cách sửa |
 | --- | --- |
-| Giao diện báo *"Không thể kết nối máy chủ…"* hoặc Vite báo `ECONNREFUSED` | Backend PHP chưa chạy hoặc không nghe trên cổng 8000. Chạy `php -S localhost:8000 index.php` trong thư mục `Back-End`, kiểm tra `BACKEND_URL=http://localhost:8000`, rồi khởi động lại Vite |
+| Vite báo **HTTP 502** / `connect ECONNREFUSED ::1:8000` (hay gặp khi đổi máy Windows ⇄ macOS) | Backend được chạy bằng `localhost` nên chỉ nghe IPv6 hoặc IPv4, còn Node phân giải `localhost` theo kiểu khác. Luôn chạy `php -S 127.0.0.1:8000` (hoặc `npm run backend` trong Front-End) và đặt `BACKEND_URL=http://127.0.0.1:8000`. `vite.config.js` đã tự đổi `localhost` → `127.0.0.1` |
+| Giao diện báo *"Không thể kết nối máy chủ…"* hoặc Vite báo `ECONNREFUSED` | Backend PHP chưa chạy hoặc không nghe trên cổng 8000. Chạy `php -S 127.0.0.1:8000 index.php` trong thư mục `Back-End`, kiểm tra `BACKEND_URL=http://127.0.0.1:8000`, rồi khởi động lại Vite |
 | *"Phản hồi từ backend không đúng định dạng JSON"* | `BACKEND_URL` trỏ vào trang HTML (ví dụ trang chủ MAMP). Mở URL đó trong trình duyệt để xem |
 | `Lỗi cơ sở dữ liệu: SQLSTATE[HY000] [2002] Connection refused` | Sai `DB_HOST`/`DB_PORT` trong `env.php` hoặc MySQL chưa bật. MAMP dùng 8889, XAMPP dùng 3306 |
 | `SQLSTATE[HY000] [1049] Unknown database 'qlns'` | Chưa import `QLNS-Database.sql` (mục 2.1) |
 | `Unknown column 'u.department'` | Database bản cũ, cần chạy migration `001_employee_profile.sql` (mục 2.2) |
 | Đăng nhập báo sai mật khẩu với `123456` | Chưa chạy `seed_passwords.php` (mục 2.3) |
 | Đăng nhập được nhưng F5 lại bị đăng xuất / API trả 401 | Cookie phiên không được gửi: phải gọi qua `/api` (proxy) hoặc đúng `FRONTEND_ORIGIN`; không mở frontend bằng `127.0.0.1` khi cấu hình `localhost` |
-| `php -S localhost:8888` báo *Address already in use* | Apache của MAMP đang dùng 8888. Dùng 8000 |
+| `php -S 127.0.0.1:8888` báo *Address already in use* | Apache của MAMP đang dùng 8888. Dùng 8000 |
 | Thiếu `env.php` | Backend trả JSON 500 *"Thiếu Back-End/configs/env.php — hãy sao chép từ configs/env.example.php"* (mục 3.1) |

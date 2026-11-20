@@ -12,7 +12,7 @@ class BaseModel
         $this->db = null;
         try {
             $this->db = new PDO(
-                "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8mb4", 
+                "mysql:host=" . DB_HOST . (defined('DB_PORT') && DB_PORT ? ";port=" . DB_PORT : "") . ";dbname=" . DB_NAME . ";charset=utf8mb4",
                 DB_USERNAME, 
                 DB_PASSWORD
             );

@@ -3,7 +3,7 @@ import { formatMoney, formatNumber, formatPeriod } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /* Màu cơ cấu chi trả — khớp biểu đồ ở dashboard (đã kiểm tra mù màu / tương phản). */
-export const PAYOUT_PARTS = [
+const PAYOUT_PARTS = [
   { key: "net_salary", label: "Thực nhận", color: "var(--chart-1)" },
   { key: "social_insurance", label: "BHXH · BHYT · BHTN", color: "var(--chart-2)" },
   { key: "personal_tax", label: "Thuế TNCN", color: "var(--chart-3)" },
