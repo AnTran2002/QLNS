@@ -124,7 +124,7 @@ function SidebarUser() {
   );
 }
 
-function AdminHeader({ groups, title, onSearch }) {
+function AdminHeader({ groups, title, searchLabel, onSearch }) {
   const { pathname } = useLocation();
   const current = groups.flatMap((g) => g.items).find((i) => isActive(i, pathname));
   const group = groups.find((g) => g.items.includes(current));
@@ -153,7 +153,7 @@ function AdminHeader({ groups, title, onSearch }) {
           aria-label="Tìm kiếm (⌘K)"
         >
           <Search className="size-3.5" />
-          <span className="hidden sm:inline">Tìm trang, nhân viên…</span>
+          <span className="hidden sm:inline">{searchLabel}</span>
           <kbd className="ml-auto hidden rounded border border-border/80 bg-muted px-1.5 font-sans text-[11px] sm:inline">⌘K</kbd>
         </button>
         <ThemeToggle className="size-8" />
@@ -162,8 +162,16 @@ function AdminHeader({ groups, title, onSearch }) {
   );
 }
 
-/** Bố cục quản trị kiểu shadcn "sidebar-inset": thanh bên trái + vùng nội dung bo góc. */
-export function AdminShell({ groups, title = "Quản trị" }) {
+/**
+ * Bố cục kiểu shadcn "sidebar-inset": thanh bên trái + vùng nội dung bo góc.
+ * Dùng chung cho trang quản trị và cổng nhân viên (khác nhau ở `groups`, `subtitle`, `searchLabel`).
+ */
+export function AdminShell({
+  groups,
+  title = "Quản trị",
+  subtitle = "Quản trị nhân sự & lương",
+  searchLabel = "Tìm trang, nhân viên…",
+}) {
   const items = groups.flatMap((g) => g.items);
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -193,7 +201,7 @@ export function AdminShell({ groups, title = "Quản trị" }) {
             <BrandMark className="size-7" />
             <span className="grid leading-tight whitespace-nowrap group-data-[state=collapsed]/sidebar:hidden">
               <span className="font-display text-[15px] font-semibold tracking-[-0.02em]">QLNS</span>
-              <span className="text-[11.5px] text-sidebar-foreground/60">Quản trị nhân sự & lương</span>
+              <span className="text-[11.5px] text-sidebar-foreground/60">{subtitle}</span>
             </span>
           </div>
         </SidebarHeader>
@@ -206,7 +214,7 @@ export function AdminShell({ groups, title = "Quản trị" }) {
       </Sidebar>
 
       <SidebarInset>
-        <AdminHeader groups={groups} title={title} onSearch={() => setSearchOpen(true)} />
+        <AdminHeader groups={groups} title={title} searchLabel={searchLabel} onSearch={() => setSearchOpen(true)} />
         <div id="noi-dung" data-density="compact" className="mx-auto w-full max-w-[1400px] flex-1 px-4 pt-6 pb-16 md:px-6 lg:px-8">
           <Suspense fallback={<LoadingState rows={4} />}>
             <PageTransition effect="fade">

@@ -1,10 +1,8 @@
-import { motion } from "motion/react";
-import { SPRING } from "@/components/app/motion";
 import { WEEKDAYS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
-/** Lịch 7 ngày theo `work_schedule` của API; hôm nay nổi bật bằng màu nhấn. */
-export function WeekSchedule({ schedule = {}, className, onTile = false }) {
+/** Ca làm theo `work_schedule` của API; hôm nay nổi bật bằng viền & nền màu nhấn. */
+export function WeekSchedule({ schedule = {}, className }) {
   const todayIndex = (new Date().getDay() + 6) % 7; // 0 = Thứ Hai
   return (
     <ul className={cn("grid grid-cols-7 gap-1.5", className)}>
@@ -14,37 +12,40 @@ export function WeekSchedule({ schedule = {}, className, onTile = false }) {
         const today = i === todayIndex;
         const [start, end] = off ? [] : value.split(/\s*-\s*/);
         return (
-          <motion.li
+          <li
             key={d.key}
-            initial={{ opacity: 0, y: 12 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ ...SPRING, delay: i * 0.04 }}
-            whileHover={{ y: -3 }}
-            className={cn(
-              "flex flex-col items-center gap-1.5 rounded-2xl px-1 py-3.5 text-center",
-              today
-                ? "bg-primary text-primary-foreground"
-                : onTile
-                  ? off ? "bg-white/5 text-tile-muted" : "bg-white/10 text-tile-foreground"
-                  : off ? "bg-muted/60 text-muted-foreground" : "bg-muted text-foreground",
-            )}
             title={`${d.label}: ${value}`}
             aria-current={today ? "date" : undefined}
+            className={cn(
+              "relative flex flex-col items-center gap-1 rounded-xl border px-1 py-3 text-center transition-[transform,background-color] duration-200 hover:-translate-y-0.5",
+              today
+                ? "border-primary/40 bg-primary/[0.07] text-foreground"
+                : off
+                  ? "border-dashed border-border bg-transparent text-muted-foreground"
+                  : "border-border/80 bg-muted/40 text-foreground",
+            )}
           >
-            <span className="text-[13px] font-semibold">{d.short}</span>
+            <span className={cn("text-[12.5px] font-semibold", today && "text-primary")}>{d.short}</span>
             {off ? (
-              <span className="text-[11px] leading-tight opacity-70">Nghỉ</span>
+              <span className="text-[11px] leading-tight">Nghỉ</span>
             ) : (
-              <span className="tabular text-[11px] leading-tight opacity-80">
+              <span className="text-[11px] leading-tight text-muted-foreground tabular-nums">
                 {start}
                 <br />
                 {end}
               </span>
             )}
-          </motion.li>
+            {today && <span className="absolute -top-1 size-2 rounded-full bg-primary ring-2 ring-card" aria-hidden="true" />}
+          </li>
         );
       })}
     </ul>
   );
+}
+
+/** Ca làm hôm nay — { label, value, off } */
+export function todayShift(schedule = {}) {
+  const d = WEEKDAYS[(new Date().getDay() + 6) % 7];
+  const value = schedule[d.key] ?? "—";
+  return { label: d.label, value, off: !/\d/.test(value) };
 }

@@ -16,7 +16,6 @@ import {
 } from "lucide-react";
 import { ShimmeringText } from "@/components/animate-ui/primitives/texts/shimmering";
 import { AdminShell } from "@/components/admin/admin-shell";
-import { AppShell } from "@/components/app/app-shell";
 import { BrandMark } from "@/components/app/brand";
 import { ErrorState } from "@/components/app/kit";
 import { Toaster } from "@/components/app/toaster";
@@ -135,7 +134,7 @@ export function AppRoutes() {
         <Route path="bang-luong" element={<PayrollPage />} />
       </Route>
 
-      <Route path="/nhan-vien" element={<RequireRole role="EMPLOYEE"><AppShell groups={EMPLOYEE_NAV} title="Cổng nhân viên" /></RequireRole>}>
+      <Route path="/nhan-vien" element={<RequireRole role="EMPLOYEE"><AdminShell groups={EMPLOYEE_NAV} title="Cổng nhân viên" subtitle="Cổng nhân viên" searchLabel="Tìm trang…" /></RequireRole>}>
         <Route index element={<EmployeeOverview />} />
         <Route path="ho-so" element={<EmployeeProfile />} />
         <Route path="phieu-luong" element={<EmployeePayslips />} />

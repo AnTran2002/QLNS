@@ -150,3 +150,24 @@ describe("Định dạng", () => {
     expect(initials("Nguyễn Văn An")).toBe("NA");
   });
 });
+
+describe("Cổng nhân viên", () => {
+  it.each([
+    ["/nhan-vien/phieu-luong", "Phiếu lương", "Các kỳ lương"],
+    ["/nhan-vien/cham-cong", "Chấm công", "Chi tiết theo kỳ"],
+    ["/nhan-vien/ho-so", "Hồ sơ", "Hợp đồng lao động"],
+    ["/nhan-vien/dong-nghiep", "Phòng Thiết kế", "(bạn)"],
+  ])("%s hiển thị đúng nội dung", async (path, heading, text) => {
+    api.me.mockResolvedValue({ user: EMPLOYEE });
+    renderApp(path);
+    expect(await screen.findByRole("heading", { level: 1, name: heading })).toBeInTheDocument();
+    expect((await screen.findAllByText(text)).length).toBeGreaterThan(0);
+  });
+
+  it("phiếu lương đã chốt có link tải về", async () => {
+    api.me.mockResolvedValue({ user: EMPLOYEE });
+    renderApp("/nhan-vien/phieu-luong");
+    const link = await screen.findByRole("link", { name: /Tải phiếu lương Tháng 10/ });
+    expect(link.getAttribute("href")).toContain("action=payroll/payslip/download&period_id=1");
+  });
+});

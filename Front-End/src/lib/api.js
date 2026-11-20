@@ -48,6 +48,10 @@ export async function callApi(action, { method = "GET", data, params, timeout } 
   }
 }
 
+/** Link tải phiếu lương HTML (UC-03) — chỉ kỳ LOCKED/PAID, gửi kèm cookie phiên vì cùng origin. */
+export const payslipDownloadUrl = (periodId) =>
+  `${API_BASE_URL.replace(/\/$/, "")}/?action=payroll/payslip/download&period_id=${encodeURIComponent(periodId)}`;
+
 /** Ép các trường số (Back-End có chỗ trả DECIMAL dạng chuỗi) về number. */
 const MONEY_FIELDS = [
   "base_salary", "insurance_salary", "allowance", "dependents_count",

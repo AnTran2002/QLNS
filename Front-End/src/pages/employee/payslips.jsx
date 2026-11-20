@@ -1,76 +1,163 @@
-import { useState } from "react";
-import { motion } from "motion/react";
-import { Banknote, ChevronRight, FileText, Landmark, Receipt } from "lucide-react";
-import { EmptyState, ErrorState, LoadingState, PageHeader, PeriodStatusBadge, StatTile } from "@/components/app/kit";
-import { MoneyShort, Reveal, RevealGroup, SPRING } from "@/components/app/motion";
+import { useMemo, useState } from "react";
+import { Banknote, Download, Eye, FileText, Landmark, Receipt, TrendingUp } from "lucide-react";
+import { Button } from "@/components/animate-ui/components/buttons/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/animate-ui/components/radix/tooltip";
+import { KpiCard } from "@/components/admin/kpi-card";
+import { EarningsChart } from "@/components/employee/earnings-chart";
+import { EmptyState, ErrorState, LoadingState, PeriodStatusBadge, Segmented } from "@/components/app/kit";
+import { Reveal } from "@/components/app/motion";
+import { Card, CardAction, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useEmployeeDashboard } from "@/hooks/use-employee-dashboard";
-import { formatMoney, formatNumber, formatPeriod } from "@/lib/format";
-import { PayslipDialog } from "./payslip-dialog";
+import { payslipDownloadUrl } from "@/lib/api";
+import { formatMoney, formatMoneyShort, formatNumber, formatPeriod } from "@/lib/format";
+import { isPublished, PayslipDialog } from "./payslip-dialog";
+
+const sum = (rows, k) => rows.reduce((s, i) => s + (Number(i[k]) || 0), 0);
 
 export default function EmployeePayslips() {
   const { data, isPending, error, refetch } = useEmployeeDashboard();
   const [payslip, setPayslip] = useState(null);
+  const [filter, setFilter] = useState("all");
+  const history = useMemo(() => data?.payroll_history ?? [], [data]);
+  const rows = useMemo(
+    () => history.filter((i) => filter === "all" || (filter === "published" ? isPublished(i.period_status) : !isPublished(i.period_status))),
+    [history, filter],
+  );
+
   if (error) return <ErrorState error={error} onRetry={refetch} />;
   if (isPending) return <LoadingState rows={4} />;
 
-  const history = data.payroll_history ?? [];
-  const sum = (k) => history.reduce((s, i) => s + i[k], 0);
-  const maxNet = Math.max(1, ...history.map((i) => i.net_salary));
+  const published = history.filter((i) => isPublished(i.period_status));
+  const totalNet = sum(history, "net_salary");
+  const best = history.reduce((m, i) => (!m || i.net_salary > m.net_salary ? i : m), null);
 
   return (
-    <div className="space-y-10">
-      <PageHeader eyebrow="Thu nhập" title="Phiếu lương" description="Lịch sử các kỳ lương đã được tính. Chọn một kỳ để xem phiếu lương điện tử." />
+    <div className="space-y-6">
+      <header className="space-y-1">
+        <Reveal offset={8}>
+          <h1 className="font-display text-[26px] font-semibold tracking-[-0.025em] md:text-[30px]">Phiếu lương</h1>
+          <p className="text-[14px] text-muted-foreground">
+            Lịch sử các kỳ lương đã tính. Phiếu lương được phát hành và tải về được khi kỳ đã chốt.
+          </p>
+        </Reveal>
+      </header>
 
-      <div className="grid gap-3 sm:grid-cols-3 lg:gap-4">
-        <RevealGroup step={70} itemClassName="h-full">
-          <StatTile label="Tổng thực nhận" value={<MoneyShort value={sum("net_salary")} />} icon={Banknote} hint={`${history.length} kỳ lương`} />
-          <StatTile label="Tổng BHXH đã đóng" value={<MoneyShort value={sum("social_insurance")} />} icon={Landmark} hint="10,5% lương đóng BHXH" />
-          <StatTile label="Tổng thuế TNCN" value={<MoneyShort value={sum("personal_tax")} />} icon={Receipt} hint="Biểu thuế luỹ tiến 7 bậc" />
-        </RevealGroup>
-      </div>
+      <section aria-label="Tổng hợp thu nhập" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          { label: "Tổng thực nhận", icon: Banknote, value: formatMoneyShort(totalNet), hint: `${history.length} kỳ · ${published.length} đã phát hành` },
+          {
+            label: "Thực nhận trung bình",
+            icon: TrendingUp,
+            value: formatMoneyShort(history.length ? totalNet / history.length : 0),
+            hint: best ? `Cao nhất ${formatPeriod(best.month_year).toLowerCase()}` : "Chưa có dữ liệu",
+          },
+          { label: "BHXH đã đóng", icon: Landmark, value: formatMoneyShort(sum(history, "social_insurance")), hint: "10,5% lương đóng bảo hiểm" },
+          { label: "Thuế TNCN đã nộp", icon: Receipt, value: formatMoneyShort(sum(history, "personal_tax")), hint: "Biểu thuế luỹ tiến từng phần" },
+        ].map((k, i) => (
+          <Reveal key={k.label} delay={60 + i * 50} offset={10} className="h-full">
+            <KpiCard {...k} />
+          </Reveal>
+        ))}
+      </section>
 
       {history.length === 0 ? (
         <EmptyState icon={FileText} title="Chưa có phiếu lương" description="Phiếu lương sẽ xuất hiện khi phòng nhân sự tính lương kỳ đầu tiên." />
       ) : (
-        <Reveal delay={120}>
-          <ul className="card divide-y divide-border/70 overflow-hidden">
-            {history.map((i, idx) => (
-              <li key={i.id}>
-                <button
-                  type="button"
-                  onClick={() => setPayslip(i)}
-                  className="group grid w-full grid-cols-[1fr_auto] items-center gap-x-6 gap-y-3 px-5 py-5 text-left transition-colors duration-200 hover:bg-muted/60 md:grid-cols-[180px_1fr_auto] md:px-7"
-                  aria-label={`Xem phiếu lương ${formatPeriod(i.month_year)}`}
-                >
-                  <span className="flex flex-col gap-1.5">
-                    <span className="text-[17px] font-semibold text-foreground">{formatPeriod(i.month_year)}</span>
-                    <span className="flex items-center gap-2 text-[13px] text-muted-foreground">
-                      <PeriodStatusBadge status={i.period_status} />
-                      <span className="tabular">{formatNumber(i.actual_days)}/{i.standard_days} công · {formatNumber(i.ot_hours)}h OT</span>
-                    </span>
-                  </span>
-                  {/* Thanh so sánh thực nhận giữa các kỳ */}
-                  <span className="col-span-2 row-start-2 h-1.5 overflow-hidden rounded-full bg-muted md:col-span-1 md:row-start-auto" aria-hidden="true">
-                    <motion.span
-                      className="block h-full rounded-full bg-primary"
-                      initial={{ width: 0 }}
-                      whileInView={{ width: `${(i.net_salary / maxNet) * 100}%` }}
-                      viewport={{ once: true }}
-                      transition={{ ...SPRING, delay: 0.1 + idx * 0.06 }}
-                    />
-                  </span>
-                  <span className="flex items-center gap-3 justify-self-end">
-                    <span className="grid text-right">
-                      <span className="tabular text-[17px] font-semibold text-foreground">{formatMoney(i.net_salary)}</span>
-                      <span className="tabular text-[12px] text-muted-foreground">Gross {formatMoney(i.gross_salary)}</span>
-                    </span>
-                    <ChevronRight className="size-4 text-muted-foreground/60 transition-transform duration-300 group-hover:translate-x-0.5" aria-hidden="true" />
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </Reveal>
+        <>
+          <Reveal delay={120} offset={14}>
+            <EarningsChart history={history} className="gap-4" />
+          </Reveal>
+
+          <Reveal delay={160} offset={14}>
+            <Card className="gap-0 py-0">
+              <CardHeader className="border-b border-border/70 px-4 py-4 sm:px-5 [.border-b]:pb-4">
+                <CardTitle>Các kỳ lương</CardTitle>
+                <CardDescription>Chọn một dòng để xem chi tiết phiếu lương</CardDescription>
+                <CardAction className="max-sm:hidden">
+                  <Segmented
+                    value={filter}
+                    onValueChange={setFilter}
+                    label="Lọc theo trạng thái phát hành"
+                    options={[
+                      { value: "all", label: "Tất cả", count: history.length },
+                      { value: "published", label: "Đã phát hành", count: published.length },
+                      { value: "draft", label: "Nháp", count: history.length - published.length },
+                    ]}
+                  />
+                </CardAction>
+              </CardHeader>
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="pl-4 sm:pl-5">Kỳ lương</TableHead>
+                    <TableHead className="text-right max-md:hidden">Công · OT</TableHead>
+                    <TableHead className="text-right max-lg:hidden">Gross</TableHead>
+                    <TableHead className="text-right max-lg:hidden">Khấu trừ</TableHead>
+                    <TableHead className="text-right">Thực nhận</TableHead>
+                    <TableHead className="w-24 pr-4 text-right sm:pr-5">
+                      <span className="sr-only">Thao tác</span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.length === 0 && (
+                    <TableRow className="hover:bg-transparent">
+                      <TableCell colSpan={6} className="py-10 text-center text-[13px] text-muted-foreground">
+                        Không có kỳ lương phù hợp.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {rows.map((i) => {
+                    const pub = isPublished(i.period_status);
+                    return (
+                      <TableRow key={i.id} className="cursor-pointer" onClick={() => setPayslip(i)}>
+                        <TableCell className="pl-4 sm:pl-5">
+                          <div className="flex items-center gap-2.5">
+                            <span className="font-medium">{formatPeriod(i.month_year)}</span>
+                            <PeriodStatusBadge status={i.period_status} />
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground tabular-nums max-md:hidden">
+                          {formatNumber(i.actual_days)}/{i.standard_days} · {formatNumber(i.ot_hours)}h
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums max-lg:hidden">{formatMoney(i.gross_salary)}</TableCell>
+                        <TableCell className="text-right text-muted-foreground tabular-nums max-lg:hidden">
+                          − {formatMoney(i.social_insurance + i.personal_tax)}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold tabular-nums">{formatMoney(i.net_salary)}</TableCell>
+                        <TableCell className="pr-4 sm:pr-5" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex justify-end gap-1">
+                            <Button variant="ghost" size="icon-sm" onClick={() => setPayslip(i)} aria-label={`Xem phiếu lương ${formatPeriod(i.month_year)}`}>
+                              <Eye />
+                            </Button>
+                            {pub ? (
+                              <Button variant="ghost" size="icon-sm" asChild>
+                                <a href={payslipDownloadUrl(i.period_id)} download aria-label={`Tải phiếu lương ${formatPeriod(i.month_year)}`}>
+                                  <Download />
+                                </a>
+                              </Button>
+                            ) : (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span tabIndex={0} className="inline-flex size-8 cursor-not-allowed items-center justify-center rounded-lg text-muted-foreground/50">
+                                    <Download className="size-4" aria-hidden="true" />
+                                    <span className="sr-only">Chưa phát hành</span>
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>Tải được khi kỳ lương đã chốt</TooltipContent>
+                              </Tooltip>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </Card>
+          </Reveal>
+        </>
       )}
 
       <PayslipDialog item={payslip} user={data.user_info} onOpenChange={(o) => !o && setPayslip(null)} />

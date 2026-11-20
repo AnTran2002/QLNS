@@ -1,5 +1,33 @@
-# Ignore environment configuration
+# ------------------------------------------------------------------
+# Cấu hình kết nối & thông tin bảo mật — KHÔNG đưa lên GitHub.
+# Chỉ commit các file mẫu (*.example*) để người khác sao chép.
+# ------------------------------------------------------------------
+
+# Back-End: thông tin kết nối CSDL, khoá bí mật (sao chép từ env.example.php)
 Back-End/configs/env.php
+Back-End/configs/*.local.php
+Back-End/.env
+Back-End/.env.*
+
+# Front-End / mọi thư mục: biến môi trường Vite (sao chép từ .env.example)
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# Khoá, chứng chỉ, file thông tin đăng nhập
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+credentials*.json
+secrets*.json
+service-account*.json
+
+# Cấu hình cá nhân của Claude Code / công cụ AI
+.claude/settings.local.json
+**/.claude/settings.local.json
 
 # Logs
 logs
