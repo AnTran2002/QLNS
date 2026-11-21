@@ -1,5 +1,6 @@
 import { PersonAvatar } from "@/components/app/kit";
-import { formatMoney, formatNumber, formatPeriod } from "@/lib/format";
+import { PAYROLL_RULES, taxableIncomeFromTax } from "@/lib/constants";
+import { formatMoney, formatMoneyShort, formatNumber, formatPeriod } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /* Màu cơ cấu chi trả — khớp biểu đồ ở dashboard (đã kiểm tra mù màu / tương phản). */
@@ -64,34 +65,39 @@ export function PayoutBar({ item, className }) {
 }
 
 /**
- * Bảng chi tiết lương. `item` là dòng payroll_items; `detail` (tuỳ chọn) là
- * kết quả `calculation` từ PayrollEngine (có thêm pro_rated_salary, ot_pay, allowance, taxable_income).
+ * Bảng chi tiết lương từ một dòng payroll_items.
+ * Thuế TNCN 2026: biểu lũy tiến 5 bậc trên thu nhập tính thuế =
+ *   Gross − phần OT miễn thuế − BH bắt buộc − giảm trừ gia cảnh (15,5tr + 6,2tr × người phụ thuộc).
+ * Giảm trừ gia cảnh chỉ là căn cứ tính thuế, KHÔNG trừ vào tiền lương.
  */
-export function PayslipBreakdown({ item, detail, className }) {
-  const d = detail ?? {};
+export function PayslipBreakdown({ item, className }) {
+  const taxable = taxableIncomeFromTax(Number(item.personal_tax) || 0);
+  const dependents = Math.max(0, Math.round(((Number(item.tax_deduction) || 0) - PAYROLL_RULES.personalDeduction) / PAYROLL_RULES.dependentDeduction));
   return (
     <div className={cn("space-y-3", className)}>
       <Group title="Thu nhập">
-        {"pro_rated_salary" in d && (
-          <Row
-            label="Lương theo ngày công"
-            sub={`${formatNumber(item.actual_days)} / ${formatNumber(item.standard_days ?? d.standard_days)} ngày`}
-            value={d.pro_rated_salary}
-          />
-        )}
-        {"allowance" in d && <Row label="Phụ cấp cố định" value={d.allowance} />}
-        {"ot_pay" in d && <Row label="Làm thêm giờ (×1,5)" sub={`${formatNumber(item.ot_hours)} giờ`} value={d.ot_pay} />}
         <Row
           label="Tổng thu nhập (Gross)"
-          sub={"pro_rated_salary" in d ? null : `${formatNumber(item.actual_days)} ngày công · ${formatNumber(item.ot_hours)} giờ OT`}
+          sub={`${formatNumber(item.actual_days)}${item.standard_days ? `/${formatNumber(item.standard_days)}` : ""} ngày công · ${formatNumber(item.ot_hours)} giờ OT (×1,5)`}
           value={item.gross_salary}
           strong
         />
       </Group>
-      <Group title="Khấu trừ">
-        <Row label="BHXH, BHYT, BHTN (10,5%)" value={item.social_insurance} negative />
-        <Row label="Thuế thu nhập cá nhân" sub={`Giảm trừ gia cảnh ${formatMoney(item.tax_deduction)}`} value={item.personal_tax} negative />
-        {"taxable_income" in d && <Row label="Thu nhập tính thuế" value={d.taxable_income} />}
+      <Group title="Khấu trừ vào lương">
+        <Row label="BHXH, BHYT, BHTN (10,5%)" sub="8% + 1,5% + 1% lương đóng bảo hiểm" value={item.social_insurance} negative />
+        <Row label="Thuế thu nhập cá nhân" sub="Biểu lũy tiến 5 bậc (5% → 35%) · áp dụng 2026" value={item.personal_tax} negative />
+      </Group>
+      <Group title="Căn cứ tính thuế TNCN (không trừ vào lương)">
+        <Row
+          label="Giảm trừ gia cảnh"
+          sub={`Bản thân ${formatMoneyShort(PAYROLL_RULES.personalDeduction)}${dependents ? ` + ${dependents} người phụ thuộc × ${formatMoneyShort(PAYROLL_RULES.dependentDeduction)}` : ""}`}
+          value={item.tax_deduction}
+        />
+        <Row
+          label="Thu nhập tính thuế"
+          sub={taxable > 0 ? "Gross − OT miễn thuế − BH − giảm trừ gia cảnh" : "Thu nhập chưa vượt mức giảm trừ → không phát sinh thuế"}
+          value={taxable}
+        />
       </Group>
       <div className="space-y-3 rounded-xl border border-primary/25 bg-primary/[0.04] p-4">
         <div className="flex items-end justify-between gap-4">

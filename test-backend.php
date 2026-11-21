@@ -69,20 +69,41 @@ echo "\nPayrollEngine::calculateNetSalary\n";
 $r = PayrollEngine::calculateNetSalary(20_000_000, 2_000_000, 22, 22, 0, 1.5, 0);
 check('gross = lương + phụ cấp', $r['gross_salary'], 22_000_000.0);
 check('BHXH+BHYT+BHTN = 10,5%', $r['social_insurance'], 2_100_000.0);
-// TN tính thuế = 22tr − 2,1tr − 11tr = 8,9tr → 250k + 3,9tr×10% = 640k
-check('thuế TNCN lũy tiến bậc 2', $r['personal_tax'], 640_000.0);
-check('net = gross − BH − thuế', $r['net_salary'], 19_260_000.0);
+// 2026: TN tính thuế = 22tr − 2,1tr − 15,5tr = 4,4tr → bậc 1: 5% = 220k
+check('thuế TNCN 2026 bậc 1 (giảm trừ 15,5tr)', $r['personal_tax'], 220_000.0);
+check('net = gross − BH − thuế', $r['net_salary'], 19_680_000.0);
 
 $r = PayrollEngine::calculateNetSalary(22_000_000, 0, 11, 22, 8, 1.5, 0);
 check('nửa tháng công → lương theo tỉ lệ', $r['pro_rated_salary'], 11_000_000.0);
 check('OT 8h × 1,5 × lương giờ (22tr/176h)', $r['ot_pay'], 1_500_000.0);
+check('phần OT trả thêm 0,5 được miễn thuế', $r['ot_tax_exempt'], 500_000.0);
 
 $r = PayrollEngine::calculateNetSalary(15_000_000, 0, 22, 22, 0, 1.5, 2, 15_000_000);
-check('2 người phụ thuộc → giảm trừ 11tr + 8,8tr', $r['tax_deduction'], 19_800_000.0);
+check('2 người phụ thuộc → giảm trừ 15,5tr + 2 × 6,2tr', $r['tax_deduction'], 27_900_000.0);
 check('thu nhập dưới giảm trừ → thuế 0', $r['personal_tax'], 0.0);
+check('thu nhập tính thuế không âm', $r['taxable_income'], 0.0);
 
-$r = PayrollEngine::calculateNetSalary(18_500_000, 2_500_000, 22, 22, 8, 1.5, 1, 15_000_000);
-check('mẫu NV002 tháng 10 khớp dữ liệu seed (net)', near($r['net_salary'], 20_407_727.27), true);
+$r = PayrollEngine::calculateNetSalary(60_000_000, 0, 22, 22, 0, 1.5, 0);
+// 60tr − 6,3tr BH − 15,5tr = 38,2tr → 0,5tr + 2tr + 8,2tr × 20% = 4,14tr
+check('lương 60tr → bậc 3 (20%)', $r['personal_tax'], 4_140_000.0);
+
+echo "\nPayrollEngine::calculateProgressiveTax (biểu 5 bậc, Luật 109/2025/QH15)\n";
+check('10tr → 500k (5%)', PayrollEngine::calculateProgressiveTax(10_000_000), 500_000.0);
+check('30tr → 2,5tr', PayrollEngine::calculateProgressiveTax(30_000_000), 2_500_000.0);
+check('60tr → 8,5tr', PayrollEngine::calculateProgressiveTax(60_000_000), 8_500_000.0);
+check('100tr → 20,5tr', PayrollEngine::calculateProgressiveTax(100_000_000), 20_500_000.0);
+check('120tr → 27,5tr (35%)', PayrollEngine::calculateProgressiveTax(120_000_000), 27_500_000.0);
+check('0 → 0', PayrollEngine::calculateProgressiveTax(0), 0);
+
+echo "\nPayrollEngine::taxableIncomeFromTax / taxBreakdown (diễn giải phiếu lương)\n";
+check('thuế 220k → TN tính thuế 4,4tr', PayrollEngine::taxableIncomeFromTax(220_000), 4_400_000.0);
+check('thuế 4,14tr → 38,2tr', PayrollEngine::taxableIncomeFromTax(4_140_000), 38_200_000.0);
+check('thuế 27,5tr → 120tr (bậc 5)', PayrollEngine::taxableIncomeFromTax(27_500_000), 120_000_000.0);
+check('thuế 0 → 0', PayrollEngine::taxableIncomeFromTax(0), 0.0);
+$b = PayrollEngine::taxBreakdown(['tax_deduction' => 27_900_000, 'personal_tax' => 0]);
+check('giảm trừ 27,9tr → 2 người phụ thuộc', $b['dependents_count'], 2);
+$r = PayrollEngine::calculateNetSalary(40_000_000, 3_000_000, 22, 22, 10, 1.5, 1, 30_000_000);
+check('khứ hồi: thuế → TN tính thuế khớp engine', near(PayrollEngine::taxableIncomeFromTax($r['personal_tax']), $r['taxable_income'], 1.0), true);
 
 $r = PayrollEngine::calculateNetSalary(10_000_000, 0, 0, 0);
 check('công chuẩn 0 → không chia cho 0', $r['pro_rated_salary'], 0.0);

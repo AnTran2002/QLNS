@@ -1,123 +1,26 @@
 import { useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router";
+import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
-import { Calculator, Download, FileText, Loader2, Lock, Wallet } from "lucide-react";
-import { toast } from "sonner";
+import { Download, FileText, Lock, RefreshCw, Wallet } from "lucide-react";
 import { Button } from "@/components/animate-ui/components/buttons/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/animate-ui/components/radix/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/animate-ui/components/radix/dialog";
 import { Progress } from "@/components/animate-ui/components/radix/progress";
-import { AutoHeight } from "@/components/animate-ui/primitives/effects/auto-height";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { EmptyState, ErrorState, FormError, LoadingState, PageHeader, PeriodStatusBadge, PersonAvatar } from "@/components/app/kit";
+import { EmptyState, ErrorState, LoadingState, PageHeader, PeriodStatusBadge, PersonAvatar } from "@/components/app/kit";
 import { MoneyShort, Reveal, SPRING } from "@/components/app/motion";
 import { PayslipBreakdown, PayslipHeader } from "@/components/app/payslip";
 import { api } from "@/lib/api";
+import { taxableIncomeFromTax } from "@/lib/constants";
 import { formatMoney, formatNumber, formatPeriod } from "@/lib/format";
 
-function CalculateForm({ employee, period, item, onClose }) {
-  const queryClient = useQueryClient();
-  const [actualDays, setActualDays] = useState(item?.actual_days ?? period.standard_days);
-  const [otHours, setOtHours] = useState(item?.ot_hours ?? 0);
-  const [error, setError] = useState("");
-  const [result, setResult] = useState(null);
-
-  const mutation = useMutation({
-    mutationFn: () => api.calculatePayroll({ user_id: employee.id, period_id: period.id, actual_days: actualDays, ot_hours: otHours }),
-    onSuccess: (data) => {
-      setResult(data.calculation);
-      queryClient.invalidateQueries({ queryKey: ["payroll"] });
-      toast.success(`Đã tính và lưu lương cho ${employee.full_name}`);
-    },
-    onError: (err) => setError(err.message),
-  });
-
-  const submit = (e) => {
-    e.preventDefault();
-    const d = Number(actualDays);
-    const ot = Number(otHours);
-    if (!Number.isFinite(d) || d < 0) return setError("Ngày công phải là số không âm");
-    if (!Number.isFinite(ot) || ot < 0) return setError("Giờ OT phải là số không âm");
-    setError("");
-    mutation.mutate();
-  };
-
-  return (
-    <AutoHeight deps={[result, error]} transition={{ type: "spring", stiffness: 260, damping: 30 }}>
-      <AnimatePresence mode="wait" initial={false}>
-        {result ? (
-          <motion.div
-            key="result"
-            initial={{ opacity: 0, scale: 0.98, filter: "blur(6px)" }}
-            animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-            exit={{ opacity: 0, scale: 0.98, filter: "blur(6px)" }}
-            transition={SPRING}
-            className="grid gap-5"
-          >
-            <PayslipHeader name={employee.full_name} code={employee.employee_code} department={employee.department} position={employee.position} monthYear={period.month_year} />
-            <PayslipBreakdown item={{ ...result, standard_days: period.standard_days }} detail={result} />
-            <DialogFooter>
-              <Button variant="secondary" onClick={() => setResult(null)}>Tính lại</Button>
-              <Button onClick={onClose}>Xong</Button>
-            </DialogFooter>
-          </motion.div>
-        ) : (
-          <motion.form
-            key="form"
-            onSubmit={submit}
-            noValidate
-            initial={{ opacity: 0, scale: 0.98, filter: "blur(6px)" }}
-            animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-            exit={{ opacity: 0, scale: 0.98, filter: "blur(6px)" }}
-            transition={SPRING}
-            className="grid gap-5"
-          >
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="actual_days">Ngày công thực tế</Label>
-                <Input id="actual_days" type="number" min="0" step="0.5" value={actualDays} onChange={(e) => setActualDays(e.target.value)} className="tabular" />
-                <p className="text-[12px] text-muted-foreground">Công chuẩn kỳ này: {period.standard_days} ngày</p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="ot_hours">Giờ làm thêm (OT)</Label>
-                <Input id="ot_hours" type="number" min="0" step="0.5" value={otHours} onChange={(e) => setOtHours(e.target.value)} className="tabular" />
-                <p className="text-[12px] text-muted-foreground">Hệ số OT 1,5</p>
-              </div>
-            </div>
-            <dl className="grid grid-cols-2 gap-4 rounded-2xl bg-muted p-4 text-[14px]">
-              {[
-                ["Lương cơ bản", formatMoney(employee.base_salary)],
-                ["Phụ cấp", formatMoney(employee.allowance)],
-                ["Lương đóng BHXH", formatMoney(employee.insurance_salary)],
-                ["Người phụ thuộc", employee.dependents_count],
-              ].map(([k, v]) => (
-                <div key={k}>
-                  <dt className="text-[12px] text-muted-foreground">{k}</dt>
-                  <dd className="tabular mt-0.5 font-medium text-foreground">{v}</dd>
-                </div>
-              ))}
-            </dl>
-            <FormError message={error} />
-            <DialogFooter>
-              <Button type="button" variant="secondary" onClick={onClose}>Huỷ</Button>
-              <Button type="submit" disabled={mutation.isPending}>
-                {mutation.isPending ? <Loader2 className="animate-spin" /> : <Calculator />} Tính & lưu
-              </Button>
-            </DialogFooter>
-          </motion.form>
-        )}
-      </AnimatePresence>
-    </AutoHeight>
-  );
-}
-
 function exportCsv(period, rows) {
-  const header = ["Mã NV", "Họ tên", "Phòng ban", "Ngày công", "Giờ OT", "Gross", "BHXH", "Giảm trừ gia cảnh", "Thuế TNCN", "Net"];
+  const header = ["Mã NV", "Họ tên", "Phòng ban", "Ngày công", "Giờ OT", "Gross", "BHXH", "Giảm trừ gia cảnh (không trừ vào lương)", "Thu nhập tính thuế", "Thuế TNCN", "Net"];
   const lines = rows.map((r) => [
     r.employee_code, r.full_name, r.department, r.actual_days, r.ot_hours,
-    Math.round(r.gross_salary), Math.round(r.social_insurance), Math.round(r.tax_deduction), Math.round(r.personal_tax), Math.round(r.net_salary),
+    Math.round(r.gross_salary), Math.round(r.social_insurance), Math.round(r.tax_deduction),
+    taxableIncomeFromTax(r.personal_tax), Math.round(r.personal_tax), Math.round(r.net_salary),
   ]);
   const csv = [header, ...lines].map((l) => l.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
   const url = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }));
@@ -135,11 +38,14 @@ export default function PayrollPage() {
 
   const itemsQuery = useQuery({
     queryKey: ["payroll", "items", period?.id],
-    queryFn: () => api.payrollItems(period.id),
+    // Kỳ Nháp: gọi bảng công trước để Back-End đồng bộ ngày công/OT mới nhất rồi mới đọc lương.
+    queryFn: async () => {
+      if (period.status === "DRAFT") await api.payrollAttendance(period.id);
+      return api.payrollItems(period.id);
+    },
     enabled: Boolean(period),
   });
 
-  const [target, setTarget] = useState(null); // { employee, item }
   const [viewing, setViewing] = useState(null); // { item, employee }
 
   const rows = useMemo(() => {
@@ -168,7 +74,7 @@ export default function PayrollPage() {
       <PageHeader
         eyebrow="Tiền lương"
         title="Bảng lương"
-        description="Nhập ngày công và giờ OT — hệ thống tính Gross → Net theo biểu thuế 7 bậc và lưu vào kỳ lương."
+        description="Ngày công & OT tự đồng bộ từ chấm công — Gross → Net theo biểu thuế TNCN 5 bậc 2026 (giảm trừ 15,5tr / người phụ thuộc 6,2tr)."
         actions={
           <>
             {periods.length > 0 && (
@@ -191,7 +97,7 @@ export default function PayrollPage() {
       ) : periodsQuery.isPending || employeesQuery.isPending ? (
         <LoadingState rows={4} />
       ) : !period ? (
-        <EmptyState icon={Wallet} title="Chưa có kỳ lương" description="Vào mục Chấm công & OT để tạo kỳ lương mới (Tháng/Năm) và nhập ngày công." />
+        <EmptyState icon={Wallet} title="Chưa có kỳ lương" description="Vào mục Chấm công & OT để tạo kỳ lương cho tháng hiện tại — ngày công sẽ tự đồng bộ." />
       ) : (
         <>
           <Reveal delay={80}>
@@ -220,11 +126,14 @@ export default function PayrollPage() {
                 </div>
                 <div className="space-y-3">
                   <Progress value={headcount ? Math.min(100, (items.length / headcount) * 100) : 0} className="h-1.5 bg-white/12" aria-label="Tiến độ tính lương" />
-                  {!editable && (
-                    <p className="flex items-center gap-2 text-[13px] text-tile-muted">
-                      <Lock className="size-3.5" /> Kỳ đã khoá — chỉ tính lương được ở kỳ Nháp.
-                    </p>
-                  )}
+                  <p className="flex items-center gap-2 text-[13px] text-tile-muted">
+                    {editable ? (
+                      <><RefreshCw className="size-3.5" /> Tự tính lại mỗi khi chấm công thay đổi — chốt kỳ ở mục{" "}
+                        <Link to={`/admin/cham-cong?ky=${period.id}`} className="underline underline-offset-2">Chấm công & OT</Link></>
+                    ) : (
+                      <><Lock className="size-3.5" /> Kỳ đã khoá — số liệu cố định.</>
+                    )}
+                  </p>
                 </div>
               </div>
               <dl className="grid grid-cols-2 gap-3">
@@ -265,7 +174,7 @@ export default function PayrollPage() {
                       <TableHead className="hidden text-right lg:table-cell">BHXH</TableHead>
                       <TableHead className="hidden text-right lg:table-cell">Thuế TNCN</TableHead>
                       <TableHead className="text-right">Net</TableHead>
-                      <TableHead className="w-12 text-right sm:w-32"><span className="sr-only">Thao tác</span></TableHead>
+                      <TableHead className="w-12 text-right"><span className="sr-only">Thao tác</span></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -300,24 +209,15 @@ export default function PayrollPage() {
                               <TableCell className="tabular text-right font-semibold text-foreground">{formatMoney(item.net_salary)}</TableCell>
                             </>
                           ) : (
-                            <TableCell colSpan={5} className="text-right whitespace-normal text-[13px] text-muted-foreground">Chưa tính lương kỳ này</TableCell>
+                            <TableCell colSpan={5} className="text-right whitespace-normal text-[13px] text-muted-foreground">
+                              {employee && !employee.contract_id ? "Chưa có hợp đồng — không tính lương" : "Chưa có dữ liệu chấm công"}
+                            </TableCell>
                           )}
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-1">
                               {item && (
                                 <Button variant="ghost" size="icon-sm" aria-label={`Xem phiếu lương của ${name}`} onClick={() => setViewing({ item, employee })}>
                                   <FileText />
-                                </Button>
-                              )}
-                              {editable && employee && (
-                                <Button
-                                  variant={item ? "ghost" : "secondary"}
-                                  size="sm"
-                                  disabled={!employee.contract_id}
-                                  title={employee.contract_id ? undefined : "Nhân viên chưa có hợp đồng"}
-                                  onClick={() => setTarget({ employee, item })}
-                                >
-                                  <Calculator /> <span className="max-sm:sr-only">{item ? "Tính lại" : "Tính"}</span>
                                 </Button>
                               )}
                             </div>
@@ -332,16 +232,6 @@ export default function PayrollPage() {
           )}
         </>
       )}
-
-      <Dialog open={Boolean(target)} onOpenChange={(o) => !o && setTarget(null)}>
-        <DialogContent className="max-h-[92svh] overflow-y-auto sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Tính lương</DialogTitle>
-            <DialogDescription>{target?.employee.full_name} · {formatPeriod(period?.month_year)}</DialogDescription>
-          </DialogHeader>
-          {target && <CalculateForm employee={target.employee} item={target.item} period={period} onClose={() => setTarget(null)} />}
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={Boolean(viewing)} onOpenChange={(o) => !o && setViewing(null)}>
         <DialogContent className="max-h-[92svh] overflow-y-auto sm:max-w-lg">
@@ -358,7 +248,7 @@ export default function PayrollPage() {
                 position={viewing.item.position}
                 monthYear={period?.month_year}
               />
-              <PayslipBreakdown item={viewing.item} />
+              <PayslipBreakdown item={{ ...viewing.item, standard_days: viewing.item.standard_days ?? period?.standard_days }} />
             </div>
           )}
         </DialogContent>

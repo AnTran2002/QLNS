@@ -28,6 +28,21 @@ export function formatPeriod(monthYear) {
   return `Tháng ${Number(m)}/${y}`;
 }
 
+/** "2026-11" → "T11" (nhãn trục biểu đồ — năm ghi riêng dưới biểu đồ) */
+export const formatMonthShort = (monthYear) => `T${Number(String(monthYear ?? "").split("-")[1]) || "?"}`;
+
+/**
+ * Các kỳ của một năm cho biểu đồ theo tháng: năm hiện tại, hoặc năm gần nhất có dữ liệu.
+ * `rows` có trường `month_year`; trả về { year, rows } (giữ thứ tự đầu vào).
+ */
+export function rowsOfChartYear(rows, now = new Date()) {
+  const yearOf = (r) => Number(String(r.month_year).slice(0, 4));
+  const years = rows.map(yearOf);
+  const current = now.getFullYear();
+  const year = years.includes(current) || !years.length ? current : Math.max(...years);
+  return { year, rows: rows.filter((r) => yearOf(r) === year) };
+}
+
 /** "Nguyễn Văn An" → "NA" */
 export function initials(name = "") {
   const parts = String(name).trim().split(/\s+/).filter(Boolean);

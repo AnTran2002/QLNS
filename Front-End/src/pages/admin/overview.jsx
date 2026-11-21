@@ -23,7 +23,7 @@ import { Meter } from "@/components/ui/meter";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { api } from "@/lib/api";
 import { EMPLOYEE_STATUSES } from "@/lib/constants";
-import { formatMoney, formatMoneyShort, formatNumber, formatPeriod } from "@/lib/format";
+import { formatMoney, formatMoneyShort, formatMonthShort, formatNumber, formatPeriod, rowsOfChartYear } from "@/lib/format";
 import { groupByDepartment } from "@/lib/hr";
 
 const todayLabel = new Intl.DateTimeFormat("vi-VN", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
@@ -52,28 +52,26 @@ const sum = (rows, key) => rows.reduce((s, r) => s + (Number(r[key]) || 0), 0);
 /* ------------------------------------------------------------------ */
 
 function PeriodChart({ periods }) {
-  const data = useMemo(
-    () =>
-      [...periods]
-        .filter((p) => p.items_count > 0)
-        .reverse()
-        .slice(-12)
-        .map((p) => ({ label: formatPeriod(p.month_year).replace("Tháng ", "T"), gross: p.total_gross, net: p.total_net })),
-    [periods],
-  );
+  const { year, data } = useMemo(() => {
+    const picked = rowsOfChartYear([...periods].filter((p) => p.items_count > 0).reverse());
+    return {
+      year: picked.year,
+      data: picked.rows.map((p) => ({ label: formatMonthShort(p.month_year), period: formatPeriod(p.month_year), gross: p.total_gross, net: p.total_net })),
+    };
+  }, [periods]);
 
   return (
     <Card className="h-full gap-4">
       <CardHeader>
         <CardTitle>Quỹ lương theo kỳ</CardTitle>
-        <CardDescription>Tổng Gross và Net đã chốt của từng kỳ lương (payroll_items)</CardDescription>
+        <CardDescription>Tổng Gross và Net của từng tháng trong năm {year}</CardDescription>
       </CardHeader>
       <CardContent className="px-3 sm:px-6">
         {data.length === 0 ? (
           <p className="flex h-[240px] items-center justify-center text-[13px] text-muted-foreground">Chưa có kỳ lương nào được tính.</p>
         ) : data.length === 1 ? (
           <div className="flex h-[240px] flex-col justify-center gap-4 px-1">
-            <p className="text-[12.5px] text-muted-foreground">Kỳ {data[0].label.replace("T", "")} — kỳ duy nhất đã tính</p>
+            <p className="text-[12.5px] text-muted-foreground">{data[0].period} — kỳ duy nhất đã tính trong năm</p>
             <dl className="grid grid-cols-2 gap-4">
               {["gross", "net"].map((k) => (
                 <div key={k}>
@@ -95,13 +93,17 @@ function PeriodChart({ periods }) {
               <CartesianGrid vertical={false} strokeDasharray="0" />
               <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} padding={{ left: 12, right: 12 }} />
               <YAxis tickLine={false} axisLine={false} width={56} tickFormatter={(v) => formatMoneyShort(v)} />
-              <ChartTooltip cursor={lineCursor} content={<ChartTooltipContent valueFormatter={formatMoney} />} />
+              <ChartTooltip
+                cursor={lineCursor}
+                content={<ChartTooltipContent labelFormatter={(_, payload) => payload?.[0]?.payload?.period ?? ""} valueFormatter={formatMoney} />}
+              />
               <ChartLegend content={<ChartLegendContent />} />
               <Line {...lineProps("gross", 0)} />
               <Line {...lineProps("net", 1)} />
             </LineChart>
           </ChartContainer>
         )}
+        {data.length > 0 && <p className="mt-1 text-center text-[12.5px] font-medium text-muted-foreground tabular-nums">Năm {year}</p>}
       </CardContent>
     </Card>
   );
@@ -380,7 +382,7 @@ export default function AdminOverview() {
   const employees = useMemo(() => employeesQuery.data ?? [], [employeesQuery.data]);
   const periods = useMemo(() => periodsQuery.data ?? [], [periodsQuery.data]);
 
-  // Kỳ đang mở (DRAFT) để theo dõi tiến độ nhập công; kỳ gần nhất đã có dữ liệu để thống kê chi trả.
+  // Kỳ đang mở (DRAFT) để theo dõi tiến độ đồng bộ công; kỳ gần nhất đã có dữ liệu để thống kê chi trả.
   const openPeriod = periods.find((p) => p.status === "DRAFT") ?? periods[0];
   const withItems = periods.filter((p) => p.items_count > 0);
   const latest = withItems[0];
@@ -487,7 +489,7 @@ export default function AdminOverview() {
         </Reveal>
         <Reveal delay={180} offset={14} className="h-full">
           <KpiCard
-            label={openPeriod ? `Nhập công · ${formatPeriod(openPeriod.month_year)}` : "Tiến độ nhập công"}
+            label={openPeriod ? `Chấm công · ${formatPeriod(openPeriod.month_year)}` : "Đồng bộ chấm công"}
             icon={CalendarClock}
             value={
               <span>
@@ -499,16 +501,16 @@ export default function AdminOverview() {
             hint={
               openPeriod ? (
                 <Link to={`/admin/cham-cong?ky=${openPeriod.id}`} className="inline-flex items-center gap-1 text-primary hover:underline">
-                  {openEntered >= stats.total ? "Đã nhập đủ — xem lưới công" : "Tiếp tục nhập công"} <ArrowRight className="size-3.5" />
+                  {openEntered >= stats.total ? "Đã đồng bộ đủ — xem bảng công" : "Xem bảng công tự động"} <ArrowRight className="size-3.5" />
                 </Link>
               ) : (
                 <Link to="/admin/cham-cong" className="inline-flex items-center gap-1 text-primary hover:underline">
-                  Tạo kỳ lương đầu tiên <ArrowRight className="size-3.5" />
+                  Tạo kỳ lương tháng này <ArrowRight className="size-3.5" />
                 </Link>
               )
             }
           >
-            <Meter value={openProgress} label="Tiến độ nhập công" />
+            <Meter value={openProgress} label="Tiến độ đồng bộ chấm công" />
           </KpiCard>
         </Reveal>
       </section>

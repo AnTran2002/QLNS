@@ -86,24 +86,20 @@ class PayrollModel extends BaseModel {
         return $byUserId;
     }
 
-    public function getUsersByEmployeeCodes(array $employeeCodes): array
+    public function updateStandardDays(int $periodId, int $standardDays): void
     {
-        if ($employeeCodes === []) {
-            return [];
-        }
+        $stmt = $this->db->prepare("UPDATE payroll_periods SET standard_days = :days WHERE id = :id");
+        $stmt->execute(['days' => $standardDays, 'id' => $periodId]);
+    }
 
-        $placeholders = implode(', ', array_fill(0, count($employeeCodes), '?'));
+    public function findPeriodByMonth(string $monthYear): ?array
+    {
         $stmt = $this->db->prepare(
-            "SELECT id, employee_code
-             FROM users
-             WHERE employee_code IN ({$placeholders})"
+            "SELECT id, month_year, standard_days, status FROM payroll_periods WHERE month_year = :m LIMIT 1"
         );
-        $stmt->execute($employeeCodes);
-        $users = [];
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $users[$row['employee_code']] = (int) $row['id'];
-        }
-        return $users;
+        $stmt->execute(['m' => $monthYear]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
     }
 
     public function getItemsByPeriod($periodId)

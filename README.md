@@ -9,7 +9,7 @@ QLNS/
 ├── Back-End/           PHP 8 thuần (router ?action=…, PDO), không framework
 │   ├── controllers/    Auth · Employee · Contract · Payroll · Profile · Leave · Home
 │   ├── models/         User · Contract · Payroll · AttendanceRecord · LeaveRequest
-│   ├── services/       PayrollEngine · LeavePolicy · Attendance · Payslip · Xlsx…
+│   ├── services/       PayrollEngine · LeavePolicy · Attendance · Payslip · XlsxExport
 │   └── database/       migrations/001…005, seed_passwords.php
 ├── test-backend.php    Kiểm thử PHP thuần (LeavePolicy + PayrollEngine), không cần CSDL
 ├── QLNS-Database.sql   Dump đầy đủ database `qlns` (đã gồm migration 004, 005 + lương T1–T10/2026)
@@ -53,7 +53,18 @@ Sau khi rà các chức năng một hệ thống HR cần có, phần **đơn ng
 - **Tệp mới:** `migrations/005_leave_requests.sql` (đã gộp vào `QLNS-Database.sql`), `LeavePolicy.php`, `LeaveRequestModel.php`, `LeaveController.php`, `Front-End/src/lib/leave.js`, `pages/employee/leave.jsx`, `pages/admin/leave.jsx`, `components/ui/textarea.jsx`.
 - **API:** `GET/POST employee/leave`, `POST employee/leave/cancel&id=`, `GET leave/requests[&status=]` (ADMIN), `POST leave/review&id=` (ADMIN).
 
-### 1.3 Lọc gọn code Front-End (không mất tính năng)
+### 1.3 Chỉnh nghiệp vụ lương cho đúng logic
+
+| Vấn đề | Cách xử lý |
+| --- | --- |
+| **Tạo kỳ lương trong quá khứ** | Chỉ cho tạo kỳ của **tháng hiện tại hoặc tháng kế tiếp**; Back-End trả 422 cho tháng đã qua. Hộp thoại chỉ đưa ra 2 lựa chọn này; công chuẩn tự tính = số ngày T2–T6 của tháng |
+| **Sửa lương không có lý do** | Đổi điều khoản lương bắt buộc ghi **lý do điều chỉnh** (5–500 ký tự). Form sửa nhân viên khoá các ô lương; muốn đổi phải bấm "Điều chỉnh lương (phụ lục)" |
+| **Hợp đồng sửa được lương** | Hợp đồng là văn bản **cố định, chỉ xem**: bỏ API `contracts/update`. Mỗi lần điều chỉnh lương thêm một **phụ lục** (dòng `contracts` mới, cột `change_reason`), bản cũ giữ nguyên. Trang Hợp đồng hiển thị điều khoản đang hiệu lực và lịch sử "Hợp đồng gốc / Phụ lục N" kèm lý do |
+| **Thuế trên phiếu lương** | Cập nhật biểu thuế 2026 (5 bậc, giảm trừ 15,5tr / 6,2tr) ở `PayrollEngine`, `PayslipRenderer` và Front-End. Phiếu lương tách rõ: *khấu trừ vào lương* (BH 10,5%, thuế TNCN) và *căn cứ tính thuế* (giảm trừ gia cảnh, thu nhập tính thuế — không trừ vào lương) |
+| **Biểu đồ quỹ lương** | Nhãn trục chỉ còn tháng (`T1`…`T12`); năm hiển thị một lần dưới biểu đồ ("Năm 2026"); tooltip vẫn ghi đủ "Tháng 11/2026" |
+| **Chấm công & OT nhập tay** | Trang **chỉ xem**: ngày công / giờ OT tự tổng hợp từ chấm công hằng ngày (có mặt, muộn, remote, phép có lương; trừ nghỉ không lương / ốm). Bỏ nhập tay, nhập Excel và nút tính lương từng người (`payroll/attendance` PUT, `payroll/import`, `payroll/calculate`, `XlsxAttendanceReader.php`). Còn lại: Tạo kỳ → Đồng bộ lại → Khoá sổ |
+
+### 1.4 Lọc gọn code Front-End (không mất tính năng)
 
 - Xoá **23 tệp trùng lặp** dạng `* 2.jsx` / `index 2.css` (bản sao do Finder/iCloud tạo).
 - Xoá component không còn được dùng: `app-shell.jsx`, `popover`, `switch`, `counting-number`, `sliding-number` (cả bản `components` lẫn `primitives`).
@@ -62,27 +73,27 @@ Sau khi rà các chức năng một hệ thống HR cần có, phần **đơn ng
 - Định dạng lại 4 tệp dài bằng Prettier (`Front-End/.prettierrc.json`).
 - Kết quả: **−~5.000 dòng**, `npm run build` vẫn thành công, toàn bộ kiểm thử vẫn đạt.
 
-### 1.4 Back-End
+### 1.5 Back-End
 
 - `BaseModel` nay dùng `DB_PORT` khi kết nối (trước đây bỏ qua → MAMP cổng 8889 không kết nối được nếu không có socket).
 - Endpoint mới: chấm công theo ngày (`employee/attendance`), ảnh đại diện (`profile/avatar`), nghỉ phép (mục 1.2).
 
 - Dữ liệu lương mẫu: thêm kỳ **T1 → T9/2026** (đã chi trả) cho mọi nhân viên, lương tăng dần sau mỗi tháng (tổng thực nhận T1 ≈ 70,8 tr → T10 ≈ 93,4 tr), tính bằng chính `PayrollEngine`. Có trong `QLNS-Database.sql` và `database/seed_additional_demo_data.sql` (chạy lại nhiều lần không bị trùng).
 
-### 1.5 Kiểm thử (gộp vào mã chính, bỏ thư mục `tests/`)
+### 1.6 Kiểm thử (gộp vào mã chính, bỏ thư mục `tests/`)
 
 ```
 Front-End/src/test-setup.js      jest-dom + polyfill matchMedia/ResizeObserver/IntersectionObserver
 Front-End/src/App.test.jsx       luồng UI: đăng nhập, phân quyền, chấm công & OT, cổng NV, nghỉ phép
 Front-End/src/lib/lib.test.js    hàm thuần: lịch tháng, nghỉ phép, lương tạm tính, định dạng
-test-backend.php                 36 kiểm thử LeavePolicy + PayrollEngine (không cần CSDL/PHPUnit)
+test-backend.php                 50 kiểm thử LeavePolicy + PayrollEngine + chấm công tự động (không cần CSDL/PHPUnit)
 ```
 
 Cấu hình Vitest nằm ngay trong `Front-End/vite.config.js` (khối `test`). Các script phụ (`serve.sh`, `smoke.sh`, `migrate.php`, `link-frontend.js`) đã bỏ — thay bằng `npm run backend` và phpMyAdmin / `mysql`.
 
-Kết quả lần chạy gần nhất: **Front-End 26/26 · Back-End 36/36**.
+Kết quả lần chạy gần nhất: **Front-End 29/29 · Back-End 50/50**.
 
-### 1.6 Chạy trên nhiều máy (Windows + macOS) a
+### 1.7 Chạy trên nhiều máy (Windows + macOS)
 
 - **Lỗi HTTP 502** khi mở Front-End: Node 18+ phân giải `localhost` thành IPv6 `::1`, còn PHP / XAMPP thường chỉ nghe `127.0.0.1` → proxy của Vite không kết nối được. Đã đổi mặc định sang `http://127.0.0.1:8000`, và `vite.config.js` tự đổi `localhost` trong `BACKEND_URL` thành `127.0.0.1`.
 - `package-lock.json` tạo trên macOS thiếu binary native cho Windows (rolldown, lightningcss, tailwind oxide) → đã đưa mọi lock file vào `.gitignore`; mỗi máy tự `npm install`.
@@ -155,7 +166,10 @@ npm run test:backend   # kiểm thử PHP thuần (= php ../test-backend.php)
   - Điều 115: nghỉ việc riêng có hưởng lương (kết hôn, tang…).
   - Điều 98: tiền làm thêm giờ ≥ 150% ngày thường (hệ số OT 1,5 trong `PayrollEngine`).
 - Luật Bảo hiểm xã hội: nghỉ ốm do quỹ BHXH chi trả, không trừ phép năm; tỉ lệ người lao động đóng 10,5% (BHXH 8% + BHYT 1,5% + BHTN 1%).
-- Luật Thuế TNCN: biểu thuế lũy tiến 7 bậc; giảm trừ gia cảnh 11 triệu (bản thân) và 4,4 triệu / người phụ thuộc (Nghị quyết 954/2020/UBTVQH14).
+- Thuế TNCN áp dụng từ kỳ tính thuế 2026: biểu lũy tiến **5 bậc** (≤10tr 5% · ≤30tr 10% · ≤60tr 20% · ≤100tr 30% · trên 100tr 35%); giảm trừ gia cảnh **15,5 triệu** (bản thân) và **6,2 triệu** / người phụ thuộc. Phần tiền OT trả cao hơn ngày thường được miễn thuế.
+  - [Thư viện Pháp luật · Biểu thuế TNCN lũy tiến 2026 (5 bậc)](https://thuvienphapluat.vn/chinh-sach-phap-luat-moi/vn/ho-tro-phap-luat/chinh-sach-moi/100277/bieu-thue-tncn-luy-tien-2026-bieu-thue-5-bac)
+  - [Thư viện Pháp luật · Mức giảm trừ gia cảnh 2026](https://thuvienphapluat.vn/phap-luat-doanh-nghiep/bai-viet/thue-tncn-2026-cach-tinh-muc-giam-tru-gia-canh-2026-15323.html)
+  - [ThuếAZ · Thuế TNCN 2026: giảm trừ gia cảnh & 5 bậc](https://thueaz.com/kien-thuc/thue-tncn-2026-giam-tru-gia-canh-5-bac/)
 
 **Thiết kế**
 

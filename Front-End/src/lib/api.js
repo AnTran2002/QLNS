@@ -21,7 +21,7 @@ export class ApiError extends Error {
     super(message);
     this.name = "ApiError";
     this.status = status;
-    /** `data` đi kèm lỗi (vd. danh sách dòng lỗi khi import Excel). */
+    /** `data` đi kèm lỗi (vd. danh sách mã NV thiếu hợp đồng). */
     this.details = details;
   }
 }
@@ -85,6 +85,8 @@ function employeePayload(e) {
     dependents_count: Number(e.dependents_count) || 0,
   };
   if (e.password) payload.password = e.password;
+  // Điều chỉnh lương = phụ lục hợp đồng mới → Back-End bắt buộc lý do (5–500 ký tự).
+  if (e.salary_change_reason?.trim()) payload.salary_change_reason = e.salary_change_reason.trim();
   return payload;
 }
 
@@ -132,60 +134,28 @@ export const api = {
     callApi("employees/update", { method: "PUT", params: { id }, data: employeePayload(e) }),
   deleteEmployee: (id) => callApi("employees/delete", { method: "DELETE", params: { id } }),
 
-  // ---- Hợp đồng (ContractController) ----
+  // ---- Hợp đồng (ContractController — chỉ xem) ----
+  /** Hợp đồng đang hiệu lực của mọi nhân viên (kèm `version_count`). */
   contracts: () => callApi("contracts").then(toNumberList),
-  updateContract: (id, c) =>
-    callApi("contracts/update", {
-      method: "PUT",
-      params: { id },
-      data: {
-        base_salary: Number(c.base_salary) || 0,
-        insurance_salary: Number(c.insurance_salary) || 0,
-        allowance: Number(c.allowance) || 0,
-        dependents_count: Number(c.dependents_count) || 0,
-      },
-    }).then(toNumbers),
+  /** Chi tiết hợp đồng + `history`: các phiên bản (ký mới / phụ lục) mới nhất trước. */
+  contract: (id) =>
+    callApi("contracts/show", { params: { id } }).then((d) => ({ ...toNumbers(d), history: toNumberList(d?.history) })),
 
   // ---- Bảng lương (PayrollController, ADMIN) ----
   payrollPeriods: () => callApi("payroll/periods").then(toNumberList),
   payrollItems: (periodId) => callApi("payroll/items", { params: { period_id: periodId } }),
 
-  // ---- Chấm công & OT ----
-  /** Tạo kỳ lương mới (Tháng/Năm) — month_year dạng "YYYY-MM". */
-  createPayrollPeriod: ({ month_year, standard_days }) =>
-    callApi("payroll/periods", {
-      method: "POST",
-      data: { month_year, standard_days: Number(standard_days) },
-    }).then(toNumbers),
-  /** Lưới chấm công của một kỳ: mọi nhân viên + ngày công / giờ OT đã nhập (nếu có). */
+  // ---- Chấm công & OT (tự động, chỉ xem) ----
+  /** Tạo kỳ lương cho tháng hiện tại / kế tiếp — công chuẩn do Back-End tính (số ngày T2–T6). */
+  createPayrollPeriod: ({ month_year }) => callApi("payroll/periods", { method: "POST", data: { month_year } }).then(toNumbers),
+  /** Bảng công của kỳ — kỳ Nháp được Back-End đồng bộ lại từ chấm công mỗi lần gọi. */
   payrollAttendance: (periodId) =>
     callApi("payroll/attendance", { params: { period_id: periodId } }).then((d) => ({
       period: toNumbers(d?.period),
       items: toNumberList(d?.items),
+      syncedUntil: d?.synced_until ?? null,
+      missingContracts: d?.missing_contracts ?? [],
     })),
-  /** Lưu chỉnh sửa thủ công trên Grid: entries = [{ user_id, actual_days, ot_hours }]. */
-  saveAttendance: (periodId, entries) =>
-    callApi("payroll/attendance", {
-      method: "PUT",
-      data: {
-        period_id: periodId,
-        entries: entries.map((e) => ({
-          user_id: e.user_id,
-          actual_days: Number(e.actual_days),
-          ot_hours: Number(e.ot_hours),
-        })),
-      },
-    }),
-  /** Import file Excel công (.xlsx): cột Mã NV · Ngày công · Giờ OT. */
-  importAttendance: (periodId, file) => {
-    const form = new FormData();
-    form.append("period_id", String(periodId));
-    form.append("file", file);
-    return callApi("payroll/import", { method: "POST", data: form, timeout: 60000 });
-  },
-  calculatePayroll: ({ user_id, period_id, actual_days, ot_hours }) =>
-    callApi("payroll/calculate", {
-      method: "POST",
-      data: { user_id, period_id, actual_days: Number(actual_days), ot_hours: Number(ot_hours) },
-    }),
+  /** Khoá sổ kỳ (đồng bộ lần cuối rồi chốt số liệu). */
+  lockPayrollPeriod: (periodId) => callApi("payroll/lock", { method: "POST", data: { period_id: periodId } }),
 };

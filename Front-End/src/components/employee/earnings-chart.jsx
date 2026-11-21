@@ -10,7 +10,7 @@ import {
   lineCursor,
   lineProps,
 } from "@/components/ui/chart";
-import { formatMoney, formatMoneyShort, formatPeriod } from "@/lib/format";
+import { formatMoney, formatMoneyShort, formatMonthShort, formatPeriod, rowsOfChartYear } from "@/lib/format";
 
 /* Cùng thứ tự màu với "Cơ cấu chi trả" của dashboard quản trị. */
 const CONFIG = {
@@ -24,27 +24,24 @@ const LINE_CONFIG = {
   net: CONFIG.net,
 };
 
-const shortPeriod = (m) => formatPeriod(m).replace("Tháng ", "T");
-
 /**
  * Đường theo kỳ: Gross và Thực nhận trên cùng một trục; tooltip ghi rõ BH và thuế đã trừ.
  */
 export function EarningsChart({ history = [], limit = 12, className, title = "Thu nhập theo kỳ", description }) {
-  const data = useMemo(
-    () =>
-      [...history]
-        .reverse()
-        .slice(-limit)
-        .map((i) => ({
-          label: shortPeriod(i.month_year),
+  const { year, data } = useMemo(() => {
+    const picked = rowsOfChartYear([...history].reverse().slice(-limit));
+    return {
+      year: picked.year,
+      data: picked.rows.map((i) => ({
+          label: formatMonthShort(i.month_year),
           period: formatPeriod(i.month_year),
           net: i.net_salary,
           insurance: i.social_insurance,
           tax: i.personal_tax,
           gross: i.gross_salary,
         })),
-    [history, limit],
-  );
+    };
+  }, [history, limit]);
 
   return (
     <Card className={className ?? "h-full gap-4"}>
@@ -81,6 +78,7 @@ export function EarningsChart({ history = [], limit = 12, className, title = "Th
             </LineChart>
           </ChartContainer>
         )}
+        {data.length > 0 && <p className="mt-1 text-center text-[12.5px] font-medium text-muted-foreground tabular-nums">Năm {year}</p>}
       </CardContent>
     </Card>
   );

@@ -1,105 +1,94 @@
 import { useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
-import { FileSignature, Loader2, Pencil, ShieldCheck, Users, Wallet } from "lucide-react";
-import { toast } from "sonner";
+import { FileSignature, FileText, Lock, ShieldCheck, Users, Wallet } from "lucide-react";
 import { Button } from "@/components/animate-ui/components/buttons/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/animate-ui/components/radix/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/animate-ui/components/radix/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { EmptyState, ErrorState, FormError, LoadingState, PageHeader, PersonAvatar, SearchField, StatTile } from "@/components/app/kit";
-import { Count, Money, MoneyShort, Reveal, RevealGroup, SPRING } from "@/components/app/motion";
+import { EmptyState, ErrorState, LoadingState, PageHeader, PersonAvatar, SearchField, StatTile } from "@/components/app/kit";
+import { Count, MoneyShort, Reveal, RevealGroup, SPRING } from "@/components/app/motion";
 import { api } from "@/lib/api";
 import { PAYROLL_RULES } from "@/lib/constants";
 import { formatDate, formatMoney } from "@/lib/format";
 
-const FIELDS = [
-  ["base_salary", "Lương cơ bản (₫)", "100000"],
-  ["insurance_salary", "Lương đóng BHXH (₫)", "100000"],
-  ["allowance", "Phụ cấp cố định (₫)", "100000"],
-  ["dependents_count", "Số người phụ thuộc", "1"],
+const TERMS = [
+  ["base_salary", "Lương cơ bản", "money"],
+  ["insurance_salary", "Lương đóng BHXH", "money"],
+  ["allowance", "Phụ cấp cố định", "money"],
+  ["dependents_count", "Người phụ thuộc", "count"],
 ];
+const termValue = (c, key, kind) => (kind === "money" ? formatMoney(c[key]) : `${c[key]} người`);
 
-function ContractForm({ contract, onOpenChange }) {
-  const queryClient = useQueryClient();
-  const [form, setForm] = useState(() => ({
-    base_salary: contract.base_salary,
-    insurance_salary: contract.insurance_salary,
-    allowance: contract.allowance,
-    dependents_count: contract.dependents_count,
-  }));
-  const [error, setError] = useState("");
-
-  const mutation = useMutation({
-    mutationFn: () => api.updateContract(contract.id, form),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["contracts"] });
-      queryClient.invalidateQueries({ queryKey: ["employees"] });
-      toast.success(`Đã cập nhật hợp đồng của ${contract.full_name}`);
-      onOpenChange(false);
-    },
-    onError: (err) => setError(err.message),
+/** Văn bản hợp đồng — chỉ xem. Điều chỉnh lương = phụ lục mới (tạo từ hồ sơ nhân viên, bắt buộc lý do). */
+function ContractDocument({ contract }) {
+  const { data, isPending, error, refetch } = useQuery({
+    queryKey: ["contracts", contract.id],
+    queryFn: () => api.contract(contract.id),
   });
-
-  const submit = (e) => {
-    e.preventDefault();
-    for (const [key, label] of FIELDS) {
-      const n = Number(form[key]);
-      if (!Number.isFinite(n) || n < 0) return setError(`${label} phải là số không âm`);
-    }
-    if (!Number.isInteger(Number(form.dependents_count))) return setError("Số người phụ thuộc phải là số nguyên");
-    setError("");
-    mutation.mutate();
-  };
-
-  const insurance = Number(form.insurance_salary || 0) * PAYROLL_RULES.insuranceRate;
-  const deduction = PAYROLL_RULES.personalDeduction + Number(form.dependents_count || 0) * PAYROLL_RULES.dependentDeduction;
+  const history = data?.history ?? [];
+  const insurance = contract.insurance_salary * PAYROLL_RULES.insuranceRate;
+  const deduction = PAYROLL_RULES.personalDeduction + contract.dependents_count * PAYROLL_RULES.dependentDeduction;
 
   return (
-    <form onSubmit={submit} noValidate className="grid gap-5">
-      <div className="grid gap-4 sm:grid-cols-2">
-        {FIELDS.map(([key, label, step]) => (
-          <div key={key} className="space-y-2">
-            <Label htmlFor={key}>{label}</Label>
-            <Input
-              id={key}
-              type="number"
-              min="0"
-              step={step}
-              value={form[key]}
-              onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-              className="tabular"
-            />
-          </div>
-        ))}
-      </div>
-      {/* Xem trước — số lăn theo từng lần gõ */}
-      <div className="tile grid gap-4 p-5 sm:grid-cols-2">
-        <div>
-          <p className="text-[13px] text-tile-muted">Trích BHXH người lao động (10,5%)</p>
-          <Money value={insurance} className="mt-1 text-[20px] font-semibold" />
+    <div className="grid gap-5">
+      <section className="overflow-hidden rounded-xl border border-border/80">
+        <p className="flex items-center justify-between gap-3 border-b border-border/70 bg-muted/50 px-4 py-2 text-[12px] font-medium text-muted-foreground">
+          <span>Điều khoản lương đang hiệu lực</span>
+          <span className="inline-flex items-center gap-1"><Lock className="size-3" /> Cố định</span>
+        </p>
+        <dl className="grid divide-y divide-border/60 sm:grid-cols-2 sm:divide-y-0">
+          {TERMS.map(([key, label, kind]) => (
+            <div key={key} className="px-4 py-3 sm:border-b sm:border-border/60 sm:odd:border-r">
+              <dt className="text-[12px] text-muted-foreground">{label}</dt>
+              <dd className="tabular mt-0.5 text-[15px] font-medium text-foreground">{termValue(contract, key, kind)}</dd>
+            </div>
+          ))}
+        </dl>
+        <div className="grid gap-1 px-4 py-3 text-[12.5px] text-muted-foreground sm:grid-cols-2">
+          <p>BH người lao động (10,5%): <b className="tabular font-medium text-foreground">{formatMoney(insurance)}</b></p>
+          <p>Giảm trừ gia cảnh / tháng: <b className="tabular font-medium text-foreground">{formatMoney(deduction)}</b></p>
         </div>
-        <div>
-          <p className="text-[13px] text-tile-muted">Giảm trừ gia cảnh / tháng</p>
-          <Money value={deduction} className="mt-1 text-[20px] font-semibold" />
-        </div>
-      </div>
-      <FormError message={error} />
-      <DialogFooter>
-        <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>Huỷ</Button>
-        <Button type="submit" disabled={mutation.isPending}>
-          {mutation.isPending && <Loader2 className="animate-spin" />} Lưu hợp đồng
-        </Button>
-      </DialogFooter>
-    </form>
+      </section>
+
+      <section className="grid gap-2">
+        <p className="text-[13px] font-medium">Lịch sử ký kết & phụ lục</p>
+        {error ? (
+          <ErrorState error={error} onRetry={refetch} />
+        ) : isPending ? (
+          <LoadingState rows={2} />
+        ) : (
+          <ol className="grid gap-2">
+            {history.map((v, i) => (
+              <li key={v.id} className="rounded-xl border border-border/70 px-4 py-3">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <p className="text-[13.5px] font-medium">
+                    {i === history.length - 1 ? "Hợp đồng gốc" : `Phụ lục ${history.length - 1 - i}`}
+                    {i === 0 && <span className="ml-2 rounded-md bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary">Đang hiệu lực</span>}
+                  </p>
+                  <span className="text-[12px] text-muted-foreground">{formatDate(v.created_at)}</span>
+                </div>
+                <p className="mt-1 text-[13px] text-foreground/85">{v.change_reason || "—"}</p>
+                <p className="tabular mt-1 text-[12px] text-muted-foreground">
+                  Lương cơ bản {formatMoney(v.base_salary)} · BHXH {formatMoney(v.insurance_salary)} · Phụ cấp {formatMoney(v.allowance)} · NPT {v.dependents_count}
+                </p>
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
+
+      <p className="rounded-xl bg-muted/60 px-4 py-3 text-[12.5px] text-muted-foreground">
+        Hợp đồng là văn bản cố định, không sửa trực tiếp. Khi thay đổi lương, vào <b className="font-medium text-foreground">Nhân viên → Sửa → Điều chỉnh lương</b> và ghi lý do —
+        hệ thống lưu thành phụ lục mới, các bản trước được giữ nguyên.
+      </p>
+    </div>
   );
 }
 
 export default function ContractsPage() {
   const { data: contracts = [], isPending, error, refetch } = useQuery({ queryKey: ["contracts"], queryFn: api.contracts });
   const [query, setQuery] = useState("");
-  const [editing, setEditing] = useState(null);
+  const [viewing, setViewing] = useState(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -118,7 +107,7 @@ export default function ContractsPage() {
       <PageHeader
         eyebrow="Tiền lương"
         title="Hợp đồng lao động"
-        description="Thông số làm căn cứ tính lương: lương cơ bản, lương đóng BHXH, phụ cấp và người phụ thuộc."
+        description="Văn bản cố định, chỉ xem — mỗi lần điều chỉnh lương là một phụ lục kèm lý do, bản cũ được lưu lại."
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
@@ -151,8 +140,8 @@ export default function ContractsPage() {
                   <TableHead className="hidden text-right md:table-cell">Lương BHXH</TableHead>
                   <TableHead className="hidden text-right md:table-cell">Phụ cấp</TableHead>
                   <TableHead className="hidden text-center lg:table-cell">NPT</TableHead>
-                  <TableHead className="hidden lg:table-cell">Ngày tạo</TableHead>
-                  <TableHead className="w-14"><span className="sr-only">Sửa</span></TableHead>
+                  <TableHead className="hidden lg:table-cell">Hiệu lực từ</TableHead>
+                  <TableHead className="w-14"><span className="sr-only">Xem</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -182,10 +171,13 @@ export default function ContractsPage() {
                       <TableCell className="tabular hidden text-right text-foreground/85 md:table-cell">{formatMoney(c.insurance_salary)}</TableCell>
                       <TableCell className="tabular hidden text-right text-foreground/85 md:table-cell">{formatMoney(c.allowance)}</TableCell>
                       <TableCell className="tabular hidden text-center text-foreground/85 lg:table-cell">{c.dependents_count}</TableCell>
-                      <TableCell className="tabular hidden text-foreground/85 lg:table-cell">{formatDate(c.created_at)}</TableCell>
+                      <TableCell className="tabular hidden text-foreground/85 lg:table-cell">
+                        {formatDate(c.created_at)}
+                        {c.version_count > 1 && <span className="block text-[12px] text-muted-foreground">{c.version_count - 1} phụ lục</span>}
+                      </TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="icon-sm" onClick={() => setEditing(c)} aria-label={`Sửa hợp đồng của ${c.full_name}`}>
-                          <Pencil />
+                        <Button variant="ghost" size="icon-sm" onClick={() => setViewing(c)} aria-label={`Xem hợp đồng của ${c.full_name}`}>
+                          <FileText />
                         </Button>
                       </TableCell>
                     </motion.tr>
@@ -197,15 +189,16 @@ export default function ContractsPage() {
         </Reveal>
       )}
 
-      <Dialog open={Boolean(editing)} onOpenChange={(o) => !o && setEditing(null)}>
-        <DialogContent className="sm:max-w-xl">
+      <Dialog open={Boolean(viewing)} onOpenChange={(o) => !o && setViewing(null)}>
+        <DialogContent className="max-h-[92svh] overflow-y-auto sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>Sửa hợp đồng</DialogTitle>
+            <DialogTitle>Hợp đồng lao động HĐ-{String(viewing?.id ?? "").padStart(3, "0")}</DialogTitle>
             <DialogDescription>
-              {editing?.full_name} · <span className="font-mono">{editing?.employee_code}</span>
+              {viewing?.full_name} · <span className="font-mono">{viewing?.employee_code}</span>
+              {viewing?.joined_at ? ` · vào làm ${formatDate(viewing.joined_at)}` : ""}
             </DialogDescription>
           </DialogHeader>
-          {editing && <ContractForm contract={editing} onOpenChange={(o) => !o && setEditing(null)} />}
+          {viewing && <ContractDocument contract={viewing} />}
         </DialogContent>
       </Dialog>
     </div>

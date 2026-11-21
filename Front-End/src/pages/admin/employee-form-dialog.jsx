@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { FilePen, Loader2, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/animate-ui/components/buttons/button";
 import {
@@ -13,6 +13,7 @@ import {
 } from "@/components/animate-ui/components/radix/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FormError } from "@/components/app/kit";
 import { api } from "@/lib/api";
@@ -35,7 +36,11 @@ const EMPTY = {
   allowance: "",
   dependents_count: 0,
   password: "",
+  salary_change_reason: "",
 };
+
+const SALARY_KEYS = ["base_salary", "insurance_salary", "allowance", "dependents_count"];
+const salaryChanged = (a, b) => SALARY_KEYS.some((k) => Number(a[k] || 0) !== Number(b[k] || 0));
 
 function suggestCode(employees = []) {
   const max = employees.reduce((m, e) => {
@@ -56,7 +61,7 @@ function Field({ label, htmlFor, hint, children, className }) {
 }
 
 /** Kiểm tra phía client — cùng quy tắc với EmployeeController::validate() */
-function validate(f, isEdit) {
+function validate(f, isEdit, amending, original) {
   for (const [key, label, max] of [
     ["employee_code", "Mã nhân viên", 20],
     ["full_name", "Họ và tên", 100],
@@ -76,6 +81,11 @@ function validate(f, isEdit) {
   const d = Number(f.dependents_count);
   if (!Number.isInteger(d) || d < 0 || d > 99) return "Người phụ thuộc phải là số nguyên 0–99";
   if (!isEdit && f.password && f.password.length < 6) return "Mật khẩu tối thiểu 6 ký tự";
+  if (amending) {
+    if (!salaryChanged(f, original)) return "Điều khoản lương chưa thay đổi so với hợp đồng hiện hành";
+    const r = f.salary_change_reason.trim().length;
+    if (r < 5 || r > 500) return "Lý do điều chỉnh lương phải từ 5–500 ký tự (lưu thành phụ lục hợp đồng)";
+  }
   return null;
 }
 
@@ -84,10 +94,19 @@ function EmployeeForm({ employee, employees, onDone }) {
   const queryClient = useQueryClient();
   const [form, setForm] = useState(() =>
     isEdit
-      ? { ...EMPTY, ...employee, password: "" }
+      ? { ...EMPTY, ...employee, password: "", salary_change_reason: "" }
       : { ...EMPTY, employee_code: suggestCode(employees), joined_at: today() },
   );
   const [error, setError] = useState("");
+  // Hợp đồng đã ký là cố định: chỉ đổi lương qua "phụ lục" có lý do.
+  const hasContract = isEdit && employee.contract_id != null;
+  const [amending, setAmending] = useState(false);
+  const salaryLocked = hasContract && !amending;
+  const toggleAmend = () => {
+    if (amending) setForm((f) => ({ ...f, ...Object.fromEntries(SALARY_KEYS.map((k) => [k, employee[k]])), salary_change_reason: "" }));
+    setAmending((a) => !a);
+    setError("");
+  };
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e?.target ? e.target.value : e }));
 
   const mutation = useMutation({
@@ -95,7 +114,7 @@ function EmployeeForm({ employee, employees, onDone }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       queryClient.invalidateQueries({ queryKey: ["contracts"] });
-      toast.success(isEdit ? "Đã cập nhật hồ sơ nhân viên" : "Đã thêm nhân viên mới");
+      toast.success(amending ? "Đã lưu phụ lục điều chỉnh lương" : isEdit ? "Đã cập nhật hồ sơ nhân viên" : "Đã thêm nhân viên mới");
       onDone();
     },
     onError: (err) => setError(err.message),
@@ -103,10 +122,10 @@ function EmployeeForm({ employee, employees, onDone }) {
 
   const submit = (e) => {
     e.preventDefault();
-    const msg = validate(form, isEdit);
+    const msg = validate(form, isEdit, amending, employee);
     if (msg) return setError(msg);
     setError("");
-    mutation.mutate(form);
+    mutation.mutate(amending ? form : { ...form, salary_change_reason: "" });
   };
 
   const departments = [...new Set([...employees.map((e) => e.department), ...DEPARTMENT_SUGGESTIONS])].filter(Boolean);
@@ -153,19 +172,42 @@ function EmployeeForm({ employee, employees, onDone }) {
       </section>
 
       <section className="grid gap-4 rounded-2xl bg-muted p-5 sm:grid-cols-2">
-        <p className="text-eyebrow sm:col-span-2">Hợp đồng</p>
+        <div className="flex flex-wrap items-center justify-between gap-2 sm:col-span-2">
+          <p className="text-eyebrow">{hasContract ? "Điều khoản hợp đồng" : "Hợp đồng"}</p>
+          {hasContract && (
+            <Button type="button" size="sm" variant={amending ? "secondary" : "outline"} onClick={toggleAmend}>
+              {amending ? "Huỷ điều chỉnh" : <><FilePen /> Điều chỉnh lương (phụ lục)</>}
+            </Button>
+          )}
+        </div>
+        {salaryLocked && (
+          <p className="flex items-start gap-2 text-[12.5px] text-muted-foreground sm:col-span-2">
+            <Lock className="mt-0.5 size-3.5 shrink-0" /> Hợp đồng đã ký là văn bản cố định. Muốn đổi lương, bấm “Điều chỉnh lương” và ghi lý do — hệ thống lưu thành phụ lục mới.
+          </p>
+        )}
         <Field label="Lương cơ bản (₫)" htmlFor="base_salary" hint={money("base_salary")}>
-          <Input id="base_salary" type="number" min="0" step="100000" inputMode="numeric" value={form.base_salary} onChange={set("base_salary")} className="tabular" />
+          <Input id="base_salary" disabled={salaryLocked} type="number" min="0" step="100000" inputMode="numeric" value={form.base_salary} onChange={set("base_salary")} className="tabular" />
         </Field>
         <Field label="Lương đóng BHXH (₫)" htmlFor="insurance_salary" hint={money("insurance_salary")}>
-          <Input id="insurance_salary" type="number" min="0" step="100000" inputMode="numeric" value={form.insurance_salary} onChange={set("insurance_salary")} className="tabular" />
+          <Input id="insurance_salary" disabled={salaryLocked} type="number" min="0" step="100000" inputMode="numeric" value={form.insurance_salary} onChange={set("insurance_salary")} className="tabular" />
         </Field>
         <Field label="Phụ cấp cố định (₫)" htmlFor="allowance" hint={money("allowance")}>
-          <Input id="allowance" type="number" min="0" step="100000" inputMode="numeric" value={form.allowance} onChange={set("allowance")} className="tabular" />
+          <Input id="allowance" disabled={salaryLocked} type="number" min="0" step="100000" inputMode="numeric" value={form.allowance} onChange={set("allowance")} className="tabular" />
         </Field>
         <Field label="Số người phụ thuộc" htmlFor="dependents_count">
-          <Input id="dependents_count" type="number" min="0" max="99" step="1" value={form.dependents_count} onChange={set("dependents_count")} className="tabular" />
+          <Input id="dependents_count" disabled={salaryLocked} type="number" min="0" max="99" step="1" value={form.dependents_count} onChange={set("dependents_count")} className="tabular" />
         </Field>
+        {amending && (
+          <Field label="Lý do điều chỉnh" htmlFor="salary_change_reason" hint="Bắt buộc 5–500 ký tự — ghi vào phụ lục hợp đồng." className="sm:col-span-2">
+            <Textarea
+              id="salary_change_reason"
+              maxLength={500}
+              value={form.salary_change_reason}
+              onChange={set("salary_change_reason")}
+              placeholder="VD: Tăng lương định kỳ sau đánh giá năm 2026"
+            />
+          </Field>
+        )}
       </section>
 
       <FormError message={error} />

@@ -4,13 +4,18 @@ class PayslipRenderer
 {
     public function render(array $payslip): string
     {
+        $tax = PayrollEngine::taxBreakdown($payslip);
         $rows = [
             ['Ngày công thực tế', $this->number($payslip['actual_days']) . ' / ' . (int) $payslip['standard_days'] . ' ngày'],
             ['Giờ làm thêm (OT)', $this->number($payslip['ot_hours']) . ' giờ'],
             ['Tổng thu nhập (Gross)', $this->money($payslip['gross_salary'])],
-            ['Bảo hiểm bắt buộc', $this->money($payslip['social_insurance'])],
-            ['Giảm trừ gia cảnh', $this->money($payslip['tax_deduction'])],
-            ['Thuế thu nhập cá nhân', $this->money($payslip['personal_tax'])],
+            ['Bảo hiểm bắt buộc (BHXH 8%, BHYT 1,5%, BHTN 1%)', '− ' . $this->money($payslip['social_insurance'])],
+            ['Giảm trừ gia cảnh (không trừ vào lương) — bản thân '
+                . $this->money($tax['personal_deduction'])
+                . ($tax['dependents_count'] > 0 ? ' + ' . $tax['dependents_count'] . ' người phụ thuộc × ' . $this->money(PayrollEngine::DEPENDENT_DEDUCTION) : ''),
+                $this->money($payslip['tax_deduction'])],
+            ['Thu nhập tính thuế', $this->money($tax['taxable_income'])],
+            ['Thuế thu nhập cá nhân (biểu lũy tiến 5 bậc, 2026)', '− ' . $this->money($payslip['personal_tax'])],
             ['Thực nhận (Net)', $this->money($payslip['net_salary'])],
         ];
 

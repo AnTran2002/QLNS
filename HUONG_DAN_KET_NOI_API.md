@@ -188,25 +188,24 @@ Tất cả gọi tới `index.php?action=<tên>`. Các API có dấu 🔒 cần 
 | `employees` | GET | 🔒 ADMIN | – | Mảng nhân viên kèm hợp đồng mới nhất |
 | `employees/show` | GET | 🔒 ADMIN | `?id=2` | 1 nhân viên |
 | `employees/create` | POST | 🔒 ADMIN | Xem ví dụ bên dưới | Nhân viên vừa tạo (HTTP 201). Mật khẩu mặc định `123456` |
-| `employees/update` | PUT | 🔒 ADMIN | `?id=2` + body như create | Nhân viên sau khi sửa |
+| `employees/update` | PUT | 🔒 ADMIN | `?id=2` + body như create; nếu đổi điều khoản lương phải kèm `salary_change_reason` (5–500 ký tự) | Nhân viên sau khi sửa. Đổi lương = thêm **phụ lục** (dòng `contracts` mới, có `change_reason`), không sửa hợp đồng cũ; thiếu lý do → 422 |
+| `contracts` | GET | 🔒 ADMIN | – | Hợp đồng đang hiệu lực của mỗi nhân viên + `version_count` |
+| `contracts/show` | GET | 🔒 ADMIN | `?id=2` | Hợp đồng (chỉ đọc) + `history[]` các phiên bản: hợp đồng gốc và phụ lục, mỗi bản có `change_reason` |
 | `employees/delete` | DELETE | 🔒 ADMIN | `?id=2` | `null` (không cho tự xoá hoặc xoá nhân viên đã có kỳ lương khóa sổ/đã trả) |
-| `payroll/periods` | POST | 🔒 ADMIN | `{ "month_year": "2026-12", "standard_days": 22 }` | Kỳ lương mới ở trạng thái `DRAFT` |
-| `payroll/attendance` | GET | 🔒 ADMIN | `?period_id=2` | Kỳ lương và danh sách nhân viên đầy đủ cùng ngày công/OT hiện tại |
-| `payroll/attendance` | PUT/POST | 🔒 ADMIN | `{ "period_id": 2, "entries": [{ "user_id": 2, "actual_days": 22, "ot_hours": 4 }] }` | Lưu lô ngày công/OT và tính lại lương trong cùng transaction |
-| `payroll/import` | POST | 🔒 ADMIN | `multipart/form-data`: `period_id`, `file` (.xlsx) | Kiểm tra toàn file rồi nhập nguyên tử, không lưu dở một phần |
-| `payroll/run` | POST | 🔒 ADMIN | `{ "period_id": 2 }` | Tính lại và lưu Gross, BHXH 10.5%, TNCN 7 bậc và Net cho toàn kỳ |
-| `payroll/lock` | POST | 🔒 ADMIN | `{ "period_id": 2 }` | Chuyển kỳ `DRAFT` sang `LOCKED` sau khi kiểm tra dữ liệu đầy đủ |
+| `payroll/periods` | POST | 🔒 ADMIN | `{ "month_year": "2026-12" }` | Kỳ `DRAFT` mới; công chuẩn = số ngày T2–T6 của tháng. **Chỉ tháng hiện tại hoặc tháng kế tiếp** — tháng đã qua trả 422 kèm `allowed` |
+| `payroll/attendance` | GET | 🔒 ADMIN | `?period_id=2` | **Chỉ đọc.** Kỳ `DRAFT` được tự đồng bộ từ `attendance_records` rồi tính lương; trả `period`, `items[]` (kèm chi tiết có mặt/muộn/remote/phép/vắng), `synced_until`, `missing_contracts` |
+| `payroll/run` | POST | 🔒 ADMIN | `{ "period_id": 2 }` | Tính lại và lưu Gross, BHXH 10.5%, TNCN 5 bậc (2026) và Net cho toàn kỳ, sau khi đồng bộ chấm công |
+| `payroll/lock` | POST | 🔒 ADMIN | `{ "period_id": 2 }` | Đồng bộ chấm công lần cuối, tính lại rồi chuyển kỳ `DRAFT` sang `LOCKED` |
 | `payroll/bank-account` | PUT/POST | 🔒 ADMIN | `{ "user_id": 2, "bank_name": "...", "bank_account_name": "...", "bank_account_number": "..." }` | Cập nhật tài khoản nhận lương của nhân viên |
 | `payroll/export-bank-transfers` | GET | 🔒 ADMIN | `?period_id=2` | Tải workbook `.xlsx` chuyển khoản; chỉ cho kỳ `LOCKED` và đủ tài khoản ngân hàng |
 | `payroll/payslip` | GET | 🔒 EMPLOYEE | `?period_id=2` | Phiếu lương của chính nhân viên đăng nhập; chỉ kỳ `LOCKED`/`PAID` |
 | `payroll/payslip/download` | GET | 🔒 EMPLOYEE | `?period_id=2` | Tải phiếu lương HTML tự chứa để mở/in hoặc lưu thành PDF |
-| `payroll/calculate` | POST | 🔒 ADMIN | `{ user_id, period_id, actual_days, ot_hours }` | Kết quả tính lương (kỳ phải ở trạng thái `DRAFT`) |
 
-File Excel UC-02 cần có worksheet đầu tiên với hàng tiêu đề `employee_code`, `actual_days`, `ot_hours` (hoặc `Mã nhân viên`, `Ngày công`, `Giờ OT`). Mỗi mã nhân viên chỉ xuất hiện một lần; file tối đa 10 MB và 10.000 dòng. Backend yêu cầu bật PHP extension `zip` để đọc `.xlsx`; cấu hình PHP cần cho phép `upload_max_filesize=10M` và `post_max_size` lớn hơn 10 MB. Nhập Excel và chỉnh sửa grid đều chỉ ghi vào kỳ `DRAFT`, từ chối nhân viên không tồn tại/không có hợp đồng và rollback toàn bộ nếu có lỗi.
+**Chấm công & OT tự động (không nhập tay).** Ngày công và giờ OT không còn API ghi (đã bỏ `payroll/attendance` PUT/POST, `payroll/import`, `payroll/calculate`). Hệ thống tổng hợp từ chấm công hằng ngày (`attendance_records`): ngày công = `PRESENT` + `LATE` + `REMOTE` + `LEAVE` có lương trong các ngày T2–T6 (tối đa bằng công chuẩn); nghỉ `UNPAID`/`SICK` đã duyệt không tính; giờ OT = tổng `ot_hours` cả tháng. Việc đồng bộ chạy khi mở `payroll/attendance`, `payroll/items` của kỳ `DRAFT`, khi `payroll/run` và khi `payroll/lock`. Kỳ `LOCKED`/`PAID` giữ nguyên số liệu.
 
-UC-03 chỉ chạy trên kỳ `DRAFT`, yêu cầu mọi nhân viên đều có dòng công/OT và hợp đồng. Hệ thống tính lại toàn bộ kỳ trong một transaction; thiếu dữ liệu, công/OT ngoài giới hạn hoặc lỗi database sẽ không lưu kết quả dở dang. API trả `calculated_count`, tổng Gross/BHXH/TNCN/Net và các dòng lương đã tính. Engine dùng công thức prorate theo ngày công, OT hệ số 1.5, bảo hiểm 10.5% trên lương đóng bảo hiểm và biểu thuế lũy tiến 7 bậc hiện có trong `PayrollEngine`.
+Tính lương (UC-03) chạy trên kỳ `DRAFT` trong một transaction: prorate theo ngày công, OT hệ số 1,5 (phần 0,5 chênh lệch được miễn thuế), bảo hiểm 10,5% trên lương đóng bảo hiểm, giảm trừ gia cảnh 15,5 triệu bản thân + 6,2 triệu/người phụ thuộc và biểu thuế lũy tiến **5 bậc** áp dụng từ 2026 (5% / 10% / 20% / 30% / 35% với các ngưỡng 10 / 30 / 60 / 100 triệu). `tax_deduction` trên phiếu lương là mức giảm trừ gia cảnh, **không** trừ vào lương; chỉ BHXH và thuế TNCN bị trừ.
 
-UC-04 chỉ khóa sổ kỳ `DRAFT` sau khi tất cả nhân viên có dữ liệu công/OT, hợp đồng và kết quả khớp với công thức hiện tại; nếu có thay đổi sau lần tính lương, cần chạy lại UC-03 trước khi khóa. Khóa sổ được thực hiện nguyên tử và các API nhập/chỉnh sửa công tiếp tục từ chối kỳ `LOCKED`. API dashboard/lịch sử nhân viên chỉ trả phiếu của kỳ `LOCKED` hoặc `PAID`, không lộ số lương nháp. File chuyển khoản bao gồm mã nhân viên, tên, ngân hàng, chủ tài khoản, số tài khoản, số tiền Net và nội dung chuyển khoản; chỉ xuất kỳ `LOCKED` để tránh chi trùng. Nếu chưa có tài khoản của bất kỳ nhân viên nào, API trả mã nhân viên thiếu và không tạo file. Bật PHP extension `zip` để xuất `.xlsx`.
+UC-04 khoá sổ kỳ `DRAFT`: đồng bộ chấm công lần cuối, tính lại toàn kỳ, kiểm tra mọi nhân viên có hợp đồng rồi chuyển sang `LOCKED` trong một transaction; sau đó số liệu cố định. API dashboard/lịch sử nhân viên chỉ trả phiếu của kỳ `LOCKED` hoặc `PAID`, không lộ số lương nháp. File chuyển khoản bao gồm mã nhân viên, tên, ngân hàng, chủ tài khoản, số tài khoản, số tiền Net và nội dung chuyển khoản; chỉ xuất kỳ `LOCKED` để tránh chi trùng. Nếu chưa có tài khoản của bất kỳ nhân viên nào, API trả mã nhân viên thiếu và không tạo file. Bật PHP extension `zip` để xuất `.xlsx`.
 
 Mỗi bản ghi nhân viên (`employees`, `employees/show`, `employees/create`, `employees/update`):
 
@@ -381,7 +380,7 @@ import { callApi } from "@/lib/api-client";
 
 export const payrollApi = {
   periods: () => callApi("payroll/periods"),
-  calculate: (body) => callApi("payroll/calculate", { method: "POST", data: body }),
+  lock: (periodId) => callApi("payroll/lock", { method: "POST", data: { period_id: periodId } }),
 };
 ```
 

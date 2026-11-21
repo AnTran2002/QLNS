@@ -202,13 +202,14 @@ class EmployeeController
             return json_response(409, null, 'Email hoặc mã nhân viên đã tồn tại');
         }
 
+        $contracts = new ContractModel();
         try {
             $userModel->beginTransaction();
             $id = $userModel->create($data + [
                 'password' => $data['password'] ?? self::DEFAULT_PASSWORD,
                 'role'     => 'EMPLOYEE',
             ]);
-            (new ContractModel())->saveForUser($id, $data);
+            $contracts->createVersion($id, $data, ContractModel::INITIAL_REASON);
             $userModel->commit();
         } catch (Throwable $e) {
             $userModel->rollBack();
@@ -219,7 +220,7 @@ class EmployeeController
     }
 
     /**
-     * PUT ?action=employees/update&id=1 — Cập nhật hồ sơ + hợp đồng.
+     * PUT ?action=employees/update&id=1 — Cập nhật hồ sơ; đổi lương → phụ lục hợp đồng mới (cần salary_change_reason).
      */
     public function update()
     {
@@ -237,7 +238,15 @@ class EmployeeController
             return json_response(404, null, 'Không tìm thấy nhân viên');
         }
 
-        [$data, $error] = $this->validate(read_json_body());
+        // Không gửi điều khoản lương → giữ nguyên hợp đồng đang hiệu lực.
+        $contracts = new ContractModel();
+        $current = $contracts->findByUserId($id) ?: null;
+        $input = read_json_body();
+        if (is_array($input) && $current) {
+            $input += array_intersect_key($current, array_flip(['base_salary', 'insurance_salary', 'allowance', 'dependents_count']));
+        }
+
+        [$data, $error] = $this->validate($input);
         if ($error) {
             return json_response(422, null, $error);
         }
@@ -246,10 +255,22 @@ class EmployeeController
             return json_response(409, null, 'Email hoặc mã nhân viên đã tồn tại');
         }
 
+        // Hợp đồng không sửa được: đổi điều khoản lương = ký phụ lục mới, bắt buộc có lý do.
+        $termsChanged = ContractModel::termsDiffer($current, $data);
+        $reason = trim((string) ($input['salary_change_reason'] ?? ''));
+        if ($termsChanged && $current) {
+            $length = mb_strlen($reason);
+            if ($length < 5 || $length > 500) {
+                return json_response(422, null, 'Điều chỉnh lương phải ghi lý do (5–500 ký tự) — sẽ lưu thành phụ lục hợp đồng');
+            }
+        }
+
         try {
             $userModel->beginTransaction();
             $userModel->update($id, $data);
-            (new ContractModel())->saveForUser($id, $data);
+            if ($termsChanged) {
+                $contracts->createVersion($id, $data, $current ? $reason : ContractModel::INITIAL_REASON);
+            }
             $userModel->commit();
         } catch (Throwable $e) {
             $userModel->rollBack();

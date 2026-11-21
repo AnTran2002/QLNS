@@ -1,54 +1,63 @@
 <?php
 class PayrollEngine {
-    
+
+    /** Giảm trừ gia cảnh từ kỳ tính thuế 2026 (Nghị quyết 110/2025/UBTVQH15). */
+    const PERSONAL_DEDUCTION  = 15500000;
+    const DEPENDENT_DEDUCTION = 6200000;
+    /** BHXH 8% + BHYT 1,5% + BHTN 1% phần người lao động đóng. */
+    const INSURANCE_RATE = 0.105;
+
+    /**
+     * Biểu thuế lũy tiến từng phần 5 bậc (Luật Thuế TNCN 109/2025/QH15, áp dụng từ 01/01/2026).
+     * Mỗi bậc: [trần thu nhập tính thuế/tháng, thuế suất].
+     */
+    const TAX_BRACKETS = [
+        [10000000, 0.05],
+        [30000000, 0.10],
+        [60000000, 0.20],
+        [100000000, 0.30],
+        [INF, 0.35],
+    ];
+
     /**
      * Tính toán toàn diện lương Gross -> Net theo luật VN và chính sách phúc lợi công ty
      * @param float $baseSalary Lương cơ bản thỏa thuận trong hợp đồng
      * @param float $allowance Phụ cấp cố định (Ăn trưa, xăng xe...)
      * @param float $actualDays Số ngày công thực tế làm việc
-     * @param float $standardDays Số ngày công chuẩn của công ty trong tháng (VD: 22 hoặc 26 ngày)
+     * @param float $standardDays Số ngày công chuẩn của công ty trong tháng
      * @param float $otHours Số giờ làm thêm
-     * @param float $otRate Hệ số lương OT (Mặc định 1.5 theo luật, công ty có thể set-up 2.0)
+     * @param float $otRate Hệ số lương OT (Mặc định 1.5 theo luật)
      * @param int $dependents Số người phụ thuộc giảm trừ gia cảnh
      * @param float|null $insuranceSalary Mức lương làm căn cứ đóng bảo hiểm
      * @return array Kết quả chi tiết các cấu phần lương trả về JSON cho React
      */
     public static function calculateNetSalary($baseSalary, $allowance, $actualDays, $standardDays, $otHours = 0, $otRate = 1.5, $dependents = 0, $insuranceSalary = null) {
-        
-        // 1. Tính lương theo ngày công thực tế (Pro-rata calculation)
-        // Công thức: (Lương cơ bản / Ngày công chuẩn) * Ngày công thực tế
+
+        // 1. Lương theo ngày công thực tế: (Lương cơ bản / Công chuẩn) × Công thực tế
         $proRatedBaseSalary = ($standardDays > 0) ? ($baseSalary / $standardDays) * $actualDays : 0;
-        
-        // 2. Tính tiền làm thêm giờ (OT Overtime)
+
+        // 2. Tiền làm thêm giờ
         $standardHours = $standardDays * 8;
         $hourlyRate = $standardHours > 0 ? $baseSalary / $standardHours : 0;
         $otPay = $otHours * $hourlyRate * $otRate;
-        
-        // 3. Tổng thu nhập Gross thực tế
+        // Phần trả cao hơn giờ làm bình thường được miễn thuế TNCN (Thông tư 111/2013/TT-BTC, Điều 3 khoản 1 điểm i)
+        $otTaxExempt = $otHours * $hourlyRate * max(0, $otRate - 1);
+
+        // 3. Tổng thu nhập Gross
         $grossSalary = $proRatedBaseSalary + $allowance + $otPay;
-        
-        // 4. Trích đóng bảo hiểm trên mức lương làm căn cứ đóng bảo hiểm trong hợp đồng
-        // Lưu ý: Có mức trần đóng BHXH theo quy định nhà nước (20 lần mức lương cơ sở), ở đây ta tính trực tiếp trên mức đóng bảo hiểm.
+
+        // 4. Bảo hiểm bắt buộc trên mức lương đóng bảo hiểm ghi trong hợp đồng
         $insuranceSalary = $insuranceSalary === null ? $baseSalary : $insuranceSalary;
-        $socialInsurance = $insuranceSalary * 0.105;
-        
-        // 5. Tính Thuế Thu nhập cá nhân (TNCN)
-        // Thu nhập chịu thuế = Gross - Bảo hiểm - Giảm trừ bản thân (11tr) - (Số người phụ thuộc * 4.4tr)
-        $personalDeduction = 11000000; // 11 triệu đồng cho bản thân
-        $dependentDeduction = $dependents * 4400000; // 4.4 triệu đồng / người phụ thuộc
-        $taxDeduction = $personalDeduction + $dependentDeduction;
+        $socialInsurance = $insuranceSalary * self::INSURANCE_RATE;
+
+        // 5. Thuế TNCN
+        // Thu nhập tính thuế = (Gross − phần OT miễn thuế) − Bảo hiểm − Giảm trừ gia cảnh
+        $taxDeduction = self::PERSONAL_DEDUCTION + max(0, (int) $dependents) * self::DEPENDENT_DEDUCTION;
         $totalDeduction = $socialInsurance + $taxDeduction;
-        
-        $taxableIncome = $grossSalary - $totalDeduction;
-        $personalTax = 0;
-        
-        if ($taxableIncome > 0) {
-            $personalTax = self::calculateProgressiveTax($taxableIncome);
-        } else {
-            $taxableIncome = 0;
-        }
-        
-        // 6. Lương Net thực nhận cuối cùng
+        $taxableIncome = max(0, $grossSalary - $otTaxExempt - $totalDeduction);
+        $personalTax = self::calculateProgressiveTax($taxableIncome);
+
+        // 6. Lương Net thực nhận
         $netSalary = $grossSalary - $socialInsurance - $personalTax;
 
         return [
@@ -59,6 +68,7 @@ class PayrollEngine {
             "pro_rated_salary"  => round($proRatedBaseSalary, 2),
             "allowance"         => round($allowance, 2),
             "ot_pay"            => round($otPay, 2),
+            "ot_tax_exempt"     => round($otTaxExempt, 2),
             "gross_salary"      => round($grossSalary, 2),
             "social_insurance"  => round($socialInsurance, 2),
             "tax_deduction"     => round($taxDeduction, 2),
@@ -69,27 +79,45 @@ class PayrollEngine {
         ];
     }
 
-    /**
-     * Thuế TNCN lũy tiến từng phần (Biểu thuế 7 bậc theo luật Việt Nam)
-     */
-    private static function calculateProgressiveTax($income) {
+    /** Thuế TNCN lũy tiến từng phần theo biểu 5 bậc. */
+    public static function calculateProgressiveTax($income) {
         $tax = 0;
-        if ($income <= 5000000) {
-            $tax = $income * 0.05;
-        } elseif ($income <= 10000000) {
-            $tax = 250000 + ($income - 5000000) * 0.10;
-        } elseif ($income <= 18000000) {
-            $tax = 750000 + ($income - 10000000) * 0.15;
-        } elseif ($income <= 32000000) {
-            $tax = 1950000 + ($income - 18000000) * 0.20;
-        } elseif ($income <= 52000000) {
-            $tax = 4750000 + ($income - 32000000) * 0.25;
-        } elseif ($income <= 80000000) {
-            $tax = 9750000 + ($income - 52000000) * 0.30;
-        } else {
-            $tax = 18150000 + ($income - 80000000) * 0.35;
+        $floor = 0;
+        foreach (self::TAX_BRACKETS as [$ceiling, $rate]) {
+            if ($income <= $floor) break;
+            $tax += (min($income, $ceiling) - $floor) * $rate;
+            $floor = $ceiling;
         }
         return $tax;
+    }
+
+    /**
+     * Suy ngược thu nhập tính thuế từ số thuế đã lưu (biểu lũy tiến đơn điệu tăng nên kết quả duy nhất).
+     * Thuế 0 → trả 0 (thu nhập sau bảo hiểm không vượt mức giảm trừ).
+     */
+    public static function taxableIncomeFromTax($tax) {
+        $tax = (float) $tax;
+        if ($tax <= 0) return 0.0;
+        $floor = 0; $base = 0;
+        foreach (self::TAX_BRACKETS as [$ceiling, $rate]) {
+            $bracketTax = ($ceiling - $floor) * $rate;
+            if ($tax <= $base + $bracketTax) return round($floor + ($tax - $base) / $rate, 2);
+            $base += $bracketTax;
+            $floor = $ceiling;
+        }
+        return round($floor, 2);
+    }
+
+    /** Diễn giải thuế cho phiếu lương từ một dòng payroll_items đã lưu. */
+    public static function taxBreakdown(array $item) {
+        $taxDeduction = (float) ($item['tax_deduction'] ?? 0);
+        $dependents = max(0, (int) round(($taxDeduction - self::PERSONAL_DEDUCTION) / self::DEPENDENT_DEDUCTION));
+        return [
+            'personal_deduction' => (float) self::PERSONAL_DEDUCTION,
+            'dependents_count'   => $dependents,
+            'dependent_deduction'=> (float) ($dependents * self::DEPENDENT_DEDUCTION),
+            'taxable_income'     => self::taxableIncomeFromTax($item['personal_tax'] ?? 0),
+        ];
     }
 }
 ?>

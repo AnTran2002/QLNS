@@ -6,11 +6,9 @@
  * 1. Dạng RESTful URL:
  *    - GET  /api/contracts        hoặc /contracts
  *    - GET  /api/contracts/{id}   hoặc /contracts/{id}
- *    - PUT  /api/contracts/{id}   hoặc /contracts/{id}
  * 2. Dạng query parameter:
  *    - GET  /?action=contracts
  *    - GET  /?action=contracts/show&id={id}
- *    - PUT  /?action=contracts/update&id={id}
  */
 
 $action = $_GET['action'] ?? null;
@@ -44,8 +42,7 @@ if (!$action) {
     // Nhận diện RESTful route cho contracts (UC-01)
     if (preg_match('#^contracts/(\d+)$#', $path, $matches)) {
         $_GET['id'] = $matches[1];
-        $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-        $action = in_array($method, ['PUT', 'POST', 'PATCH'], true) ? 'contracts/update' : 'contracts/show';
+        $action = 'contracts/show';
     } elseif ($path === 'contracts') {
         $action = 'contracts';
     } elseif (preg_match('#^employees/(\d+)$#', $path, $matches)) {
@@ -70,7 +67,6 @@ match ($action) {
     // Hợp đồng (UC-01: Lấy danh sách, xem chi tiết, cập nhật)
     'contracts'          => (new ContractController)->index(),
     'contracts/show'     => (new ContractController)->show($_GET['id'] ?? null),
-    'contracts/update'   => (new ContractController)->update($_GET['id'] ?? null),
 
     // Nhân viên (EMPLOYEE)
     'employee/dashboard' => (new EmployeeController)->dashboard(),
@@ -96,8 +92,6 @@ match ($action) {
     'payroll/periods'    => (new PayrollController)->periods(),
     'payroll/items'      => (new PayrollController)->items(),
     'payroll/attendance' => (new PayrollController)->attendance(),
-    'payroll/import'     => (new PayrollController)->importAttendance(),
-    'payroll/calculate'  => (new PayrollController)->calculateAndSave(),
     'payroll/run'        => (new PayrollController)->run(),
     'payroll/lock'       => (new PayrollController)->lockPeriod(),
     'payroll/bank-account' => (new PayrollController)->saveBankAccount(),

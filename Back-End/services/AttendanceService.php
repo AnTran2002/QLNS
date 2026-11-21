@@ -15,16 +15,46 @@ class AttendanceException extends RuntimeException
     }
 }
 
+/**
+ * Ngày công & OT của kỳ lương được tổng hợp TỰ ĐỘNG từ bảng chấm công theo ngày
+ * (attendance_records) — không nhập tay, không import.
+ *
+ *   Công thực tế = ngày PRESENT + LATE + REMOTE + LEAVE có lương
+ *                  (LEAVE thuộc đơn UNPAID / SICK đã duyệt không tính: nghỉ ốm do quỹ BHXH chi trả),
+ *                  tối đa bằng công chuẩn.
+ *   Giờ OT       = tổng ot_hours trong tháng.
+ *   Công chuẩn   = số ngày T2–T6 trong tháng.
+ */
 class AttendanceService
 {
     private PayrollModel $payrollModel;
+    private AttendanceRecordModel $records;
 
-    public function __construct(?PayrollModel $payrollModel = null)
+    public function __construct(?PayrollModel $payrollModel = null, ?AttendanceRecordModel $records = null)
     {
         $this->payrollModel = $payrollModel ?? new PayrollModel();
+        $this->records = $records ?? new AttendanceRecordModel();
     }
 
-    public function save(int $periodId, array $entries): array
+    /** Số ngày làm việc T2–T6 của tháng `YYYY-MM`. */
+    public static function weekdaysInMonth(string $monthYear): int
+    {
+        $first = new DateTimeImmutable($monthYear . '-01');
+        $days = (int) $first->format('t');
+        $count = 0;
+        for ($d = 0; $d < $days; $d++) {
+            if ((int) $first->modify("+{$d} day")->format('N') <= 5) {
+                $count++;
+            }
+        }
+        return $count;
+    }
+
+    /**
+     * Đồng bộ ngày công/OT từ chấm công rồi tính và lưu lương cho mọi nhân viên có hợp đồng.
+     * Chỉ chạy cho kỳ DRAFT; kỳ đã khoá giữ nguyên số liệu.
+     */
+    public function sync(int $periodId): array
     {
         $this->payrollModel->beginTransaction();
 
@@ -34,66 +64,50 @@ class AttendanceService
                 throw new AttendanceException(404, 'Không tìm thấy kỳ lương');
             }
             if ($period['status'] !== 'DRAFT') {
-                throw new AttendanceException(409, 'Chỉ được nhập liệu cho kỳ lương ở trạng thái DRAFT');
+                throw new AttendanceException(409, 'Kỳ lương đã khoá sổ — số liệu chấm công không thay đổi nữa');
             }
 
-            $standardDays = (int) $period['standard_days'];
-            if ($standardDays < 1 || $standardDays > 31) {
-                throw new AttendanceException(422, 'Kỳ lương có số ngày công chuẩn không hợp lệ');
+            $standardDays = self::weekdaysInMonth($period['month_year']);
+            if ((int) $period['standard_days'] !== $standardDays) {
+                $this->payrollModel->updateStandardDays($periodId, $standardDays);
+                $period['standard_days'] = $standardDays;
             }
 
-            $daysInMonth = (int) (new DateTimeImmutable($period['month_year'] . '-01'))->format('t');
-            $normalizedEntries = $this->normalizeEntries($entries, $daysInMonth);
-            $userIds = array_column($normalizedEntries, 'user_id');
-            $payrollInputs = $this->payrollModel->getPayrollInputsByUserIds($userIds);
-
-            $missingUserIds = array_values(array_diff($userIds, array_keys($payrollInputs)));
-            if ($missingUserIds !== []) {
-                throw new AttendanceException(422, 'Có nhân viên không tồn tại', [
-                    'user_ids' => $missingUserIds,
-                ]);
-            }
-
+            $summary = $this->records->tableExists() ? $this->records->monthSummary($period['month_year']) : [];
             $missingContracts = [];
-            foreach ($normalizedEntries as $entry) {
-                $employee = $payrollInputs[$entry['user_id']];
-                if ($employee['contract_id'] === null) {
-                    $missingContracts[] = $employee['employee_code'];
+            $synced = 0;
+
+            foreach ($this->payrollModel->getAttendanceRows($periodId) as $row) {
+                if ($row['base_salary'] === null || $row['insurance_salary'] === null) {
+                    $missingContracts[] = $row['employee_code'];
+                    continue;
                 }
-            }
-            if ($missingContracts !== []) {
-                throw new AttendanceException(422, 'Nhân viên chưa có hợp đồng lương', [
-                    'employee_codes' => array_values(array_unique($missingContracts)),
-                ]);
-            }
+                $s = $summary[(int) $row['user_id']] ?? null;
+                $actualDays = $s ? min($standardDays, (float) $s['paid_days']) : 0.0;
+                $otHours = $s ? (float) $s['ot_hours'] : 0.0;
 
-            $calculations = [];
-            foreach ($normalizedEntries as $entry) {
-                $employee = $payrollInputs[$entry['user_id']];
                 $calculation = PayrollEngine::calculateNetSalary(
-                    (float) $employee['base_salary'],
-                    (float) $employee['allowance'],
-                    $entry['actual_days'],
+                    (float) $row['base_salary'],
+                    (float) $row['allowance'],
+                    $actualDays,
                     $standardDays,
-                    $entry['ot_hours'],
+                    $otHours,
                     1.5,
-                    (int) $employee['dependents_count'],
-                    (float) $employee['insurance_salary']
+                    (int) $row['dependents_count'],
+                    (float) $row['insurance_salary']
                 );
-                $calculations[$entry['user_id']] = $calculation;
-
-                $this->payrollModel->saveOrUpdate($periodId, $entry['user_id'], [
-                    'actual_days' => $entry['actual_days'],
-                    'ot_hours' => $entry['ot_hours'],
+                $this->payrollModel->saveOrUpdate($periodId, (int) $row['user_id'], [
+                    'actual_days' => $actualDays,
+                    'ot_hours' => $otHours,
                     'gross_salary' => $calculation['gross_salary'],
                     'social_insurance' => $calculation['social_insurance'],
                     'tax_deduction' => $calculation['tax_deduction'],
                     'personal_tax' => $calculation['personal_tax'],
                     'net_salary' => $calculation['net_salary'],
                 ]);
+                $synced++;
             }
 
-            $items = $this->payrollModel->getAttendanceRows($periodId);
             $this->payrollModel->commit();
         } catch (Throwable $e) {
             $this->payrollModel->rollBack();
@@ -102,79 +116,35 @@ class AttendanceService
 
         return [
             'period' => $period,
-            'updated_count' => count($normalizedEntries),
-            'calculations' => $calculations,
-            'items' => $items,
+            'synced_count' => $synced,
+            'missing_contracts' => $missingContracts,
         ];
     }
 
-    private function normalizeEntries(array $entries, int $daysInMonth): array
+    /** Bảng ngày công của kỳ kèm phần tách theo trạng thái chấm công (để hiển thị nguồn số liệu). */
+    public function rows(array $period): array
     {
-        if ($entries === [] || count($entries) > 10000) {
-            throw new AttendanceException(422, 'entries phải có từ 1 đến 10000 bản ghi');
-        }
-
-        $normalized = [];
-        $seenUserIds = [];
-        foreach ($entries as $index => $entry) {
-            if (!is_array($entry)) {
-                throw new AttendanceException(422, 'Bản ghi ngày công không hợp lệ', [
-                    'entry_index' => $index,
-                ]);
-            }
-
-            $userId = filter_var($entry['user_id'] ?? null, FILTER_VALIDATE_INT, [
-                'options' => ['min_range' => 1],
-            ]);
-            if ($userId === false) {
-                throw new AttendanceException(422, 'user_id phải là số nguyên dương', [
-                    'entry_index' => $index,
-                ]);
-            }
-            if (isset($seenUserIds[$userId])) {
-                throw new AttendanceException(422, 'Danh sách có nhân viên bị lặp', [
-                    'user_id' => (int) $userId,
-                ]);
-            }
-            $seenUserIds[$userId] = true;
-
-            $actualDays = $this->nonNegativeNumber($entry['actual_days'] ?? null, 'actual_days', $index);
-            if ($actualDays > $daysInMonth) {
-                throw new AttendanceException(422, "actual_days không được vượt quá {$daysInMonth}", [
-                    'entry_index' => $index,
-                ]);
-            }
-
-            $otHours = $this->nonNegativeNumber($entry['ot_hours'] ?? null, 'ot_hours', $index);
-            if ($otHours > $daysInMonth * 24) {
-                throw new AttendanceException(422, 'ot_hours vượt giới hạn giờ trong tháng', [
-                    'entry_index' => $index,
-                ]);
-            }
-
-            $normalized[] = [
-                'user_id' => (int) $userId,
-                'actual_days' => $actualDays,
-                'ot_hours' => $otHours,
+        $summary = $this->records->tableExists() ? $this->records->monthSummary($period['month_year']) : [];
+        $rows = $this->payrollModel->getAttendanceRows((int) $period['id']);
+        foreach ($rows as &$row) {
+            $s = $summary[(int) $row['user_id']] ?? [];
+            $row['breakdown'] = [
+                'present'     => (int) ($s['present'] ?? 0),
+                'late'        => (int) ($s['late'] ?? 0),
+                'remote'      => (int) ($s['remote'] ?? 0),
+                'paid_leave'  => (int) ($s['paid_leave'] ?? 0),
+                'unpaid_leave'=> (int) ($s['unpaid_leave'] ?? 0),
+                'absent'      => (int) ($s['absent'] ?? 0),
+                'recorded_days' => (int) ($s['recorded_days'] ?? 0),
             ];
         }
-
-        return $normalized;
+        unset($row);
+        return $rows;
     }
 
-    private function nonNegativeNumber($value, string $field, int $index): float
+    /** Ngày chấm công gần nhất của tháng (null nếu chưa có). */
+    public function lastRecordedDate(string $monthYear): ?string
     {
-        if ((!is_string($value) && !is_int($value) && !is_float($value))
-            || !is_numeric($value)
-            || !is_finite((float) $value)
-            || (float) $value < 0
-        ) {
-            throw new AttendanceException(422, "{$field} phải là số không âm hợp lệ", [
-                'entry_index' => $index,
-                'field' => $field,
-            ]);
-        }
-
-        return (float) $value;
+        return $this->records->tableExists() ? $this->records->lastDateOfMonth($monthYear) : null;
     }
 }
