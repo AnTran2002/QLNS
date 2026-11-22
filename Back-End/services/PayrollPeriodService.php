@@ -80,7 +80,8 @@ class PayrollPeriodService
                     $otHours,
                     1.5,
                     (int) $row['dependents_count'],
-                    (float) $row['insurance_salary']
+                    (float) $row['insurance_salary'],
+                    (int) substr($period['month_year'], 0, 4)
                 );
                 foreach (['gross_salary', 'social_insurance', 'tax_deduction', 'personal_tax', 'net_salary'] as $field) {
                     if (abs((float) $row[$field] - $calculation[$field]) >= 0.01) {

@@ -21,7 +21,7 @@ const EMPLOYEE = { id: 2, employee_code: "NV002", full_name: "Trần Thị Bình
 const DASHBOARD = {
   user_info: EMPLOYEE,
   contract: { id: 2, base_salary: 18500000, insurance_salary: 15000000, allowance: 2500000, dependents_count: 1, created_at: "2026-01-02" },
-  payroll_history: [{ id: 2, period_id: 1, month_year: "2026-10", standard_days: 22, period_status: "PAID", actual_days: 22, ot_hours: 8, gross_salary: 22261363.64, social_insurance: 1575000, tax_deduction: 15400000, personal_tax: 278636.36, net_salary: 20407727.27 }],
+  payroll_history: [{ id: 2, period_id: 1, month_year: "2026-10", standard_days: 22, period_status: "PAID", actual_days: 22, ot_hours: 8, gross_salary: 22261363.64, social_insurance: 1575000, tax_deduction: 21700000, personal_tax: 0, net_salary: 20686363.64 }],
   attendance_summary: { total_actual_days: 22, total_ot_hours: 8 },
   current_period: { id: 2, month_year: "2026-11", standard_days: 22, status: "DRAFT" },
   work_schedule: { monday: "08:30 - 17:30", tuesday: "08:30 - 17:30", wednesday: "08:30 - 17:30", thursday: "08:30 - 17:30", friday: "08:30 - 17:30", saturday: "Nghỉ tuần", sunday: "Nghỉ tuần" },

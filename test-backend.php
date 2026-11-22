@@ -83,24 +83,39 @@ check('chặn sửa lương qua form hồ sơ', ContractSalaryAdjustmentPolicy::
 check('cho phép cập nhật hồ sơ không có lương', ContractSalaryAdjustmentPolicy::containsCompensationFields(['full_name' => 'Nguyễn Văn An']), false);
 
 echo "\nPayrollEngine::calculateNetSalary\n";
-// Đủ công, không OT: 20tr lương + 2tr phụ cấp, BH 10,5% trên 20tr, 0 người phụ thuộc
-$r = PayrollEngine::calculateNetSalary(20_000_000, 2_000_000, 22, 22, 0, 1.5, 0);
+// Kỳ 2026: 20tr lương + 2tr phụ cấp, BH 10,5% trên 20tr, không người phụ thuộc
+$r = PayrollEngine::calculateNetSalary(20_000_000, 2_000_000, 22, 22, 0, 1.5, 0, null, 2026);
 check('gross = lương + phụ cấp', $r['gross_salary'], 22_000_000.0);
 check('BHXH+BHYT+BHTN = 10,5%', $r['social_insurance'], 2_100_000.0);
-// TN tính thuế = 22tr − 2,1tr − 11tr = 8,9tr → 250k + 3,9tr×10% = 640k
-check('thuế TNCN lũy tiến bậc 2', $r['personal_tax'], 640_000.0);
-check('net = gross − BH − thuế', $r['net_salary'], 19_260_000.0);
+check('giảm trừ bản thân theo kỳ tính thuế 2026', $r['tax_deduction'], 15_500_000.0);
+check('thu nhập tính thuế sau bảo hiểm và giảm trừ', $r['taxable_income'], 4_400_000.0);
+check('thuế TNCN 2026 bậc 1 = 5%', $r['personal_tax'], 220_000.0);
+check('net = gross − BH − thuế', $r['net_salary'], 19_680_000.0);
+
+$r = PayrollEngine::calculateNetSalary(20_000_000, 2_000_000, 22, 22, 0, 1.5, 0, null, 2025);
+check('kỳ 2025 vẫn dùng mức giảm trừ cũ', $r['tax_deduction'], 11_000_000.0);
+check('kỳ 2025 vẫn dùng biểu thuế 7 bậc', $r['personal_tax'], 640_000.0);
+
+foreach ([10_000_000 => 500_000, 30_000_000 => 2_500_000, 60_000_000 => 8_500_000, 100_000_000 => 20_500_000] as $taxableIncome => $expectedTax) {
+    $r = PayrollEngine::calculateNetSalary($taxableIncome + 15_500_000, 0, 22, 22, 0, 1.5, 0, 0, 2026);
+    check("biểu thuế 2026 tại ngưỡng {$taxableIncome}", $r['personal_tax'], (float) $expectedTax);
+}
 
 $r = PayrollEngine::calculateNetSalary(22_000_000, 0, 11, 22, 8, 1.5, 0);
 check('nửa tháng công → lương theo tỉ lệ', $r['pro_rated_salary'], 11_000_000.0);
 check('OT 8h × 1,5 × lương giờ (22tr/176h)', $r['ot_pay'], 1_500_000.0);
 
-$r = PayrollEngine::calculateNetSalary(15_000_000, 0, 22, 22, 0, 1.5, 2, 15_000_000);
-check('2 người phụ thuộc → giảm trừ 11tr + 8,8tr', $r['tax_deduction'], 19_800_000.0);
+$r = PayrollEngine::calculateNetSalary(15_000_000, 0, 22, 22, 0, 1.5, 2, 15_000_000, 2026);
+check('2 người phụ thuộc năm 2026 → giảm trừ 15,5tr + 12,4tr', $r['tax_deduction'], 27_900_000.0);
 check('thu nhập dưới giảm trừ → thuế 0', $r['personal_tax'], 0.0);
 
 $r = PayrollEngine::calculateNetSalary(18_500_000, 2_500_000, 22, 22, 8, 1.5, 1, 15_000_000);
-check('mẫu NV002 tháng 10 khớp dữ liệu seed (net)', near($r['net_salary'], 20_407_727.27), true);
+check('mẫu NV002 tháng 10 dùng giảm trừ và biểu thuế 2026', $r['personal_tax'], 0.0);
+check('mẫu NV002 tháng 10 net theo quy tắc 2026', near($r['net_salary'], 20_686_363.64), true);
+$r = PayrollEngine::calculateNetSalary(20_000_000, 0, 22, 22, 8, 1.5, 0, 0, 2026);
+check('phần OT cao hơn lương giờ bình thường được miễn thuế', $r['tax_exempt_overtime'], 454_545.45);
+check('OT miễn thuế không bị cộng vào thu nhập tính thuế', $r['taxable_income'], 5_409_090.91);
+check('thuế tính trên lương giờ thường và OT chịu thuế', $r['personal_tax'], 270_454.55);
 
 $r = PayrollEngine::calculateNetSalary(10_000_000, 0, 0, 0);
 check('công chuẩn 0 → không chia cho 0', $r['pro_rated_salary'], 0.0);

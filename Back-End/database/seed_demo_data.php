@@ -316,7 +316,8 @@ try {
                 (float) $attendance['ot_hours'],
                 1.5,
                 (int) $contract['dependents_count'],
-                (float) $contract['insurance_salary']
+                (float) $contract['insurance_salary'],
+                (int) substr($monthYear, 0, 4)
             );
             $values = [
                 'actual_days' => $attendance['actual_days'],

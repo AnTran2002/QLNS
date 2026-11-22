@@ -78,7 +78,8 @@ class AttendanceService
                     $entry['ot_hours'],
                     1.5,
                     (int) $employee['dependents_count'],
-                    (float) $employee['insurance_salary']
+                    (float) $employee['insurance_salary'],
+                    (int) substr($period['month_year'], 0, 4)
                 );
                 $calculations[$entry['user_id']] = $calculation;
 

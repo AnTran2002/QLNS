@@ -168,7 +168,7 @@ export default function PayrollPage() {
       <PageHeader
         eyebrow="Tiền lương"
         title="Bảng lương"
-        description="Nhập ngày công và giờ OT — hệ thống tính Gross → Net theo biểu thuế 7 bậc và lưu vào kỳ lương."
+        description="Nhập ngày công và giờ OT — hệ thống tính Gross → Net theo quy định thuế của năm tính lương và lưu vào kỳ lương."
         actions={
           <>
             {periods.length > 0 && (

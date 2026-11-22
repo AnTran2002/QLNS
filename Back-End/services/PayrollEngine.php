@@ -13,7 +13,7 @@ class PayrollEngine {
      * @param float|null $insuranceSalary Mức lương làm căn cứ đóng bảo hiểm
      * @return array Kết quả chi tiết các cấu phần lương trả về JSON cho React
      */
-    public static function calculateNetSalary($baseSalary, $allowance, $actualDays, $standardDays, $otHours = 0, $otRate = 1.5, $dependents = 0, $insuranceSalary = null) {
+    public static function calculateNetSalary($baseSalary, $allowance, $actualDays, $standardDays, $otHours = 0, $otRate = 1.5, $dependents = 0, $insuranceSalary = null, ?int $taxYear = null) {
         
         // 1. Tính lương theo ngày công thực tế (Pro-rata calculation)
         // Công thức: (Lương cơ bản / Ngày công chuẩn) * Ngày công thực tế
@@ -32,18 +32,21 @@ class PayrollEngine {
         $insuranceSalary = $insuranceSalary === null ? $baseSalary : $insuranceSalary;
         $socialInsurance = $insuranceSalary * 0.105;
         
-        // 5. Tính Thuế Thu nhập cá nhân (TNCN)
-        // Thu nhập chịu thuế = Gross - Bảo hiểm - Giảm trừ bản thân (11tr) - (Số người phụ thuộc * 4.4tr)
-        $personalDeduction = 11000000; // 11 triệu đồng cho bản thân
-        $dependentDeduction = $dependents * 4400000; // 4.4 triệu đồng / người phụ thuộc
+        // 5. Tính thuế TNCN cho cá nhân cư trú có thu nhập từ tiền lương, tiền công.
+        $taxYear = $taxYear ?? (int) date('Y');
+        $personalDeduction = $taxYear >= 2026 ? 15500000 : 11000000;
+        $dependentDeductionPerPerson = $taxYear >= 2026 ? 6200000 : 4400000;
+        $dependentDeduction = max(0, $dependents) * $dependentDeductionPerPerson;
         $taxDeduction = $personalDeduction + $dependentDeduction;
+        $taxExemptOvertime = $otHours > 0 && $otRate > 1
+            ? $otHours * $hourlyRate * ($otRate - 1)
+            : 0;
         $totalDeduction = $socialInsurance + $taxDeduction;
-        
-        $taxableIncome = $grossSalary - $totalDeduction;
+        $taxableIncome = $grossSalary - $totalDeduction - $taxExemptOvertime;
         $personalTax = 0;
         
         if ($taxableIncome > 0) {
-            $personalTax = self::calculateProgressiveTax($taxableIncome);
+            $personalTax = self::calculateProgressiveTax($taxableIncome, $taxYear);
         } else {
             $taxableIncome = 0;
         }
@@ -62,6 +65,7 @@ class PayrollEngine {
             "gross_salary"      => round($grossSalary, 2),
             "social_insurance"  => round($socialInsurance, 2),
             "tax_deduction"     => round($taxDeduction, 2),
+            "tax_exempt_overtime" => round($taxExemptOvertime, 2),
             "total_deduction"   => round($totalDeduction, 2),
             "taxable_income"    => round($taxableIncome, 2),
             "personal_tax"      => round($personalTax, 2),
@@ -69,27 +73,42 @@ class PayrollEngine {
         ];
     }
 
-    /**
-     * Thuế TNCN lũy tiến từng phần (Biểu thuế 7 bậc theo luật Việt Nam)
-     */
-    private static function calculateProgressiveTax($income) {
-        $tax = 0;
-        if ($income <= 5000000) {
-            $tax = $income * 0.05;
-        } elseif ($income <= 10000000) {
-            $tax = 250000 + ($income - 5000000) * 0.10;
-        } elseif ($income <= 18000000) {
-            $tax = 750000 + ($income - 10000000) * 0.15;
-        } elseif ($income <= 32000000) {
-            $tax = 1950000 + ($income - 18000000) * 0.20;
-        } elseif ($income <= 52000000) {
-            $tax = 4750000 + ($income - 32000000) * 0.25;
-        } elseif ($income <= 80000000) {
-            $tax = 9750000 + ($income - 52000000) * 0.30;
-        } else {
-            $tax = 18150000 + ($income - 80000000) * 0.35;
+    private static function calculateProgressiveTax($income, int $taxYear) {
+        if ($taxYear >= 2026) {
+            if ($income <= 10000000) {
+                return $income * 0.05;
+            }
+            if ($income <= 30000000) {
+                return 500000 + ($income - 10000000) * 0.10;
+            }
+            if ($income <= 60000000) {
+                return 2500000 + ($income - 30000000) * 0.20;
+            }
+            if ($income <= 100000000) {
+                return 8500000 + ($income - 60000000) * 0.30;
+            }
+            return 20500000 + ($income - 100000000) * 0.35;
         }
-        return $tax;
+
+        if ($income <= 5000000) {
+            return $income * 0.05;
+        }
+        if ($income <= 10000000) {
+            return 250000 + ($income - 5000000) * 0.10;
+        }
+        if ($income <= 18000000) {
+            return 750000 + ($income - 10000000) * 0.15;
+        }
+        if ($income <= 32000000) {
+            return 1950000 + ($income - 18000000) * 0.20;
+        }
+        if ($income <= 52000000) {
+            return 4750000 + ($income - 32000000) * 0.25;
+        }
+        if ($income <= 80000000) {
+            return 9750000 + ($income - 52000000) * 0.30;
+        }
+        return 18150000 + ($income - 80000000) * 0.35;
     }
 }
 ?>

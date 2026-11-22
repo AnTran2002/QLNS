@@ -101,7 +101,8 @@ class PayrollRunService
                     $otHours,
                     1.5,
                     (int) $row['dependents_count'],
-                    (float) $row['insurance_salary']
+                    (float) $row['insurance_salary'],
+                    (int) substr($period['month_year'], 0, 4)
                 );
 
                 $this->payrollModel->updateCalculation($periodId, (int) $row['user_id'], $calculation);

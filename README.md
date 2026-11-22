@@ -10,9 +10,9 @@ QLNS/
 │   ├── controllers/    Auth · Employee · Contract · Payroll · Profile · Leave · Home
 │   ├── models/         User · Contract · SalaryAdjustment · Payroll · AttendanceRecord · LeaveRequest
 │   ├── services/       PayrollEngine · PayrollPeriodPolicy · ContractSalaryAdjustmentPolicy · LeavePolicy · Attendance · Payslip · Xlsx…
-│   └── database/       migrations/001…006, seed_passwords.php
-├── test-backend.php    Kiểm thử PHP thuần (các quy tắc nghỉ phép, kỳ lương và tính lương), không cần CSDL
-├── QLNS-Database.sql   Dump đầy đủ database `qlns` (đã gồm migration 004–006 + lương T1–T10/2026)
+│   └── database/       migrations/001…007, seed_passwords.php
+├── test-backend.php    Kiểm thử PHP thuần (nghỉ phép, kỳ lương và tính lương/thuế), không cần CSDL
+├── QLNS-Database.sql   Dump đầy đủ database `qlns` (đã gồm migration 004–007 + lương T1–T10/2026)
 ├── HUONG_DAN_KET_NOI_API.md   Hướng dẫn chi tiết kết nối API
 └── TAI_KHOAN_DANG_NHAP.md     Tài khoản mẫu
 ```
@@ -75,12 +75,12 @@ Sau khi rà các chức năng một hệ thống HR cần có, phần **đơn ng
 Front-End/src/test-setup.js      jest-dom + polyfill matchMedia/ResizeObserver/IntersectionObserver
 Front-End/src/App.test.jsx       luồng UI: đăng nhập, phân quyền, chấm công & OT, cổng NV, nghỉ phép
 Front-End/src/lib/lib.test.js    hàm thuần: lịch tháng, nghỉ phép, lương tạm tính, định dạng
-test-backend.php                 36 kiểm thử LeavePolicy + PayrollEngine (không cần CSDL/PHPUnit)
+test-backend.php                 60 kiểm thử LeavePolicy + PayrollEngine (không cần CSDL/PHPUnit)
 ```
 
 Cấu hình Vitest nằm ngay trong `Front-End/vite.config.js` (khối `test`). Các script phụ (`serve.sh`, `smoke.sh`, `migrate.php`, `link-frontend.js`) đã bỏ — thay bằng `npm run backend` và phpMyAdmin / `mysql`.
 
-Kết quả lần chạy gần nhất: **Front-End 26/26 · Back-End 36/36**.
+Kết quả lần chạy gần nhất: **Back-End 60/60** (bao gồm các biên biểu thuế, giảm trừ và OT miễn thuế).
 
 ### 1.6 Chạy trên nhiều máy (Windows + macOS) a
 
@@ -102,6 +102,8 @@ mysql -u root -p qlns < Back-End/database/migrations/005_leave_requests.sql
 mysql -u root -p qlns < Back-End/database/migrations/006_contract_salary_adjustments.sql
 #    Thêm dữ liệu lương T1–T9/2026 vào database cũ:
 mysql -u root -p qlns < Back-End/database/seed_additional_demo_data.sql
+#    Tính lại thuế TNCN các kỳ từ 2026 trở đi (chạy sau khi đã thêm dữ liệu mẫu):
+mysql -u root -p qlns < Back-End/database/migrations/007_recalculate_pit_2026.sql
 
 # 2. Back-End
 cp Back-End/configs/env.example.php Back-End/configs/env.php   # sửa thông tin kết nối
@@ -156,7 +158,9 @@ npm run test:backend   # kiểm thử PHP thuần (= php ../test-backend.php)
   - Điều 115: nghỉ việc riêng có hưởng lương (kết hôn, tang…).
   - Điều 98: tiền làm thêm giờ ≥ 150% ngày thường (hệ số OT 1,5 trong `PayrollEngine`).
 - Luật Bảo hiểm xã hội: nghỉ ốm do quỹ BHXH chi trả, không trừ phép năm; tỉ lệ người lao động đóng 10,5% (BHXH 8% + BHYT 1,5% + BHTN 1%).
-- Luật Thuế TNCN: biểu thuế lũy tiến 7 bậc; giảm trừ gia cảnh 11 triệu (bản thân) và 4,4 triệu / người phụ thuộc (Nghị quyết 954/2020/UBTVQH14).
+- Thuế TNCN tiền lương (cá nhân cư trú): kỳ tính thuế từ năm 2026 dùng biểu lũy tiến 5 bậc (5%, 10%, 20%, 30%, 35%) và mức giảm trừ gia cảnh 15,5 triệu đồng/tháng cho bản thân, 6,2 triệu đồng/tháng cho mỗi người phụ thuộc; các kỳ trước năm 2026 giữ biểu 7 bậc và mức giảm trừ cũ. Phần tiền làm thêm cao hơn tiền lương giờ bình thường được loại khỏi thu nhập tính thuế. Căn cứ: Luật Thuế TNCN số 109/2025/QH15 áp dụng từ kỳ tính thuế 2026; Nghị quyết 110/2025/UBTVQH15 về mức giảm trừ gia cảnh.
+- Kỳ lương 2026 trở đi trong database cũ cần chạy `Back-End/database/migrations/007_recalculate_pit_2026.sql` để cập nhật cả phiếu đã khóa/đã chi. Migration chỉ cập nhật khoản giảm trừ gia cảnh, thuế TNCN và net; không thay đổi gross hoặc khoản bảo hiểm đã lưu.
+- Các khoản phụ cấp hiện được lưu thành một số tổng, không có phân loại miễn thuế; do đó hệ thống đang xem toàn bộ phụ cấp này là thu nhập chịu thuế. Thuế khấu trừ tại nguồn giả định nhân viên là cá nhân cư trú làm việc theo hợp đồng từ 3 tháng trở lên; chưa xử lý cá nhân không cư trú, hợp đồng ngắn hạn hoặc tổng hợp nhiều nguồn thu nhập để quyết toán năm.
 
 **Thiết kế**
 
