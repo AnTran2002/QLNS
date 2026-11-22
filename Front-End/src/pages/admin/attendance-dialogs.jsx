@@ -71,14 +71,19 @@ function CreatePeriodForm({ periods, onCreated, onCancel }) {
   const exists = periods.some((p) => p.month_year === monthYear);
   const maxDays = new Date(year, month, 0).getDate();
   const suggested = weekdaysIn(year, month);
-  const thisYear = new Date().getFullYear();
-  const years = [thisYear - 1, thisYear, thisYear + 1];
+  const now = new Date();
+  const thisYear = now.getFullYear();
+  const thisMonth = now.getMonth() + 1;
+  const currentMonthYear = `${thisYear}-${String(thisMonth).padStart(2, "0")}`;
+  const isPast = monthYear < currentMonthYear;
+  const years = [thisYear, thisYear + 1];
 
   const pick = (y, m) => {
+    const nextMonth = y === thisYear && m < thisMonth ? thisMonth : m;
     setYear(y);
-    setMonth(m);
+    setMonth(nextMonth);
     setError("");
-    if (!touchedDays) setStandardDays(String(weekdaysIn(y, m)));
+    if (!touchedDays) setStandardDays(String(weekdaysIn(y, nextMonth)));
   };
 
   const mutation = useMutation({
@@ -102,6 +107,10 @@ function CreatePeriodForm({ periods, onCreated, onCancel }) {
       setError(`Kỳ lương ${formatPeriod(monthYear)} đã tồn tại.`);
       return;
     }
+    if (isPast) {
+      setError("Không thể tạo kỳ lương cho tháng đã qua.");
+      return;
+    }
     mutation.mutate();
   };
 
@@ -118,7 +127,7 @@ function CreatePeriodForm({ periods, onCreated, onCancel }) {
               {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => {
                 const taken = periods.some((p) => p.month_year === `${year}-${String(m).padStart(2, "0")}`);
                 return (
-                  <SelectItem key={m} value={String(m)}>
+                  <SelectItem key={m} value={String(m)} disabled={year === thisYear && m < thisMonth}>
                     Tháng {m}
                     {taken ? " · đã có" : ""}
                   </SelectItem>
@@ -197,7 +206,7 @@ function CreatePeriodForm({ periods, onCreated, onCancel }) {
         <Button type="button" variant="outline" onClick={onCancel}>
           Huỷ
         </Button>
-        <Button type="submit" disabled={mutation.isPending || exists}>
+        <Button type="submit" disabled={mutation.isPending || exists || isPast}>
           {mutation.isPending ? <Loader2 className="animate-spin" /> : <CalendarPlus />}
           Tạo kỳ lương
         </Button>

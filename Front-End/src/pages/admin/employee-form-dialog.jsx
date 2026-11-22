@@ -152,21 +152,30 @@ function EmployeeForm({ employee, employees, onDone }) {
         )}
       </section>
 
-      <section className="grid gap-4 rounded-2xl bg-muted p-5 sm:grid-cols-2">
-        <p className="text-eyebrow sm:col-span-2">Hợp đồng</p>
-        <Field label="Lương cơ bản (₫)" htmlFor="base_salary" hint={money("base_salary")}>
-          <Input id="base_salary" type="number" min="0" step="100000" inputMode="numeric" value={form.base_salary} onChange={set("base_salary")} className="tabular" />
-        </Field>
-        <Field label="Lương đóng BHXH (₫)" htmlFor="insurance_salary" hint={money("insurance_salary")}>
-          <Input id="insurance_salary" type="number" min="0" step="100000" inputMode="numeric" value={form.insurance_salary} onChange={set("insurance_salary")} className="tabular" />
-        </Field>
-        <Field label="Phụ cấp cố định (₫)" htmlFor="allowance" hint={money("allowance")}>
-          <Input id="allowance" type="number" min="0" step="100000" inputMode="numeric" value={form.allowance} onChange={set("allowance")} className="tabular" />
-        </Field>
-        <Field label="Số người phụ thuộc" htmlFor="dependents_count">
-          <Input id="dependents_count" type="number" min="0" max="99" step="1" value={form.dependents_count} onChange={set("dependents_count")} className="tabular" />
-        </Field>
-      </section>
+      {isEdit ? (
+        <div className="rounded-2xl border border-border/70 bg-muted/50 p-5">
+          <p className="text-eyebrow">Thông tin hợp đồng</p>
+          <p className="mt-2 text-[13px] text-muted-foreground">
+            Không thể sửa lương từ hồ sơ nhân viên. Dùng mục Hợp đồng → Điều chỉnh lương để ghi lý do và lưu lịch sử.
+          </p>
+        </div>
+      ) : (
+        <section className="grid gap-4 rounded-2xl bg-muted p-5 sm:grid-cols-2">
+          <p className="text-eyebrow sm:col-span-2">Hợp đồng ban đầu</p>
+          <Field label="Lương cơ bản (₫)" htmlFor="base_salary" hint={money("base_salary")}>
+            <Input id="base_salary" type="number" min="0" step="100000" inputMode="numeric" value={form.base_salary} onChange={set("base_salary")} className="tabular" />
+          </Field>
+          <Field label="Lương đóng BHXH (₫)" htmlFor="insurance_salary" hint={money("insurance_salary")}>
+            <Input id="insurance_salary" type="number" min="0" step="100000" inputMode="numeric" value={form.insurance_salary} onChange={set("insurance_salary")} className="tabular" />
+          </Field>
+          <Field label="Phụ cấp cố định (₫)" htmlFor="allowance" hint={money("allowance")}>
+            <Input id="allowance" type="number" min="0" step="100000" inputMode="numeric" value={form.allowance} onChange={set("allowance")} className="tabular" />
+          </Field>
+          <Field label="Số người phụ thuộc" htmlFor="dependents_count">
+            <Input id="dependents_count" type="number" min="0" max="99" step="1" value={form.dependents_count} onChange={set("dependents_count")} className="tabular" />
+          </Field>
+        </section>
+      )}
 
       <FormError message={error} />
 
@@ -189,7 +198,7 @@ export function EmployeeFormDialog({ open, onOpenChange, employee, employees = [
           <DialogTitle>{employee ? "Sửa hồ sơ nhân viên" : "Thêm nhân viên"}</DialogTitle>
           <DialogDescription>
             {employee
-              ? `Cập nhật ${employee.full_name} — thay đổi được ghi thẳng vào cơ sở dữ liệu.`
+              ? `Cập nhật hồ sơ của ${employee.full_name}. Thông tin lương được quản lý riêng trong hợp đồng.`
               : "Tạo tài khoản vai trò nhân viên kèm hợp đồng đầu tiên."}
           </DialogDescription>
         </DialogHeader>

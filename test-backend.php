@@ -9,6 +9,8 @@ declare(strict_types=1);
 $services = __DIR__ . '/Back-End/services/';
 require $services . 'LeavePolicy.php';
 require $services . 'PayrollEngine.php';
+require $services . 'PayrollPeriodPolicy.php';
+require $services . 'ContractSalaryAdjustmentPolicy.php';
 
 $passed = 0;
 $failed = [];
@@ -63,6 +65,22 @@ check('chỉ cuối tuần', LeavePolicy::validate(['start_date' => '2026-12-05'
 check('quá 30 ngày làm việc (05/01 → 20/02)', LeavePolicy::validate(['start_date' => '2026-01-05', 'end_date' => '2026-02-20'] + $ok, '2026-01-01')[0], 'Mỗi đơn tối đa 30 ngày làm việc');
 check('lý do quá ngắn', LeavePolicy::validate(['reason' => ' a '] + $ok, $today)[0], 'Lý do cần từ 3 đến 500 ký tự');
 check('lý do tiếng Việt 3 ký tự (mb_strlen)', LeavePolicy::validate(['reason' => 'Ốm!'] + $ok, $today)[0], null);
+
+echo "\nQuy tắc kỳ lương và điều chỉnh lương\n";
+$periodToday = new DateTimeImmutable('2026-11-22');
+check('không tạo kỳ lương trong quá khứ', PayrollPeriodPolicy::validateCreationMonth('2026-10', $periodToday), 'Không thể tạo kỳ lương cho tháng đã qua');
+check('cho tạo kỳ lương tháng hiện tại', PayrollPeriodPolicy::validateCreationMonth('2026-11', $periodToday), null);
+check('cho tạo kỳ lương tương lai', PayrollPeriodPolicy::validateCreationMonth('2026-12', $periodToday), null);
+check('từ chối tháng không hợp lệ', PayrollPeriodPolicy::validateCreationMonth('2026-13', $periodToday), 'month_year phải có định dạng YYYY-MM');
+check('điều chỉnh lương hiệu lực tháng kế tiếp', ContractSalaryAdjustmentPolicy::effectiveMonth($periodToday), '2026-12');
+check('tháng 12 chuyển hiệu lực sang tháng 1 năm sau', ContractSalaryAdjustmentPolicy::effectiveMonth(new DateTimeImmutable('2026-12-22')), '2027-01');
+$salaryInput = ['base_salary' => '20000000', 'insurance_salary' => '18000000', 'allowance' => '2000000', 'dependents_count' => '1', 'reason' => 'Điều chỉnh lương'];
+check('bắt buộc lý do điều chỉnh lương', ContractSalaryAdjustmentPolicy::validate(array_merge($salaryInput, ['reason' => '  ']))[0], 'Lý do cần từ 3 đến 500 ký tự');
+check('chấp nhận điều chỉnh lương hợp lệ', ContractSalaryAdjustmentPolicy::validate($salaryInput)[0], null);
+check('phải có thay đổi mới tạo điều chỉnh', ContractSalaryAdjustmentPolicy::hasChanges($salaryInput, $salaryInput), false);
+check('điều chỉnh có thay đổi so với hiện tại', ContractSalaryAdjustmentPolicy::hasChanges($salaryInput, array_merge($salaryInput, ['base_salary' => '21000000'])), true);
+check('chặn sửa lương qua form hồ sơ', ContractSalaryAdjustmentPolicy::containsCompensationFields(['base_salary' => 21000000]), true);
+check('cho phép cập nhật hồ sơ không có lương', ContractSalaryAdjustmentPolicy::containsCompensationFields(['full_name' => 'Nguyễn Văn An']), false);
 
 echo "\nPayrollEngine::calculateNetSalary\n";
 // Đủ công, không OT: 20tr lương + 2tr phụ cấp, BH 10,5% trên 20tr, 0 người phụ thuộc

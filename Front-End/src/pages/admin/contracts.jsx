@@ -1,18 +1,19 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
-import { FileSignature, Loader2, Pencil, ShieldCheck, Users, Wallet } from "lucide-react";
+import { FileSignature, Loader2, ShieldCheck, Users, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/animate-ui/components/buttons/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/animate-ui/components/radix/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState, ErrorState, FormError, LoadingState, PageHeader, PersonAvatar, SearchField, StatTile } from "@/components/app/kit";
 import { Count, Money, MoneyShort, Reveal, RevealGroup, SPRING } from "@/components/app/motion";
 import { api } from "@/lib/api";
 import { PAYROLL_RULES } from "@/lib/constants";
-import { formatDate, formatMoney } from "@/lib/format";
+import { formatDate, formatMoney, formatPeriod } from "@/lib/format";
 
 const FIELDS = [
   ["base_salary", "Lương cơ bản (₫)", "100000"],
@@ -21,22 +22,31 @@ const FIELDS = [
   ["dependents_count", "Số người phụ thuộc", "1"],
 ];
 
-function ContractForm({ contract, onOpenChange }) {
+function SalaryAdjustmentForm({ contract, onOpenChange }) {
   const queryClient = useQueryClient();
+  const { data: history = [], isPending: historyPending, error: historyError } = useQuery({
+    queryKey: ["salary-adjustments", contract.id],
+    queryFn: () => api.salaryAdjustments(contract.id),
+  });
   const [form, setForm] = useState(() => ({
     base_salary: contract.base_salary,
     insurance_salary: contract.insurance_salary,
     allowance: contract.allowance,
     dependents_count: contract.dependents_count,
   }));
+  const [reason, setReason] = useState("");
   const [error, setError] = useState("");
+  const effectiveMonthDate = new Date();
+  effectiveMonthDate.setDate(1);
+  effectiveMonthDate.setMonth(effectiveMonthDate.getMonth() + 1);
+  const effectiveMonth = `${effectiveMonthDate.getFullYear()}-${String(effectiveMonthDate.getMonth() + 1).padStart(2, "0")}`;
+  const alreadyScheduled = history.some((adjustment) => adjustment.effective_month === effectiveMonth);
 
   const mutation = useMutation({
-    mutationFn: () => api.updateContract(contract.id, form),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["contracts"] });
-      queryClient.invalidateQueries({ queryKey: ["employees"] });
-      toast.success(`Đã cập nhật hợp đồng của ${contract.full_name}`);
+    mutationFn: () => api.createSalaryAdjustment(contract.id, { ...form, reason }),
+    onSuccess: (adjustment) => {
+      queryClient.setQueryData(["salary-adjustments", contract.id], (previous = []) => [adjustment, ...previous]);
+      toast.success(`Đã ghi nhận điều chỉnh có hiệu lực từ ${formatPeriod(adjustment.effective_month)}`);
       onOpenChange(false);
     },
     onError: (err) => setError(err.message),
@@ -44,11 +54,17 @@ function ContractForm({ contract, onOpenChange }) {
 
   const submit = (e) => {
     e.preventDefault();
+    if (historyPending || historyError) return setError("Không thể tải lịch sử điều chỉnh; hãy thử lại trước khi ghi nhận.");
+    if (alreadyScheduled) return setError("Hợp đồng đã có điều chỉnh cho tháng kế tiếp.");
     for (const [key, label] of FIELDS) {
       const n = Number(form[key]);
       if (!Number.isFinite(n) || n < 0) return setError(`${label} phải là số không âm`);
     }
     if (!Number.isInteger(Number(form.dependents_count))) return setError("Số người phụ thuộc phải là số nguyên");
+    if (reason.trim().length < 3 || reason.trim().length > 500) return setError("Lý do cần từ 3 đến 500 ký tự");
+    if (!FIELDS.some(([key]) => Number(form[key]) !== Number(contract[key]))) {
+      return setError("Cần thay đổi ít nhất một thông số lương");
+    }
     setError("");
     mutation.mutate();
   };
@@ -58,6 +74,10 @@ function ContractForm({ contract, onOpenChange }) {
 
   return (
     <form onSubmit={submit} noValidate className="grid gap-5">
+      <p className="rounded-xl border border-border/70 bg-muted/50 px-4 py-3 text-[13px] text-muted-foreground">
+        Mức lương mới có hiệu lực từ tháng kế tiếp: <b className="font-medium text-foreground">{formatPeriod(effectiveMonth)}</b>.
+        Mỗi hợp đồng chỉ tạo một điều chỉnh cho tháng hiệu lực này.
+      </p>
       <div className="grid gap-4 sm:grid-cols-2">
         {FIELDS.map(([key, label, step]) => (
           <div key={key} className="space-y-2">
@@ -68,11 +88,29 @@ function ContractForm({ contract, onOpenChange }) {
               min="0"
               step={step}
               value={form[key]}
-              onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+              onChange={(e) => {
+                setError("");
+                setForm((f) => ({ ...f, [key]: e.target.value }));
+              }}
               className="tabular"
+              disabled={alreadyScheduled}
             />
           </div>
         ))}
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="salary-adjustment-reason">Lý do điều chỉnh</Label>
+        <Textarea
+          id="salary-adjustment-reason"
+          value={reason}
+          onChange={(e) => {
+            setError("");
+            setReason(e.target.value);
+          }}
+          maxLength={500}
+          placeholder="Nhập lý do thay đổi lương (bắt buộc)"
+          disabled={alreadyScheduled}
+        />
       </div>
       {/* Xem trước — số lăn theo từng lần gõ */}
       <div className="tile grid gap-4 p-5 sm:grid-cols-2">
@@ -85,11 +123,40 @@ function ContractForm({ contract, onOpenChange }) {
           <Money value={deduction} className="mt-1 text-[20px] font-semibold" />
         </div>
       </div>
+      {alreadyScheduled && (
+        <p className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-[13px] text-warning">
+          Hợp đồng đã có điều chỉnh lương hiệu lực từ tháng kế tiếp.
+        </p>
+      )}
+      {historyError && <FormError message={historyError.message} />}
+      {historyPending ? (
+        <p className="text-[13px] text-muted-foreground">Đang tải lịch sử điều chỉnh…</p>
+      ) : history.length > 0 ? (
+        <section className="space-y-3">
+          <h3 className="text-[13px] font-semibold">Lịch sử điều chỉnh</h3>
+          <div className="max-h-48 space-y-3 overflow-y-auto rounded-xl border border-border/70 p-3">
+            {history.map((adjustment) => (
+              <article key={adjustment.id} className="border-b border-border/60 pb-3 last:border-0 last:pb-0">
+                <p className="text-[12px] font-medium">
+                  Hiệu lực {formatPeriod(adjustment.effective_month)} · {adjustment.changed_by_name || "Quản trị viên"} · {formatDate(adjustment.created_at)}
+                </p>
+                <div className="mt-1 grid gap-x-4 text-[12px] text-muted-foreground sm:grid-cols-2">
+                  <p>Lương cơ bản: {formatMoney(adjustment.previous_base_salary)} → {formatMoney(adjustment.base_salary)}</p>
+                  <p>Lương BHXH: {formatMoney(adjustment.previous_insurance_salary)} → {formatMoney(adjustment.insurance_salary)}</p>
+                  <p>Phụ cấp: {formatMoney(adjustment.previous_allowance)} → {formatMoney(adjustment.allowance)}</p>
+                  <p>Người phụ thuộc: {adjustment.previous_dependents_count} → {adjustment.dependents_count}</p>
+                </div>
+                <p className="text-[12px] text-muted-foreground">Lý do: {adjustment.reason}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
       <FormError message={error} />
       <DialogFooter>
         <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>Huỷ</Button>
-        <Button type="submit" disabled={mutation.isPending}>
-          {mutation.isPending && <Loader2 className="animate-spin" />} Lưu hợp đồng
+        <Button type="submit" disabled={mutation.isPending || historyPending || historyError || alreadyScheduled}>
+          {mutation.isPending && <Loader2 className="animate-spin" />} Ghi nhận điều chỉnh
         </Button>
       </DialogFooter>
     </form>
@@ -99,7 +166,7 @@ function ContractForm({ contract, onOpenChange }) {
 export default function ContractsPage() {
   const { data: contracts = [], isPending, error, refetch } = useQuery({ queryKey: ["contracts"], queryFn: api.contracts });
   const [query, setQuery] = useState("");
-  const [editing, setEditing] = useState(null);
+  const [adjusting, setAdjusting] = useState(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -118,7 +185,7 @@ export default function ContractsPage() {
       <PageHeader
         eyebrow="Tiền lương"
         title="Hợp đồng lao động"
-        description="Thông số làm căn cứ tính lương: lương cơ bản, lương đóng BHXH, phụ cấp và người phụ thuộc."
+        description="Thông số lương hiện hành chỉ xem; điều chỉnh lương phải có lý do và có hiệu lực từ tháng kế tiếp."
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
@@ -152,7 +219,7 @@ export default function ContractsPage() {
                   <TableHead className="hidden text-right md:table-cell">Phụ cấp</TableHead>
                   <TableHead className="hidden text-center lg:table-cell">NPT</TableHead>
                   <TableHead className="hidden lg:table-cell">Ngày tạo</TableHead>
-                  <TableHead className="w-14"><span className="sr-only">Sửa</span></TableHead>
+                  <TableHead className="w-14"><span className="sr-only">Điều chỉnh lương</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -184,8 +251,8 @@ export default function ContractsPage() {
                       <TableCell className="tabular hidden text-center text-foreground/85 lg:table-cell">{c.dependents_count}</TableCell>
                       <TableCell className="tabular hidden text-foreground/85 lg:table-cell">{formatDate(c.created_at)}</TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="icon-sm" onClick={() => setEditing(c)} aria-label={`Sửa hợp đồng của ${c.full_name}`}>
-                          <Pencil />
+                        <Button variant="ghost" size="icon-sm" onClick={() => setAdjusting(c)} aria-label={`Điều chỉnh lương của ${c.full_name}`}>
+                          <Wallet />
                         </Button>
                       </TableCell>
                     </motion.tr>
@@ -197,15 +264,15 @@ export default function ContractsPage() {
         </Reveal>
       )}
 
-      <Dialog open={Boolean(editing)} onOpenChange={(o) => !o && setEditing(null)}>
+      <Dialog open={Boolean(adjusting)} onOpenChange={(o) => !o && setAdjusting(null)}>
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>Sửa hợp đồng</DialogTitle>
+            <DialogTitle>Điều chỉnh lương</DialogTitle>
             <DialogDescription>
-              {editing?.full_name} · <span className="font-mono">{editing?.employee_code}</span>
+              {adjusting?.full_name} · <span className="font-mono">{adjusting?.employee_code}</span>
             </DialogDescription>
           </DialogHeader>
-          {editing && <ContractForm contract={editing} onOpenChange={(o) => !o && setEditing(null)} />}
+          {adjusting && <SalaryAdjustmentForm contract={adjusting} onOpenChange={(o) => !o && setAdjusting(null)} />}
         </DialogContent>
       </Dialog>
     </div>

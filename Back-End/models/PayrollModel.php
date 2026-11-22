@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/BaseModel.php';
+require_once __DIR__ . '/SalaryAdjustmentSql.php';
 
 class PayrollModel extends BaseModel {
     protected $table = 'payroll_items';
@@ -34,7 +35,7 @@ class PayrollModel extends BaseModel {
     {
         $stmt = $this->db->prepare(
             "SELECT u.id AS user_id, u.employee_code, u.full_name, u.department, u.status AS employee_status,
-                    c.base_salary, c.insurance_salary, c.allowance, c.dependents_count,
+                    " . SalaryAdjustmentSql::selectedFields() . ",
                     pi.id AS payroll_item_id, COALESCE(pi.actual_days, 0) AS actual_days,
                     COALESCE(pi.ot_hours, 0) AS ot_hours,
                     COALESCE(pi.gross_salary, 0) AS gross_salary,
@@ -43,6 +44,7 @@ class PayrollModel extends BaseModel {
                     COALESCE(pi.personal_tax, 0) AS personal_tax,
                     COALESCE(pi.net_salary, 0) AS net_salary
              FROM users u
+             INNER JOIN payroll_periods payroll_period ON payroll_period.id = :period_for_salary
              LEFT JOIN contracts c ON c.id = (
                  SELECT c2.id
                  FROM contracts c2
@@ -50,23 +52,25 @@ class PayrollModel extends BaseModel {
                  ORDER BY c2.created_at DESC, c2.id DESC
                  LIMIT 1
              )
+             " . SalaryAdjustmentSql::effectiveJoin('c', 'sa', 'payroll_period.month_year') . "
              LEFT JOIN payroll_items pi ON pi.user_id = u.id AND pi.period_id = :period_id
              ORDER BY u.employee_code"
         );
-        $stmt->execute(['period_id' => $periodId]);
+        $stmt->execute(['period_for_salary' => $periodId, 'period_id' => $periodId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public function getPayrollInputsByUserIds(array $userIds): array
+    public function getPayrollInputsByUserIds(array $userIds, string $effectiveMonth): array
     {
         if ($userIds === []) {
             return [];
         }
 
-        $placeholders = implode(', ', array_fill(0, count($userIds), '?'));
+        $userIds = array_values($userIds);
+        $placeholders = implode(', ', array_map(fn ($index) => ':user_' . $index, array_keys($userIds)));
         $stmt = $this->db->prepare(
             "SELECT u.id AS user_id, u.employee_code, c.id AS contract_id,
-                    c.base_salary, c.insurance_salary, c.allowance, c.dependents_count
+                    " . SalaryAdjustmentSql::selectedFields() . "
              FROM users u
              LEFT JOIN contracts c ON c.id = (
                  SELECT c2.id
@@ -75,9 +79,14 @@ class PayrollModel extends BaseModel {
                  ORDER BY c2.created_at DESC, c2.id DESC
                  LIMIT 1
              )
+             " . SalaryAdjustmentSql::effectiveJoin('c', 'sa', ':effective_month') . "
              WHERE u.id IN ({$placeholders})"
         );
-        $stmt->execute($userIds);
+        $params = ['effective_month' => $effectiveMonth];
+        foreach (array_values($userIds) as $index => $userId) {
+            $params['user_' . $index] = $userId;
+        }
+        $stmt->execute($params);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         $byUserId = [];
         foreach ($rows as $row) {

@@ -39,7 +39,7 @@ Khi lỗi, `success` là `false`, HTTP status là 4xx/5xx và `message` cho bi�
    - MAMP: <http://localhost:8888/phpMyAdmin/> (MySQL cổng **8889**, user `root` / mật khẩu `root`)
    - XAMPP: <http://localhost/phpmyadmin/> (MySQL cổng **3306**, user `root` / mật khẩu rỗng)
 2. Chọn tab **Import**, chọn file `QLNS-Database.sql` ở thư mục gốc repo, rồi bấm **Go / Thực hiện**.
-   File này tự `CREATE DATABASE IF NOT EXISTS qlns` và tạo 4 bảng `users`, `contracts`, `payroll_periods`, `payroll_items` cùng 5 nhân viên mẫu.
+   File này tự `CREATE DATABASE IF NOT EXISTS qlns` và tạo các bảng ứng dụng cùng 5 nhân viên mẫu, bao gồm lịch sử điều chỉnh lương.
 
 ### 2.2. Database `qlns` đã có từ trước (bản cũ)
 
@@ -60,6 +60,8 @@ Migration thêm:
 Đối với UC-02, chạy thêm migration `Back-End/database/migrations/002_payroll_period_unique_month.sql` một lần để bảo đảm mỗi tháng chỉ có một kỳ lương. Nếu database đã có nhiều kỳ cùng `month_year`, cần xử lý dữ liệu trùng trước khi chạy migration này.
 
 Đối với UC-04, sau migration hồ sơ nhân viên (nếu database cũ), chạy `Back-End/database/migrations/003_user_bank_accounts.sql` một lần để thêm thông tin tài khoản nhận lương. Thông tin ngân hàng hiện chưa có trong schema cũ; Admin cần cập nhật dữ liệu trước khi xuất file chuyển khoản.
+
+Để bật lịch sử điều chỉnh lương, chạy `Back-End/database/migrations/006_contract_salary_adjustments.sql` một lần trên database hiện có. Điều chỉnh lương mới bắt buộc có lý do và chỉ có hiệu lực từ tháng kế tiếp.
 
 ### 2.3. Đặt mật khẩu cho tài khoản mẫu
 
@@ -117,13 +119,13 @@ define('FRONTEND_ORIGIN', 'http://localhost:5173');
 
 ```bash
 cd Back-End
-php -S 127.0.0.1:8000 index.php
+php -S localhost:8000 index.php
 ```
 
 > Dùng cổng **8000**. Cổng 8888 thường đã bị Apache của MAMP chiếm.
-> Trên macOS có MAMP, có thể gọi trực tiếp: `/Applications/MAMP/bin/php/php8.3.x/bin/php -S 127.0.0.1:8000 index.php`.
+> Trên macOS có MAMP, có thể gọi trực tiếp: `/Applications/MAMP/bin/php/php8.3.x/bin/php -S localhost:8000 index.php`.
 
-Kiểm tra: mở <http://127.0.0.1:8000/?action=/>
+Kiểm tra: mở <http://localhost:8000/?action=/>
 
 ```json
 { "success": true, "data": { "backend": "ok", "database": "qlns", "users": 5 }, "message": "Backend đang chạy và đã kết nối database" }
@@ -141,12 +143,12 @@ Nếu thấy `users` đúng bằng số dòng trong bảng `users` ở phpMyAdmi
 
 ```bash
 cd Front-End
-cp .env.example .env   # tuỳ chọn, chỉ cần khi backend không ở 127.0.0.1:8000
+cp .env.example .env   # tuỳ chọn, chỉ cần khi backend không ở localhost:8000
 ```
 
 | Biến | Mặc định | Ý nghĩa |
 | --- | --- | --- |
-| `BACKEND_URL` | `http://127.0.0.1:8000` | Địa chỉ backend thật mà Vite proxy chuyển tới (chỉ dùng khi dev) |
+| `BACKEND_URL` | `http://localhost:8000` | Địa chỉ backend thật mà Vite proxy chuyển tới (chỉ dùng khi dev) |
 | `VITE_API_BASE_URL` | `/api` | Đường dẫn axios gọi. Khi build production và backend ở domain khác, đặt URL đầy đủ, ví dụ `https://api.congty.vn` |
 
 ### 4.2. Chạy
@@ -162,7 +164,7 @@ Proxy trong `Front-End/vite.config.js`:
 server: {
   proxy: {
     "/api": {
-      target: env.BACKEND_URL || "http://127.0.0.1:8000",
+      target: env.BACKEND_URL || "http://localhost:8000",
       changeOrigin: true,
       rewrite: (p) => p.replace(/^\/api/, "") || "/",
     },
@@ -170,7 +172,7 @@ server: {
 },
 ```
 
-Nghĩa là `http://localhost:5173/api/?action=employees` được chuyển tới `http://127.0.0.1:8000/?action=employees`.
+Nghĩa là `http://localhost:5173/api/?action=employees` được chuyển tới `http://localhost:8000/?action=employees`.
 
 ---
 
@@ -185,12 +187,16 @@ Tất cả gọi tới `index.php?action=<tên>`. Các API có dấu 🔒 cần 
 | `me` | GET | 🔒 | – | `{ user, contract, payroll_history, current_period }` |
 | `logout` | GET | 🔒 | – | `null` |
 | `employee/dashboard` | GET | 🔒 EMPLOYEE | – | `{ user_info, contract, payroll_history[], attendance_summary, current_period, work_schedule, team_members[] }` |
+| `contracts` | GET | 🔒 ADMIN | – | Danh sách hợp đồng và mức lương đang có hiệu lực |
+| `contracts/update` | PUT | 🔒 ADMIN | `?id=2` | Bị từ chối (HTTP 409); hợp đồng đã lưu không được sửa trực tiếp |
+| `contracts/adjustments` | GET | 🔒 ADMIN | `?contract_id=2` | Lịch sử điều chỉnh lương, lý do và tháng hiệu lực |
+| `contracts/adjustments` | POST | 🔒 ADMIN | `?contract_id=2` + thông số lương và `reason` | Ghi nhận điều chỉnh có hiệu lực từ tháng kế tiếp |
 | `employees` | GET | 🔒 ADMIN | – | Mảng nhân viên kèm hợp đồng mới nhất |
 | `employees/show` | GET | 🔒 ADMIN | `?id=2` | 1 nhân viên |
 | `employees/create` | POST | 🔒 ADMIN | Xem ví dụ bên dưới | Nhân viên vừa tạo (HTTP 201). Mật khẩu mặc định `123456` |
-| `employees/update` | PUT | 🔒 ADMIN | `?id=2` + body như create | Nhân viên sau khi sửa |
+| `employees/update` | PUT | 🔒 ADMIN | `?id=2` + thông tin hồ sơ (không gồm lương) | Nhân viên sau khi sửa |
 | `employees/delete` | DELETE | 🔒 ADMIN | `?id=2` | `null` (không cho tự xoá hoặc xoá nhân viên đã có kỳ lương khóa sổ/đã trả) |
-| `payroll/periods` | POST | 🔒 ADMIN | `{ "month_year": "2026-12", "standard_days": 22 }` | Kỳ lương mới ở trạng thái `DRAFT` |
+| `payroll/periods` | POST | 🔒 ADMIN | `{ "month_year": "2026-12", "standard_days": 22 }` | Kỳ lương mới ở trạng thái `DRAFT`; không nhận tháng đã qua |
 | `payroll/attendance` | GET | 🔒 ADMIN | `?period_id=2` | Kỳ lương và danh sách nhân viên đầy đủ cùng ngày công/OT hiện tại |
 | `payroll/attendance` | PUT/POST | 🔒 ADMIN | `{ "period_id": 2, "entries": [{ "user_id": 2, "actual_days": 22, "ot_hours": 4 }] }` | Lưu lô ngày công/OT và tính lại lương trong cùng transaction |
 | `payroll/import` | POST | 🔒 ADMIN | `multipart/form-data`: `period_id`, `file` (.xlsx) | Kiểm tra toàn file rồi nhập nguyên tử, không lưu dở một phần |
@@ -201,6 +207,8 @@ Tất cả gọi tới `index.php?action=<tên>`. Các API có dấu 🔒 cần 
 | `payroll/payslip` | GET | 🔒 EMPLOYEE | `?period_id=2` | Phiếu lương của chính nhân viên đăng nhập; chỉ kỳ `LOCKED`/`PAID` |
 | `payroll/payslip/download` | GET | 🔒 EMPLOYEE | `?period_id=2` | Tải phiếu lương HTML tự chứa để mở/in hoặc lưu thành PDF |
 | `payroll/calculate` | POST | 🔒 ADMIN | `{ user_id, period_id, actual_days, ot_hours }` | Kết quả tính lương (kỳ phải ở trạng thái `DRAFT`) |
+
+Điều chỉnh lương gửi đủ `base_salary`, `insurance_salary`, `allowance`, `dependents_count` và `reason` (3–500 ký tự). Backend lưu mức cũ/mới, người điều chỉnh và lý do; mức mới chỉ áp dụng từ tháng kế tiếp. Mỗi hợp đồng chỉ có một điều chỉnh cho cùng tháng hiệu lực.
 
 File Excel UC-02 cần có worksheet đầu tiên với hàng tiêu đề `employee_code`, `actual_days`, `ot_hours` (hoặc `Mã nhân viên`, `Ngày công`, `Giờ OT`). Mỗi mã nhân viên chỉ xuất hiện một lần; file tối đa 10 MB và 10.000 dòng. Backend yêu cầu bật PHP extension `zip` để đọc `.xlsx`; cấu hình PHP cần cho phép `upload_max_filesize=10M` và `post_max_size` lớn hơn 10 MB. Nhập Excel và chỉnh sửa grid đều chỉ ghi vào kỳ `DRAFT`, từ chối nhân viên không tồn tại/không có hợp đồng và rollback toàn bộ nếu có lỗi.
 
@@ -265,9 +273,9 @@ Thử nhanh bằng `curl` (lưu cookie vào file `cj`):
 ```bash
 curl -c cj -H 'Content-Type: application/json' \
      -d '{"employee_code":"NV001","password":"123456"}' \
-     'http://127.0.0.1:8000/?action=login'
+     'http://localhost:8000/?action=login'
 
-curl -b cj 'http://127.0.0.1:8000/?action=employees'
+curl -b cj 'http://localhost:8000/?action=employees'
 ```
 
 ---
@@ -372,7 +380,7 @@ public function periods()
 'payroll/periods' => (new PayrollController)->periods(),
 ```
 
-Kiểm tra: `curl -b cj 'http://127.0.0.1:8000/?action=payroll/periods'`
+Kiểm tra: `curl -b cj 'http://localhost:8000/?action=payroll/periods'`
 
 **④ API frontend**: tạo `Front-End/src/lib/payroll-api.js`
 
@@ -421,13 +429,14 @@ Thêm nhân viên trong phpMyAdmin:
 
 | Triệu chứng | Nguyên nhân và cách sửa |
 | --- | --- |
-| Vite báo **HTTP 502** / `connect ECONNREFUSED ::1:8000` (hay gặp khi đổi máy Windows ⇄ macOS) | Backend được chạy bằng `localhost` nên chỉ nghe IPv6 hoặc IPv4, còn Node phân giải `localhost` theo kiểu khác. Luôn chạy `php -S 127.0.0.1:8000` (hoặc `npm run backend` trong Front-End) và đặt `BACKEND_URL=http://127.0.0.1:8000`. `vite.config.js` đã tự đổi `localhost` → `127.0.0.1` |
-| Giao diện báo *"Không thể kết nối máy chủ…"* hoặc Vite báo `ECONNREFUSED` | Backend PHP chưa chạy hoặc không nghe trên cổng 8000. Chạy `php -S 127.0.0.1:8000 index.php` trong thư mục `Back-End`, kiểm tra `BACKEND_URL=http://127.0.0.1:8000`, rồi khởi động lại Vite |
+| Backend trả trang HTML **404 Not Found** | PHP server chưa được khởi chạy với router của dự án. Trong `Front-End`, chạy `npm run backend` (hoặc trong `Back-End`, chạy `php -S localhost:8000 index.php`), rồi thử lại |
+| Vite báo **HTTP 502** / `ECONNREFUSED` | Backend chưa chạy hoặc `BACKEND_URL` không khớp địa chỉ backend. Chạy `php -S localhost:8000 index.php` trong thư mục `Back-End` và đặt `BACKEND_URL=http://localhost:8000` |
+| Giao diện báo *"Không thể kết nối máy chủ…"* hoặc Vite báo `ECONNREFUSED` | Backend PHP chưa chạy hoặc không nghe trên cổng 8000. Chạy `php -S localhost:8000 index.php` trong thư mục `Back-End`, kiểm tra `BACKEND_URL=http://localhost:8000`, rồi khởi động lại Vite |
 | *"Phản hồi từ backend không đúng định dạng JSON"* | `BACKEND_URL` trỏ vào trang HTML (ví dụ trang chủ MAMP). Mở URL đó trong trình duyệt để xem |
 | `Lỗi cơ sở dữ liệu: SQLSTATE[HY000] [2002] Connection refused` | Sai `DB_HOST`/`DB_PORT` trong `env.php` hoặc MySQL chưa bật. MAMP dùng 8889, XAMPP dùng 3306 |
 | `SQLSTATE[HY000] [1049] Unknown database 'qlns'` | Chưa import `QLNS-Database.sql` (mục 2.1) |
 | `Unknown column 'u.department'` | Database bản cũ, cần chạy migration `001_employee_profile.sql` (mục 2.2) |
 | Đăng nhập báo sai mật khẩu với `123456` | Chưa chạy `seed_passwords.php` (mục 2.3) |
 | Đăng nhập được nhưng F5 lại bị đăng xuất / API trả 401 | Cookie phiên không được gửi: phải gọi qua `/api` (proxy) hoặc đúng `FRONTEND_ORIGIN`; không mở frontend bằng `127.0.0.1` khi cấu hình `localhost` |
-| `php -S 127.0.0.1:8888` báo *Address already in use* | Apache của MAMP đang dùng 8888. Dùng 8000 |
+| `php -S localhost:8888` báo *Address already in use* | Apache của MAMP đang dùng 8888. Dùng 8000 |
 | Thiếu `env.php` | Backend trả JSON 500 *"Thiếu Back-End/configs/env.php — hãy sao chép từ configs/env.example.php"* (mục 3.1) |

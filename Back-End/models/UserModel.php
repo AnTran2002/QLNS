@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/SalaryAdjustmentSql.php';
+
 class UserModel extends BaseModel
 {
     protected $table = 'users';
@@ -79,7 +81,7 @@ class UserModel extends BaseModel
     public function getAllWithContract()
     {
         $sql = "SELECT " . $this->publicColumns() . ",
-                       c.id AS contract_id, c.base_salary, c.insurance_salary, c.allowance, c.dependents_count
+                       c.id AS contract_id, " . SalaryAdjustmentSql::selectedFields() . "
                 FROM {$this->table} u
                 LEFT JOIN contracts c ON c.id = (
                     SELECT c2.id FROM contracts c2
@@ -87,8 +89,11 @@ class UserModel extends BaseModel
                     ORDER BY c2.created_at DESC, c2.id DESC
                     LIMIT 1
                 )
+                " . SalaryAdjustmentSql::effectiveJoin() . "
                 ORDER BY u.id ASC";
-        return $this->db->query($sql)->fetchAll();
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute(['effective_month' => date('Y-m')]);
+        return $stmt->fetchAll();
     }
 
     /**
@@ -97,7 +102,7 @@ class UserModel extends BaseModel
     public function findWithContract($id)
     {
         $sql = "SELECT " . $this->publicColumns() . ",
-                       c.id AS contract_id, c.base_salary, c.insurance_salary, c.allowance, c.dependents_count
+                       c.id AS contract_id, " . SalaryAdjustmentSql::selectedFields() . "
                 FROM {$this->table} u
                 LEFT JOIN contracts c ON c.id = (
                     SELECT c2.id FROM contracts c2
@@ -105,10 +110,11 @@ class UserModel extends BaseModel
                     ORDER BY c2.created_at DESC, c2.id DESC
                     LIMIT 1
                 )
+                " . SalaryAdjustmentSql::effectiveJoin() . "
                 WHERE u.id = :id
                 LIMIT 1";
         $stmt = $this->db->prepare($sql);
-        $stmt->execute(['id' => $id]);
+        $stmt->execute(['id' => $id, 'effective_month' => date('Y-m')]);
         return $stmt->fetch();
     }
 

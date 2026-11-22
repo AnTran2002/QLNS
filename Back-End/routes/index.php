@@ -67,10 +67,11 @@ match ($action) {
     'me'                 => (new AuthController)->me(),
     'logout'             => (new AuthController)->logout(),
 
-    // Hợp đồng (UC-01: Lấy danh sách, xem chi tiết, cập nhật)
+    // Hợp đồng (UC-01: Lấy danh sách, xem chi tiết, điều chỉnh lương)
     'contracts'          => (new ContractController)->index(),
     'contracts/show'     => (new ContractController)->show($_GET['id'] ?? null),
     'contracts/update'   => (new ContractController)->update($_GET['id'] ?? null),
+    'contracts/adjustments' => (new ContractController)->adjustments(),
 
     // Nhân viên (EMPLOYEE)
     'employee/dashboard' => (new EmployeeController)->dashboard(),

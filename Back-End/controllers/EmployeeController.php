@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/../services/ContractSalaryAdjustmentPolicy.php';
+
 class EmployeeController
 {
     private const STATUSES = ['Đang làm việc', 'Thử việc', 'Nghỉ phép'];
@@ -208,7 +210,7 @@ class EmployeeController
                 'password' => $data['password'] ?? self::DEFAULT_PASSWORD,
                 'role'     => 'EMPLOYEE',
             ]);
-            (new ContractModel())->saveForUser($id, $data);
+            (new ContractModel())->createForUser($id, $data);
             $userModel->commit();
         } catch (Throwable $e) {
             $userModel->rollBack();
@@ -219,7 +221,7 @@ class EmployeeController
     }
 
     /**
-     * PUT ?action=employees/update&id=1 — Cập nhật hồ sơ + hợp đồng.
+     * PUT ?action=employees/update&id=1 — Cập nhật hồ sơ; không thay đổi thông tin lương.
      */
     public function update()
     {
@@ -237,7 +239,12 @@ class EmployeeController
             return json_response(404, null, 'Không tìm thấy nhân viên');
         }
 
-        [$data, $error] = $this->validate(read_json_body());
+        $input = read_json_body();
+        if ($input !== null && ContractSalaryAdjustmentPolicy::containsCompensationFields($input)) {
+            return json_response(422, null, 'Thông tin lương chỉ được thay đổi qua điều chỉnh lương kèm lý do');
+        }
+
+        [$data, $error] = $this->validate($input, false);
         if ($error) {
             return json_response(422, null, $error);
         }
@@ -249,7 +256,6 @@ class EmployeeController
         try {
             $userModel->beginTransaction();
             $userModel->update($id, $data);
-            (new ContractModel())->saveForUser($id, $data);
             $userModel->commit();
         } catch (Throwable $e) {
             $userModel->rollBack();
@@ -299,7 +305,7 @@ class EmployeeController
     /**
      * Kiểm tra dữ liệu gửi lên. Trả về [dữ liệu đã chuẩn hóa, thông báo lỗi | null].
      */
-    private function validate(?array $input): array
+    private function validate(?array $input, bool $includeContract = true): array
     {
         if ($input === null) {
             return [null, 'Dữ liệu JSON không hợp lệ'];
@@ -335,18 +341,20 @@ class EmployeeController
             return [null, 'joined_at phải có dạng YYYY-MM-DD'];
         }
 
-        foreach (['base_salary', 'insurance_salary', 'allowance'] as $key) {
-            $value = $input[$key] ?? 0;
-            if (!is_numeric($value) || (float) $value < 0 || (float) $value > 9999999999) {
-                return [null, "Trường {$key} phải là số không âm"];
+        if ($includeContract) {
+            foreach (['base_salary', 'insurance_salary', 'allowance'] as $key) {
+                $value = $input[$key] ?? 0;
+                if (!is_numeric($value) || (float) $value < 0 || (float) $value > 9999999999) {
+                    return [null, "Trường {$key} phải là số không âm"];
+                }
+                $data[$key] = round((float) $value, 2);
             }
-            $data[$key] = round((float) $value, 2);
+            $dependents = filter_var($input['dependents_count'] ?? 0, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 99]]);
+            if ($dependents === false) {
+                return [null, 'dependents_count phải là số nguyên từ 0 đến 99'];
+            }
+            $data['dependents_count'] = $dependents;
         }
-        $dependents = filter_var($input['dependents_count'] ?? 0, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 99]]);
-        if ($dependents === false) {
-            return [null, 'dependents_count phải là số nguyên từ 0 đến 99'];
-        }
-        $data['dependents_count'] = $dependents;
 
         if (isset($input['password']) && $input['password'] !== '') {
             if (mb_strlen((string) $input['password']) < 6) {

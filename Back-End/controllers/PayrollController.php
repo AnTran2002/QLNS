@@ -7,6 +7,7 @@ require_once __DIR__ . '/../services/PayrollRunService.php';
 require_once __DIR__ . '/../services/PayrollPeriodService.php';
 require_once __DIR__ . '/../services/XlsxExportWriter.php';
 require_once __DIR__ . '/../services/PayslipRenderer.php';
+require_once __DIR__ . '/../services/PayrollPeriodPolicy.php';
 
 class PayrollController
 {
@@ -564,8 +565,9 @@ class PayrollController
         }
 
         $monthYear = trim((string) ($input['month_year'] ?? ''));
-        if (preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $monthYear) !== 1) {
-            return json_response(422, null, 'month_year phải có định dạng YYYY-MM');
+        $monthError = PayrollPeriodPolicy::validateCreationMonth($monthYear);
+        if ($monthError !== null) {
+            return json_response(422, null, $monthError);
         }
 
         $standardDays = filter_var($input['standard_days'] ?? null, FILTER_VALIDATE_INT, [

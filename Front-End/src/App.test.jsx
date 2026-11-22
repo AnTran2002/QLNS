@@ -242,3 +242,43 @@ describe("Nghỉ phép", () => {
     await waitFor(() => expect(api.reviewLeave).toHaveBeenCalledWith(7, "REJECTED", "Trùng lịch bàn giao"));
   });
 });
+
+describe("Điều chỉnh lương", () => {
+  it("bắt buộc lý do và gửi điều chỉnh qua luồng riêng", async () => {
+    const nextMonthDate = new Date();
+    nextMonthDate.setDate(1);
+    nextMonthDate.setMonth(nextMonthDate.getMonth() + 1);
+    const effectiveMonth = `${nextMonthDate.getFullYear()}-${String(nextMonthDate.getMonth() + 1).padStart(2, "0")}`;
+    api.me.mockResolvedValue({ user: ADMIN });
+    api.contracts.mockResolvedValue([{
+      id: 1,
+      full_name: ADMIN.full_name,
+      employee_code: ADMIN.employee_code,
+      department: ADMIN.department,
+      base_salary: 25000000,
+      insurance_salary: 20000000,
+      allowance: 3000000,
+      dependents_count: 1,
+      created_at: "2026-01-01",
+    }]);
+    api.salaryAdjustments.mockResolvedValue([]);
+    api.createSalaryAdjustment.mockResolvedValue({ id: 1, effective_month: effectiveMonth });
+    renderApp("/admin/hop-dong");
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: `Điều chỉnh lương của ${ADMIN.full_name}` }));
+    await user.clear(screen.getByLabelText("Lương cơ bản (₫)"));
+    await user.type(screen.getByLabelText("Lương cơ bản (₫)"), "26000000");
+    await user.click(screen.getByRole("button", { name: "Ghi nhận điều chỉnh" }));
+
+    expect(await screen.findByText("Lý do cần từ 3 đến 500 ký tự")).toBeInTheDocument();
+    expect(api.createSalaryAdjustment).not.toHaveBeenCalled();
+
+    await user.type(screen.getByLabelText("Lý do điều chỉnh"), "Điều chỉnh theo quyết định");
+    await user.click(screen.getByRole("button", { name: "Ghi nhận điều chỉnh" }));
+    await waitFor(() => expect(api.createSalaryAdjustment).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({ base_salary: "26000000", reason: "Điều chỉnh theo quyết định" }),
+    ));
+  });
+});

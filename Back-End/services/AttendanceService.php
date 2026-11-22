@@ -45,7 +45,7 @@ class AttendanceService
             $daysInMonth = (int) (new DateTimeImmutable($period['month_year'] . '-01'))->format('t');
             $normalizedEntries = $this->normalizeEntries($entries, $daysInMonth);
             $userIds = array_column($normalizedEntries, 'user_id');
-            $payrollInputs = $this->payrollModel->getPayrollInputsByUserIds($userIds);
+            $payrollInputs = $this->payrollModel->getPayrollInputsByUserIds($userIds, $period['month_year']);
 
             $missingUserIds = array_values(array_diff($userIds, array_keys($payrollInputs)));
             if ($missingUserIds !== []) {

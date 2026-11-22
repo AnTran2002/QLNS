@@ -55,6 +55,7 @@ export const payslipDownloadUrl = (periodId) =>
 /** Ép các trường số (Back-End có chỗ trả DECIMAL dạng chuỗi) về number. */
 const MONEY_FIELDS = [
   "base_salary", "insurance_salary", "allowance", "dependents_count",
+  "previous_base_salary", "previous_insurance_salary", "previous_allowance", "previous_dependents_count",
   "gross_salary", "social_insurance", "tax_deduction", "personal_tax", "net_salary",
   "actual_days", "ot_hours", "standard_days",
   "items_count", "total_gross", "total_net",
@@ -70,7 +71,7 @@ function toNumbers(row) {
 const toNumberList = (rows) => (Array.isArray(rows) ? rows.map(toNumbers) : []);
 
 /** Chỉ gửi các trường mà EmployeeController::validate() nhận. */
-function employeePayload(e) {
+function employeePayload(e, includeContract = true) {
   const payload = {
     employee_code: e.employee_code,
     full_name: e.full_name,
@@ -79,11 +80,13 @@ function employeePayload(e) {
     position: e.position,
     status: e.status,
     joined_at: e.joined_at,
-    base_salary: Number(e.base_salary) || 0,
-    insurance_salary: Number(e.insurance_salary) || 0,
-    allowance: Number(e.allowance) || 0,
-    dependents_count: Number(e.dependents_count) || 0,
   };
+  if (includeContract) {
+    payload.base_salary = Number(e.base_salary) || 0;
+    payload.insurance_salary = Number(e.insurance_salary) || 0;
+    payload.allowance = Number(e.allowance) || 0;
+    payload.dependents_count = Number(e.dependents_count) || 0;
+  }
   if (e.password) payload.password = e.password;
   return payload;
 }
@@ -129,20 +132,23 @@ export const api = {
   employees: () => callApi("employees").then(toNumberList),
   createEmployee: (e) => callApi("employees/create", { method: "POST", data: employeePayload(e) }),
   updateEmployee: (id, e) =>
-    callApi("employees/update", { method: "PUT", params: { id }, data: employeePayload(e) }),
+    callApi("employees/update", { method: "PUT", params: { id }, data: employeePayload(e, false) }),
   deleteEmployee: (id) => callApi("employees/delete", { method: "DELETE", params: { id } }),
 
   // ---- Hợp đồng (ContractController) ----
   contracts: () => callApi("contracts").then(toNumberList),
-  updateContract: (id, c) =>
-    callApi("contracts/update", {
-      method: "PUT",
-      params: { id },
+  salaryAdjustments: (contractId) =>
+    callApi("contracts/adjustments", { params: { contract_id: contractId } }).then(toNumberList),
+  createSalaryAdjustment: (contractId, adjustment) =>
+    callApi("contracts/adjustments", {
+      method: "POST",
+      params: { contract_id: contractId },
       data: {
-        base_salary: Number(c.base_salary) || 0,
-        insurance_salary: Number(c.insurance_salary) || 0,
-        allowance: Number(c.allowance) || 0,
-        dependents_count: Number(c.dependents_count) || 0,
+        base_salary: Number(adjustment.base_salary),
+        insurance_salary: Number(adjustment.insurance_salary),
+        allowance: Number(adjustment.allowance),
+        dependents_count: Number(adjustment.dependents_count),
+        reason: adjustment.reason,
       },
     }).then(toNumbers),
 

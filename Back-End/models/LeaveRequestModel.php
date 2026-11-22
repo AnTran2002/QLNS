@@ -9,7 +9,7 @@ class LeaveRequestModel extends BaseModel
 
     private const SELECT = "SELECT l.id, l.user_id, l.type, l.start_date, l.end_date, l.days, l.reason, l.status,
                                    l.review_note, l.reviewed_at, l.created_at,
-                                   u.employee_code, u.full_name, u.department, u.position, u.avatar,
+                                   u.employee_code, u.full_name, u.department, u.position,
                                    r.full_name AS reviewer_name
                             FROM leave_requests l
                             JOIN users u ON u.id = l.user_id

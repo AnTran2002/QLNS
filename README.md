@@ -8,11 +8,11 @@ QLNS/
 ├── Front-End/          React 19 + Vite 8 + Tailwind v4 + shadcn/ui + Animate UI
 ├── Back-End/           PHP 8 thuần (router ?action=…, PDO), không framework
 │   ├── controllers/    Auth · Employee · Contract · Payroll · Profile · Leave · Home
-│   ├── models/         User · Contract · Payroll · AttendanceRecord · LeaveRequest
-│   ├── services/       PayrollEngine · LeavePolicy · Attendance · Payslip · Xlsx…
-│   └── database/       migrations/001…005, seed_passwords.php
-├── test-backend.php    Kiểm thử PHP thuần (LeavePolicy + PayrollEngine), không cần CSDL
-├── QLNS-Database.sql   Dump đầy đủ database `qlns` (đã gồm migration 004, 005 + lương T1–T10/2026)
+│   ├── models/         User · Contract · SalaryAdjustment · Payroll · AttendanceRecord · LeaveRequest
+│   ├── services/       PayrollEngine · PayrollPeriodPolicy · ContractSalaryAdjustmentPolicy · LeavePolicy · Attendance · Payslip · Xlsx…
+│   └── database/       migrations/001…006, seed_passwords.php
+├── test-backend.php    Kiểm thử PHP thuần (các quy tắc nghỉ phép, kỳ lương và tính lương), không cần CSDL
+├── QLNS-Database.sql   Dump đầy đủ database `qlns` (đã gồm migration 004–006 + lương T1–T10/2026)
 ├── HUONG_DAN_KET_NOI_API.md   Hướng dẫn chi tiết kết nối API
 └── TAI_KHOAN_DANG_NHAP.md     Tài khoản mẫu
 ```
@@ -84,7 +84,7 @@ Kết quả lần chạy gần nhất: **Front-End 26/26 · Back-End 36/36**.
 
 ### 1.6 Chạy trên nhiều máy (Windows + macOS) a
 
-- **Lỗi HTTP 502** khi mở Front-End: Node 18+ phân giải `localhost` thành IPv6 `::1`, còn PHP / XAMPP thường chỉ nghe `127.0.0.1` → proxy của Vite không kết nối được. Đã đổi mặc định sang `http://127.0.0.1:8000`, và `vite.config.js` tự đổi `localhost` trong `BACKEND_URL` thành `127.0.0.1`.
+- Front-End dùng Vite proxy tới `http://localhost:8000` theo mặc định. Nếu đổi địa chỉ backend, cập nhật `BACKEND_URL` trong `Front-End/.env`.
 - `package-lock.json` tạo trên macOS thiếu binary native cho Windows (rolldown, lightningcss, tailwind oxide) → đã đưa mọi lock file vào `.gitignore`; mỗi máy tự `npm install`.
 - `.gitignore` còn bỏ qua cache Vite, `coverage/`, tệp rác của Windows/macOS (`Thumbs.db`, `desktop.ini`, `._*`, `.DS_Store`) và các tệp bí mật (`env.php`, `.env`).
 
@@ -99,6 +99,7 @@ Yêu cầu: Node.js 22.12+ (đã thử 24.11), PHP 8.1+ (đã thử 8.3 của MA
 #    Đã có database cũ? Chạy các migration còn thiếu (phpMyAdmin → tab SQL, hoặc dòng lệnh):
 mysql -u root -p qlns < Back-End/database/migrations/004_avatar_daily_attendance.sql
 mysql -u root -p qlns < Back-End/database/migrations/005_leave_requests.sql
+mysql -u root -p qlns < Back-End/database/migrations/006_contract_salary_adjustments.sql
 #    Thêm dữ liệu lương T1–T9/2026 vào database cũ:
 mysql -u root -p qlns < Back-End/database/seed_additional_demo_data.sql
 
@@ -108,10 +109,10 @@ php Back-End/database/seed_passwords.php                         # đặt mật 
 
 # 3. Front-End (2 cửa sổ terminal)
 cd Front-End && npm install
-npm run backend        # = php -S 127.0.0.1:8000 -t ../Back-End ../Back-End/index.php
+npm run backend        # = php -S localhost:8000 -t ../Back-End ../Back-End/index.php
 npm run dev            # http://127.0.0.1:5173
 #    Dùng XAMPP/MAMP thay cho npm run backend: đặt BACKEND_URL trong Front-End/.env
-#    (xem Front-End/.env.example), luôn dùng 127.0.0.1 thay cho localhost.
+#    (xem Front-End/.env.example) trỏ tới địa chỉ backend đang chạy.
 ```
 
 Tài khoản mẫu: xem [TAI_KHOAN_DANG_NHAP.md](TAI_KHOAN_DANG_NHAP.md). `env.php` và `.env` đã được `.gitignore`, **không đưa lên GitHub**.
