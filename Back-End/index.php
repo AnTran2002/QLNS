@@ -14,7 +14,7 @@ if (!file_exists(__DIR__ . '/configs/env.php')) {
 require_once __DIR__ . '/configs/env.php';
 require_once __DIR__ . '/configs/helper.php';
 
-// CORS — hỗ trợ Front-End khi gọi trực tiếp khác origin
+// CORS — chỉ cho phép các origin Front-End đã cấu hình.
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 $allowedOrigins = [
     defined('FRONTEND_ORIGIN') ? FRONTEND_ORIGIN : 'http://localhost:5173',
@@ -23,16 +23,12 @@ $allowedOrigins = [
     'http://localhost:3000',
     'http://localhost:5174',
 ];
-if ($origin && in_array($origin, $allowedOrigins, true)) {
-    header("Access-Control-Allow-Origin: {$origin}");
-    header('Access-Control-Allow-Credentials: true');
+if ($origin !== '') {
     header('Vary: Origin');
-} else if ($origin) {
-    header("Access-Control-Allow-Origin: {$origin}");
-    header('Access-Control-Allow-Credentials: true');
-    header('Vary: Origin');
-} else {
-    header("Access-Control-Allow-Origin: *");
+    if (in_array($origin, $allowedOrigins, true)) {
+        header("Access-Control-Allow-Origin: {$origin}");
+        header('Access-Control-Allow-Credentials: true');
+    }
 }
 header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
@@ -43,6 +39,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 if (session_status() === PHP_SESSION_NONE) {
+    session_set_cookie_params([
+        'httponly' => true,
+        'secure' => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+        'samesite' => 'Lax',
+    ]);
+    ini_set('session.use_strict_mode', '1');
     session_start();
 }
 
@@ -65,8 +67,8 @@ try {
     require_once __DIR__ . '/routes/index.php';
 } catch (PDOException $e) {
     error_log($e->getMessage());
-    json_response(500, null, 'Lỗi cơ sở dữ liệu: ' . $e->getMessage());
+    json_response(500, null, 'Lỗi cơ sở dữ liệu. Vui lòng thử lại sau.');
 } catch (Throwable $e) {
     error_log($e->getMessage());
-    json_response(500, null, 'Lỗi máy chủ: ' . $e->getMessage());
+    json_response(500, null, 'Lỗi máy chủ. Vui lòng thử lại sau.');
 }

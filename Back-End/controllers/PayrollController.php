@@ -116,7 +116,7 @@ class PayrollController
             return json_response(422, null, $e->getMessage());
         } catch (RuntimeException $e) {
             error_log($e->getMessage());
-            return json_response(500, null, $e->getMessage());
+            return json_response(500, null, 'Không thể xử lý tệp Excel lúc này. Vui lòng thử lại sau.');
         }
 
         $employeeCodes = [];

@@ -5,26 +5,19 @@ class BaseModel
 {
     protected static ?PDO $connection = null;
     protected $table;
-    protected $db;
+    protected PDO $db;
 
     public function __construct()
     {
-        $this->db = null;
-        try {
-            $this->db = new PDO(
+        if (self::$connection === null) {
+            self::$connection = new PDO(
                 "mysql:host=" . DB_HOST . (defined('DB_PORT') && DB_PORT ? ";port=" . DB_PORT : "") . ";dbname=" . DB_NAME . ";charset=utf8mb4",
-                DB_USERNAME, 
-                DB_PASSWORD
+                DB_USERNAME,
+                DB_PASSWORD,
+                defined('DB_OPTIONS') ? DB_OPTIONS : []
             );
-            $this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        } catch(PDOException $exception) {
-            http_response_code(500);
-            echo json_encode([
-                "status" => "error", 
-                "message" => "Lỗi kết nối CSDL: " . $exception->getMessage()
-            ]);
-            exit();
         }
+        $this->db = self::$connection;
     }
 
     public function query(string $sql): PDOStatement

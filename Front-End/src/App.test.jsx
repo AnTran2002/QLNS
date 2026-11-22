@@ -95,7 +95,7 @@ describe("Phân quyền & đăng nhập", () => {
     await user.type(await screen.findByLabelText("Mã nhân viên hoặc email"), "NV001");
     await user.type(screen.getByLabelText("Mật khẩu"), "123456");
     await user.click(screen.getByRole("button", { name: /Đăng nhập/ }));
-    expect(await screen.findByText(/Tổng quan quản trị/)).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /Tổng quan quản trị/ })).toBeInTheDocument();
     expect(api.login).toHaveBeenCalledWith("NV001", "123456");
   });
 

@@ -25,7 +25,8 @@ class ContractController
             $contracts = $this->contractModel->getAllWithUser();
             json_response(200, $contracts, 'Lấy danh sách hợp đồng thành công');
         } catch (Throwable $e) {
-            json_response(500, null, 'Lỗi lấy danh sách hợp đồng: ' . $e->getMessage());
+            error_log($e->getMessage());
+            json_response(500, null, 'Lỗi lấy danh sách hợp đồng. Vui lòng thử lại sau.');
         }
     }
 
@@ -52,7 +53,8 @@ class ContractController
 
             json_response(200, $contract, 'Lấy chi tiết hợp đồng thành công');
         } catch (Throwable $e) {
-            json_response(500, null, 'Lỗi lấy chi tiết hợp đồng: ' . $e->getMessage());
+            error_log($e->getMessage());
+            json_response(500, null, 'Lỗi lấy chi tiết hợp đồng. Vui lòng thử lại sau.');
         }
     }
 
