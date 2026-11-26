@@ -24,8 +24,6 @@ final class LeavePolicy
     public const SENIORITY_STEP_YEARS = 5;
     /** Một đơn tối đa 30 ngày làm việc (dài hơn → nghỉ không lương dài hạn, xử lý ngoài hệ thống). */
     public const MAX_WORKDAYS = 30;
-    /** Nghỉ ốm được khai bù tối đa 30 ngày trước hôm nay; các loại khác phải từ hôm nay trở đi. */
-    public const SICK_BACKDATE_DAYS = 30;
 
     /** Các ngày làm việc (T2–T6) trong [start, end], định dạng Y-m-d. */
     public static function workdays(string $start, string $end): array
@@ -91,11 +89,8 @@ final class LeavePolicy
         if ($from->format('Y') !== $to->format('Y')) {
             return ['Đơn không được kéo dài sang năm khác — hãy tách thành 2 đơn', []];
         }
-        $earliest = $type === 'SICK' ? $today->modify('-' . self::SICK_BACKDATE_DAYS . ' days') : $today;
-        if ($from < $earliest) {
-            return [$type === 'SICK'
-                ? 'Nghỉ ốm chỉ khai bù tối đa ' . self::SICK_BACKDATE_DAYS . ' ngày trước hôm nay'
-                : 'Ngày bắt đầu không được ở quá khứ', []];
+        if ($from < $today) {
+            return ['Ngày bắt đầu không được ở quá khứ', []];
         }
         $days = self::workdays($start, $end);
         if (!$days) {

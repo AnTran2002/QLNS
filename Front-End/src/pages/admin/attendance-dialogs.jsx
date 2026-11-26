@@ -221,7 +221,7 @@ export function CreatePeriodDialog({ open, onOpenChange, periods, onCreated }) {
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Tạo kỳ lương mới</DialogTitle>
-          <DialogDescription>Chọn Tháng/Năm. Kỳ mới ở trạng thái Nháp để bắt đầu nhập ngày công & OT.</DialogDescription>
+          <DialogDescription>Chọn Tháng/Năm. Kỳ mới ở trạng thái Nháp để nhập OT; ngày công lấy từ chấm công từng ngày.</DialogDescription>
         </DialogHeader>
         {open && (
           <CreatePeriodForm
@@ -363,27 +363,28 @@ function ImportForm({ period, onDone, onCancel }) {
             <thead className="bg-muted/60 text-left text-muted-foreground">
               <tr>
                 <th className="px-3 py-2 font-medium">Mã nhân viên</th>
-                <th className="px-3 py-2 font-medium">Ngày công</th>
                 <th className="px-3 py-2 font-medium">Giờ OT</th>
+                <th className="px-3 py-2 font-medium">Lý do riêng của nhân viên</th>
               </tr>
             </thead>
             <tbody className="font-mono tabular-nums">
               <tr className="border-t border-border/60">
                 <td className="px-3 py-1.5">NV002</td>
-                <td className="px-3 py-1.5">22</td>
                 <td className="px-3 py-1.5">4</td>
+                <td className="px-3 py-1.5">Điều chỉnh OT theo xác nhận quản lý</td>
               </tr>
               <tr className="border-t border-border/60">
                 <td className="px-3 py-1.5">NV003</td>
-                <td className="px-3 py-1.5">20.5</td>
                 <td className="px-3 py-1.5">0</td>
+                <td className="px-3 py-1.5">Bổ sung dữ liệu OT đã được phê duyệt</td>
               </tr>
             </tbody>
           </table>
         </div>
         <p className="text-[12px] text-muted-foreground">
-          Tên cột chấp nhận: <span className="font-mono">employee_code / Mã NV</span>, <span className="font-mono">actual_days / Số ngày công</span>,{" "}
-          <span className="font-mono">ot_hours / Số giờ OT</span>. Dòng trùng mã sẽ bị từ chối.
+          Tên cột chấp nhận: <span className="font-mono">employee_code / Mã NV</span> và{" "}
+          <span className="font-mono">ot_hours / Số giờ OT</span>, <span className="font-mono">reason / Lý do</span>.
+          Mỗi dòng cần lý do riêng từ 10 đến 500 ký tự. Ngày công lấy từ chấm công theo ngày. Dòng trùng mã sẽ bị từ chối.
         </p>
       </div>
 
@@ -425,7 +426,7 @@ export function ImportDialog({ open, onOpenChange, period, onDone }) {
         <DialogHeader>
           <DialogTitle>Import file Excel công</DialogTitle>
           <DialogDescription>
-            {period ? `Ghi đè ngày công & giờ OT của ${formatPeriod(period.month_year)} cho các nhân viên có trong file.` : ""}
+            {period ? `Cập nhật giờ OT của ${formatPeriod(period.month_year)} cho các nhân viên có trong file.` : ""}
           </DialogDescription>
         </DialogHeader>
         {open && period && (

@@ -197,7 +197,8 @@ class PayrollModel extends BaseModel {
                 WHERE pi.period_id = :period_id AND pi.user_id = :user_id";
         $stmt = $this->db->prepare($sql);
         $stmt->execute(['period_id' => $periodId, 'user_id' => $userId]);
-        return $stmt->fetch(PDO::FETCH_ASSOC);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
     }
 
     public function getPublishedPayslip(int $periodId, int $userId): ?array
@@ -221,8 +222,15 @@ class PayrollModel extends BaseModel {
         return $row ?: null;
     }
 
-    // Lưu hoặc cập nhật kết quả tính lương real-time vào CSDL
-    public function saveOrUpdate($periodId, $userId, $data) {
+    // Lưu hoặc cập nhật kết quả lương và ghi nhật ký nếu có thay đổi.
+    public function saveOrUpdate(
+        int $periodId,
+        int $userId,
+        array $data,
+        string $reason,
+        int $changedBy
+    ): bool {
+        $previous = $this->getByPeriodAndUser($periodId, $userId);
         $sql = "INSERT INTO payroll_items
                     (period_id, user_id, actual_days, ot_hours, gross_salary, social_insurance, tax_deduction, personal_tax, net_salary)
                 VALUES
@@ -237,7 +245,7 @@ class PayrollModel extends BaseModel {
                     net_salary = VALUES(net_salary)";
 
         $stmt = $this->db->prepare($sql);
-        return $stmt->execute([
+        $saved = $stmt->execute([
             'period_id' => $periodId,
             'user_id' => $userId,
             'actual_days' => $data['actual_days'],
@@ -248,13 +256,36 @@ class PayrollModel extends BaseModel {
             'personal_tax' => $data['personal_tax'],
             'net_salary' => $data['net_salary'],
         ]);
+        if ($saved && $this->hasPayrollChanges($previous, $data)) {
+            $this->insertPayrollChangeLog(
+                $periodId,
+                $userId,
+                $changedBy,
+                $previous ? 'INPUT_UPDATE' : 'INITIAL_CALCULATION',
+                $reason,
+                $previous,
+                $data
+            );
+        }
+        return $saved;
     }
 
-    public function updateCalculation(int $periodId, int $userId, array $calculation): void
+    public function updateCalculation(
+        int $periodId,
+        int $userId,
+        array $calculation,
+        string $reason,
+        int $changedBy
+    ): void
     {
+        $previous = $this->getByPeriodAndUser($periodId, $userId);
+        if (!$previous) {
+            throw new RuntimeException('Không tìm thấy dữ liệu lương để tính lại');
+        }
         $stmt = $this->db->prepare(
             "UPDATE payroll_items
-             SET gross_salary = :gross_salary,
+             SET actual_days = :actual_days,
+                 gross_salary = :gross_salary,
                  social_insurance = :social_insurance,
                  tax_deduction = :tax_deduction,
                  personal_tax = :personal_tax,
@@ -264,15 +295,104 @@ class PayrollModel extends BaseModel {
         $stmt->execute([
             'period_id' => $periodId,
             'user_id' => $userId,
+            'actual_days' => $calculation['actual_days'],
             'gross_salary' => $calculation['gross_salary'],
             'social_insurance' => $calculation['social_insurance'],
             'tax_deduction' => $calculation['tax_deduction'],
             'personal_tax' => $calculation['personal_tax'],
             'net_salary' => $calculation['net_salary'],
         ]);
-        if ($stmt->rowCount() === 0 && !$this->getByPeriodAndUser($periodId, $userId)) {
-            throw new RuntimeException('Không tìm thấy dữ liệu công để cập nhật kết quả lương');
+        if ($this->hasPayrollChanges($previous, $calculation)) {
+            $this->insertPayrollChangeLog(
+                $periodId,
+                $userId,
+                $changedBy,
+                'RECALCULATION',
+                $reason,
+                $previous,
+                $calculation
+            );
         }
+    }
+
+    public function getPayrollChangeHistory(int $periodId, int $userId): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT change_log.id, change_log.period_id, change_log.user_id,
+                    change_log.change_type, change_log.reason, change_log.changed_by, change_log.created_at,
+                    actor.full_name AS changed_by_name,
+                    change_log.previous_actual_days, change_log.actual_days,
+                    change_log.previous_ot_hours, change_log.ot_hours,
+                    change_log.previous_gross_salary, change_log.gross_salary,
+                    change_log.previous_social_insurance, change_log.social_insurance,
+                    change_log.previous_tax_deduction, change_log.tax_deduction,
+                    change_log.previous_personal_tax, change_log.personal_tax,
+                    change_log.previous_net_salary, change_log.net_salary
+             FROM payroll_change_logs change_log
+             LEFT JOIN users actor ON actor.id = change_log.changed_by
+             WHERE change_log.period_id = :period_id AND change_log.user_id = :user_id
+             ORDER BY change_log.created_at DESC, change_log.id DESC"
+        );
+        $stmt->execute(['period_id' => $periodId, 'user_id' => $userId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    private function hasPayrollChanges(?array $previous, array $current): bool
+    {
+        if ($previous === null) {
+            return true;
+        }
+        foreach ([
+            'actual_days', 'ot_hours', 'gross_salary', 'social_insurance',
+            'tax_deduction', 'personal_tax', 'net_salary',
+        ] as $field) {
+            if (abs((float) $previous[$field] - (float) $current[$field]) >= 0.01) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function insertPayrollChangeLog(
+        int $periodId,
+        int $userId,
+        int $changedBy,
+        string $changeType,
+        string $reason,
+        ?array $previous,
+        array $current
+    ): void {
+        $stmt = $this->db->prepare(
+            "INSERT INTO payroll_change_logs (
+                period_id, user_id, changed_by, change_type, reason,
+                previous_actual_days, actual_days, previous_ot_hours, ot_hours,
+                previous_gross_salary, gross_salary, previous_social_insurance, social_insurance,
+                previous_tax_deduction, tax_deduction, previous_personal_tax, personal_tax,
+                previous_net_salary, net_salary
+             ) VALUES (
+                :period_id, :user_id, :changed_by, :change_type, :reason,
+                :previous_actual_days, :actual_days, :previous_ot_hours, :ot_hours,
+                :previous_gross_salary, :gross_salary, :previous_social_insurance, :social_insurance,
+                :previous_tax_deduction, :tax_deduction, :previous_personal_tax, :personal_tax,
+                :previous_net_salary, :net_salary
+             )"
+        );
+        $fields = [
+            'actual_days', 'ot_hours', 'gross_salary', 'social_insurance',
+            'tax_deduction', 'personal_tax', 'net_salary',
+        ];
+        $params = [
+            'period_id' => $periodId,
+            'user_id' => $userId,
+            'changed_by' => $changedBy,
+            'change_type' => $changeType,
+            'reason' => $reason,
+        ];
+        foreach ($fields as $field) {
+            $params['previous_' . $field] = $previous[$field] ?? null;
+            $params[$field] = $current[$field];
+        }
+        $stmt->execute($params);
     }
 
     public function getPeriodById($periodId)

@@ -61,9 +61,33 @@ describe("lib/hr", () => {
       contract: { base_salary: 20_000_000, allowance: 2_000_000 },
       schedule,
       period: { month_year: "2026-11", standard_days: 22 },
+      attendanceRecords: [
+        { work_date: "2026-11-02", status: "PRESENT" },
+        { work_date: "2026-11-03", status: "LATE" },
+        { work_date: "2026-11-04", status: "REMOTE" },
+      ],
       now: new Date(2026, 10, 4, 18, 0), // T4 04/11 sau giờ tan ca
     });
     expect(r).toMatchObject({ monthYear: "2026-11", workedDays: 3, standardDays: 22, dailyRate: 1_000_000, earned: 3_000_000 });
+  });
+
+  it("ước tính lương theo ngày chấm công thực tế, bỏ ngày nghỉ/vắng và ngày chưa kết thúc ca", () => {
+    const schedule = { monday: "08:30 - 17:30", tuesday: "08:30 - 17:30", wednesday: "08:30 - 17:30", thursday: "08:30 - 17:30", friday: "08:30 - 17:30" };
+    const workedDates = ["02", "03", "04", "05", "06", "09", "10", "11", "12", "13", "16", "17", "18"];
+    const attendanceRecords = [
+      ...workedDates.map((day) => ({ work_date: `2026-11-${day}`, status: "PRESENT" })),
+      { work_date: "2026-11-19", status: "LEAVE" },
+      { work_date: "2026-11-20", status: "ABSENT" },
+      { work_date: "2026-11-26", status: "PRESENT" },
+    ];
+    const r = monthToDateEarnings({
+      contract: { base_salary: 20_000_000, allowance: 2_000_000 },
+      schedule,
+      period: { month_year: "2026-11", standard_days: 22 },
+      attendanceRecords,
+      now: new Date(2026, 10, 26, 12, 0),
+    });
+    expect(r).toMatchObject({ workedDays: 13, standardDays: 22, dailyRate: 1_000_000, earned: 13_000_000 });
   });
 });
 

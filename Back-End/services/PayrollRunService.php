@@ -1,6 +1,8 @@
 <?php
 
 require_once __DIR__ . '/PayrollEngine.php';
+require_once __DIR__ . '/PayrollChangePolicy.php';
+require_once __DIR__ . '/../models/AttendanceRecordModel.php';
 
 class PayrollRunException extends RuntimeException
 {
@@ -24,7 +26,7 @@ class PayrollRunService
         $this->payrollModel = $payrollModel ?? new PayrollModel();
     }
 
-    public function run(int $periodId): array
+    public function run(int $periodId, array $reasons, int $changedBy): array
     {
         $this->payrollModel->beginTransaction();
 
@@ -50,6 +52,12 @@ class PayrollRunService
                 throw new PayrollRunException(422, 'Kỳ lương vượt quá giới hạn 10000 nhân viên');
             }
 
+            $attendanceModel = new AttendanceRecordModel();
+            if (!$attendanceModel->tableExists()) {
+                throw new PayrollRunException(409, 'Chưa có bảng chấm công theo ngày — hãy chạy migration 004_avatar_daily_attendance.sql');
+            }
+            $workedDaysByUser = $attendanceModel->workedDaysByUserForMonth($period['month_year']);
+
             $missingAttendance = [];
             $missingContracts = [];
             foreach ($rows as $row) {
@@ -62,13 +70,29 @@ class PayrollRunService
             }
 
             if ($missingAttendance !== []) {
-                throw new PayrollRunException(422, 'Chưa nhập ngày công/OT cho tất cả nhân viên', [
+                throw new PayrollRunException(422, 'Chưa nhập OT cho tất cả nhân viên', [
                     'employee_codes' => $missingAttendance,
                 ]);
             }
             if ($missingContracts !== []) {
                 throw new PayrollRunException(422, 'Nhân viên chưa có hợp đồng lương', [
                     'employee_codes' => $missingContracts,
+                ]);
+            }
+
+            $reasonsByUserId = [];
+            $missingReasons = [];
+            foreach ($rows as $row) {
+                [$reasonError, $reason] = PayrollChangePolicy::validateReason($reasons[$row['user_id']] ?? null);
+                if ($reasonError !== null) {
+                    $missingReasons[] = $row['employee_code'];
+                    continue;
+                }
+                $reasonsByUserId[(int) $row['user_id']] = $reason;
+            }
+            if ($missingReasons !== []) {
+                throw new PayrollRunException(422, 'Cần lý do cụ thể cho từng nhân viên khi chạy lại bảng lương', [
+                    'employee_codes' => $missingReasons,
                 ]);
             }
 
@@ -80,7 +104,7 @@ class PayrollRunService
                 'net_salary' => 0.0,
             ];
             foreach ($rows as $row) {
-                $actualDays = (float) $row['actual_days'];
+                $actualDays = $workedDaysByUser[(int) $row['user_id']] ?? 0;
                 $otHours = (float) $row['ot_hours'];
                 if (!is_finite($actualDays) || $actualDays < 0 || $actualDays > $daysInMonth) {
                     throw new PayrollRunException(422, 'Ngày công không hợp lệ trong dữ liệu kỳ lương', [
@@ -105,7 +129,13 @@ class PayrollRunService
                     (int) substr($period['month_year'], 0, 4)
                 );
 
-                $this->payrollModel->updateCalculation($periodId, (int) $row['user_id'], $calculation);
+                $this->payrollModel->updateCalculation(
+                    $periodId,
+                    (int) $row['user_id'],
+                    $calculation,
+                    $reasonsByUserId[(int) $row['user_id']],
+                    $changedBy
+                );
                 foreach (array_keys($totals) as $field) {
                     $totals[$field] += $calculation[$field];
                 }

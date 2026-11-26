@@ -19,6 +19,7 @@ export function groupByDepartment(employees = []) {
 }
 
 const SCHEDULE_KEYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+const WORKED_ATTENDANCE_STATUSES = new Set(["PRESENT", "LATE", "REMOTE"]);
 
 /** "08:30 - 17:30" → { end: 17*60+30 } (phút trong ngày); null nếu là ngày nghỉ */
 function parseShift(value) {
@@ -29,30 +30,39 @@ function parseShift(value) {
 }
 
 /**
- * Lương tạm tính của tháng hiện tại theo số ngày đã làm (tính đến thời điểm `now`).
- * Một ngày làm việc được tính là "đã làm" khi đã qua giờ kết thúc ca theo lịch.
+ * Lương tạm tính của tháng hiện tại theo ngày chấm công thực tế (tính đến thời điểm `now`).
  * Công thức khớp PayrollEngine: (lương cơ bản / công chuẩn) × ngày công; phụ cấp chia theo cùng tỉ lệ.
  */
-export function monthToDateEarnings({ contract, schedule = {}, period, joinedAt, now = new Date() }) {
+export function monthToDateEarnings({ contract, schedule = {}, period, attendanceRecords = [], joinedAt, now = new Date() }) {
   const year = now.getFullYear();
   const month = now.getMonth();
   const monthYear = `${year}-${String(month + 1).padStart(2, "0")}`;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const minutesNow = now.getHours() * 60 + now.getMinutes();
-
-  const joined = joinedAt ? new Date(`${String(joinedAt).slice(0, 10)}T00:00:00`) : null;
+  const today = `${monthYear}-${String(now.getDate()).padStart(2, "0")}`;
+  const joined = joinedAt ? String(joinedAt).slice(0, 10) : null;
 
   let workDaysInMonth = 0;
-  let workedDays = 0;
   for (let d = 1; d <= daysInMonth; d++) {
     const date = new Date(year, month, d);
     const shift = parseShift(schedule[SCHEDULE_KEYS[date.getDay()]]);
     if (!shift) continue;
     workDaysInMonth += 1;
-    if (joined && date < joined) continue;
-    if (d < now.getDate() || (d === now.getDate() && minutesNow >= shift.end)) workedDays += 1;
   }
 
+  const todayShift = parseShift(schedule[SCHEDULE_KEYS[now.getDay()]]);
+  const workedDates = new Set();
+  for (const record of attendanceRecords) {
+    if (!WORKED_ATTENDANCE_STATUSES.has(record?.status)) continue;
+    const workDate = String(record.work_date ?? "").slice(0, 10);
+    if (!workDate.startsWith(`${monthYear}-`) || workDate > today || (joined && workDate < joined)) continue;
+    if (workDate === today) {
+      const shiftComplete = todayShift ? minutesNow >= todayShift.end : Boolean(record.check_out);
+      if (!shiftComplete) continue;
+    }
+    workedDates.add(workDate);
+  }
+  const workedDays = workedDates.size;
   const standardDays = period?.month_year === monthYear && Number(period.standard_days) > 0 ? Number(period.standard_days) : workDaysInMonth;
   const base = Number(contract?.base_salary) || 0;
   const allowance = Number(contract?.allowance) || 0;

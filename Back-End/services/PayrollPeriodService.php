@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/PayrollEngine.php';
+require_once __DIR__ . '/../models/AttendanceRecordModel.php';
 
 class PayrollPeriodException extends RuntimeException
 {
@@ -45,6 +46,12 @@ class PayrollPeriodService
                 throw new PayrollPeriodException(422, 'Kỳ lương vượt quá giới hạn 10000 nhân viên');
             }
 
+            $attendanceModel = new AttendanceRecordModel();
+            if (!$attendanceModel->tableExists()) {
+                throw new PayrollPeriodException(409, 'Chưa có bảng chấm công theo ngày — hãy chạy migration 004_avatar_daily_attendance.sql');
+            }
+            $workedDaysByUser = $attendanceModel->workedDaysByUserForMonth($period['month_year']);
+
             $standardDays = (int) $period['standard_days'];
             if ($standardDays < 1 || $standardDays > 31) {
                 throw new PayrollPeriodException(422, 'Kỳ lương có số ngày công chuẩn không hợp lệ');
@@ -53,6 +60,7 @@ class PayrollPeriodService
             $missingAttendance = [];
             $missingContracts = [];
             $staleCalculations = [];
+            $staleAttendance = [];
             foreach ($rows as $row) {
                 if ($row['payroll_item_id'] === null) {
                     $missingAttendance[] = $row['employee_code'];
@@ -63,6 +71,10 @@ class PayrollPeriodService
                 }
 
                 $actualDays = (float) $row['actual_days'];
+                $currentActualDays = $workedDaysByUser[(int) $row['user_id']] ?? 0;
+                if ($actualDays !== (float) $currentActualDays) {
+                    $staleAttendance[] = $row['employee_code'];
+                }
                 $otHours = (float) $row['ot_hours'];
                 if (!is_finite($actualDays) || $actualDays < 0 || $actualDays > $daysInMonth
                     || !is_finite($otHours) || $otHours < 0 || $otHours > $daysInMonth * 24
@@ -92,13 +104,18 @@ class PayrollPeriodService
             }
 
             if ($missingAttendance !== []) {
-                throw new PayrollPeriodException(422, 'Không thể khóa kỳ khi còn thiếu ngày công/OT', [
+                throw new PayrollPeriodException(422, 'Không thể khóa kỳ khi còn thiếu OT', [
                     'employee_codes' => $missingAttendance,
                 ]);
             }
             if ($missingContracts !== []) {
                 throw new PayrollPeriodException(422, 'Không thể khóa kỳ khi nhân viên thiếu hợp đồng lương', [
                     'employee_codes' => $missingContracts,
+                ]);
+            }
+            if ($staleAttendance !== []) {
+                throw new PayrollPeriodException(409, 'Chấm công theo ngày đã thay đổi — hãy chạy lại bảng lương trước khi khóa sổ', [
+                    'employee_codes' => array_values(array_unique($staleAttendance)),
                 ]);
             }
             if ($staleCalculations !== []) {

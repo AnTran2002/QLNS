@@ -97,6 +97,7 @@ match ($action) {
     'payroll/periods'    => (new PayrollController)->periods(),
     'payroll/items'      => (new PayrollController)->items(),
     'payroll/attendance' => (new PayrollController)->attendance(),
+    'payroll/changes'    => (new PayrollController)->changes(),
     'payroll/import'     => (new PayrollController)->importAttendance(),
     'payroll/calculate'  => (new PayrollController)->calculateAndSave(),
     'payroll/run'        => (new PayrollController)->run(),

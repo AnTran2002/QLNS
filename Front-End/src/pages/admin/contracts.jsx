@@ -61,7 +61,7 @@ function SalaryAdjustmentForm({ contract, onOpenChange }) {
       if (!Number.isFinite(n) || n < 0) return setError(`${label} phải là số không âm`);
     }
     if (!Number.isInteger(Number(form.dependents_count))) return setError("Số người phụ thuộc phải là số nguyên");
-    if (reason.trim().length < 3 || reason.trim().length > 500) return setError("Lý do cần từ 3 đến 500 ký tự");
+    if (reason.trim().length < 10 || reason.trim().length > 500) return setError("Lý do cần cụ thể, từ 10 đến 500 ký tự");
     if (!FIELDS.some(([key]) => Number(form[key]) !== Number(contract[key]))) {
       return setError("Cần thay đổi ít nhất một thông số lương");
     }
@@ -108,7 +108,7 @@ function SalaryAdjustmentForm({ contract, onOpenChange }) {
             setReason(e.target.value);
           }}
           maxLength={500}
-          placeholder="Nhập lý do thay đổi lương (bắt buộc)"
+          placeholder="Mô tả căn cứ thay đổi cụ thể (10–500 ký tự)"
           disabled={alreadyScheduled}
         />
       </div>

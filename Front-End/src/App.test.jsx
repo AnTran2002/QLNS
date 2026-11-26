@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router";
@@ -115,35 +115,81 @@ const ATT_ROW = {
 };
 
 describe("Chấm công & OT", () => {
-  it("sửa công trên Grid → lưu gửi đúng entries", async () => {
+  it("ngày công chỉ đọc, sửa OT trên Grid → lưu gửi đúng entries", async () => {
     api.me.mockResolvedValue({ user: ADMIN });
     const period = { id: 2, month_year: "2026-11", standard_days: 22, status: "DRAFT" };
-    api.payrollAttendance.mockResolvedValue({ period, items: [ATT_ROW] });
+    api.payrollAttendance.mockResolvedValue({ period, items: [{ ...ATT_ROW, actual_days: 13 }] });
     api.saveAttendance.mockResolvedValue({
       period, updated_count: 1,
-      items: [{ ...ATT_ROW, payroll_item_id: 9, actual_days: 21, ot_hours: 4, gross_salary: 20000000, net_salary: 18000000 }],
+      items: [{ ...ATT_ROW, payroll_item_id: 9, actual_days: 13, ot_hours: 4, gross_salary: 20000000, net_salary: 18000000 }],
     });
     renderApp("/admin/cham-cong?ky=2");
     const user = userEvent.setup();
     expect(await screen.findByRole("heading", { name: "Chấm công & OT" })).toBeInTheDocument();
     const days = await screen.findByLabelText("Ngày công của Trần Thị Bình");
-    await user.type(days, "21");
+    expect(days.tagName).not.toBe("INPUT");
+    expect(days).toHaveTextContent("13");
     await user.type(screen.getByLabelText("Giờ OT của Trần Thị Bình"), "4");
     expect(screen.getByText(/thay đổi chưa lưu/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /Lưu thay đổi/ }));
-    await waitFor(() => expect(api.saveAttendance).toHaveBeenCalledWith(2, [{ user_id: 2, actual_days: 21, ot_hours: 4 }]));
+    expect(api.saveAttendance).not.toHaveBeenCalled();
+    await user.type(screen.getByLabelText("Lý do thay đổi lương của Trần Thị Bình"), "Điều chỉnh OT theo xác nhận quản lý");
+    await user.click(screen.getByRole("button", { name: /Lưu thay đổi/ }));
+    await waitFor(() => expect(api.saveAttendance).toHaveBeenCalledWith(2, [{
+      user_id: 2,
+      ot_hours: 4,
+      reason: "Điều chỉnh OT theo xác nhận quản lý",
+    }]));
     expect(await screen.findByText("18.000.000 ₫")).toBeInTheDocument();
   });
 
-  it("chặn ngày công vượt số ngày trong tháng", async () => {
+  it("không cung cấp ô sửa ngày công cho admin", async () => {
     api.me.mockResolvedValue({ user: ADMIN });
-    api.payrollAttendance.mockResolvedValue({ period: { id: 2, month_year: "2026-11", standard_days: 22, status: "DRAFT" }, items: [ATT_ROW] });
+    api.payrollAttendance.mockResolvedValue({
+      period: { id: 2, month_year: "2026-11", standard_days: 22, status: "DRAFT" },
+      items: [{ ...ATT_ROW, actual_days: 13 }],
+    });
     renderApp("/admin/cham-cong");
-    const user = userEvent.setup();
-    await user.type(await screen.findByLabelText("Ngày công của Trần Thị Bình"), "45");
-    await user.click(screen.getByRole("button", { name: /Lưu thay đổi/ }));
+    const days = await screen.findByLabelText("Ngày công của Trần Thị Bình");
+    expect(days.tagName).not.toBe("INPUT");
+    expect(days).toHaveTextContent("13");
     expect(api.saveAttendance).not.toHaveBeenCalled();
-    expect(screen.getByLabelText("Ngày công của Trần Thị Bình")).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("admin có thể xem lý do và giá trị trước/sau trong lịch sử lương", async () => {
+    api.me.mockResolvedValue({ user: ADMIN });
+    const period = { id: 2, month_year: "2026-11", standard_days: 22, status: "DRAFT" };
+    api.payrollAttendance.mockResolvedValue({
+      period,
+      items: [{ ...ATT_ROW, payroll_item_id: 9, actual_days: 13, ot_hours: 4, gross_salary: 20000000 }],
+    });
+    api.payrollChanges.mockResolvedValue([{
+      id: 1,
+      change_type: "INPUT_UPDATE",
+      changed_by_name: ADMIN.full_name,
+      created_at: "2026-11-20 09:00:00",
+      reason: "Điều chỉnh OT theo xác nhận quản lý",
+      previous_actual_days: 12,
+      actual_days: 13,
+      previous_ot_hours: 2,
+      ot_hours: 4,
+      previous_gross_salary: 19000000,
+      gross_salary: 20000000,
+      previous_social_insurance: 1575000,
+      social_insurance: 1575000,
+      previous_tax_deduction: 21700000,
+      tax_deduction: 21700000,
+      previous_personal_tax: 0,
+      personal_tax: 0,
+      previous_net_salary: 17425000,
+      net_salary: 18425000,
+    }]);
+    renderApp("/admin/cham-cong?ky=2");
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Xem lịch sử lương của Trần Thị Bình" }));
+    expect(await screen.findByText("Điều chỉnh OT theo xác nhận quản lý")).toBeInTheDocument();
+    expect(screen.getByText("12 → 13")).toBeInTheDocument();
+    expect(api.payrollChanges).toHaveBeenCalledWith(2, 2);
   });
 });
 
@@ -212,6 +258,23 @@ describe("Nghỉ phép", () => {
     await waitFor(() => expect(api.cancelLeave).toHaveBeenCalledWith(7));
   });
 
+  it("chặn tạo đơn nghỉ bắt đầu từ ngày quá khứ", async () => {
+    api.me.mockResolvedValue({ user: EMPLOYEE });
+    renderApp("/nhan-vien/nghi-phep");
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Tạo đơn nghỉ" }));
+
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayKey = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, "0")}-${String(yesterday.getDate()).padStart(2, "0")}`;
+    fireEvent.change(screen.getByLabelText("Từ ngày"), { target: { value: yesterdayKey } });
+    fireEvent.change(screen.getByLabelText("Đến ngày"), { target: { value: yesterdayKey } });
+    await user.click(screen.getByRole("button", { name: "Gửi đơn" }));
+
+    expect(await screen.findByText("Ngày bắt đầu không được ở quá khứ")).toBeInTheDocument();
+    expect(api.createLeave).not.toHaveBeenCalled();
+  });
+
   it("chưa chạy migration 005 → hiện hướng dẫn", async () => {
     api.me.mockResolvedValue({ user: EMPLOYEE });
     api.myLeave.mockResolvedValue({ available: false, balance: null, requests: [] });
@@ -271,7 +334,7 @@ describe("Điều chỉnh lương", () => {
     await user.type(screen.getByLabelText("Lương cơ bản (₫)"), "26000000");
     await user.click(screen.getByRole("button", { name: "Ghi nhận điều chỉnh" }));
 
-    expect(await screen.findByText("Lý do cần từ 3 đến 500 ký tự")).toBeInTheDocument();
+    expect(await screen.findByText("Lý do cần cụ thể, từ 10 đến 500 ký tự")).toBeInTheDocument();
     expect(api.createSalaryAdjustment).not.toHaveBeenCalled();
 
     await user.type(screen.getByLabelText("Lý do điều chỉnh"), "Điều chỉnh theo quyết định");

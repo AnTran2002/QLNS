@@ -166,17 +166,17 @@ class XlsxAttendanceReader
             }
 
             $employeeCode = trim((string) ($cells[$columnIndexes['employee_code']] ?? ''));
-            $actualDays = trim((string) ($cells[$columnIndexes['actual_days']] ?? ''));
             $otHours = trim((string) ($cells[$columnIndexes['ot_hours']] ?? ''));
-            if ($employeeCode === '' && $actualDays === '' && $otHours === '') {
+            $reason = trim((string) ($cells[$columnIndexes['reason']] ?? ''));
+            if ($employeeCode === '' && $otHours === '' && $reason === '') {
                 continue;
             }
 
             $records[] = [
                 'row_number' => (int) $row->getAttribute('r'),
                 'employee_code' => $employeeCode,
-                'actual_days' => $actualDays,
                 'ot_hours' => $otHours,
+                'reason' => $reason,
             ];
         }
 
@@ -184,7 +184,7 @@ class XlsxAttendanceReader
             throw new UnexpectedValueException('File Excel không có dòng tiêu đề');
         }
         if ($records === []) {
-            throw new UnexpectedValueException('File Excel không có dữ liệu ngày công');
+            throw new UnexpectedValueException('File Excel không có dữ liệu OT');
         }
         return $records;
     }
@@ -193,8 +193,8 @@ class XlsxAttendanceReader
     {
         $aliases = [
             'employee_code' => ['employee_code', 'mã nhân viên', 'mã nv'],
-            'actual_days' => ['actual_days', 'ngày công', 'số ngày công'],
             'ot_hours' => ['ot_hours', 'giờ ot', 'số giờ ot', 'ot giờ'],
+            'reason' => ['reason', 'lý do', 'lý do điều chỉnh'],
         ];
         $indexes = [];
 
@@ -213,7 +213,7 @@ class XlsxAttendanceReader
         foreach (array_keys($aliases) as $field) {
             if (!isset($indexes[$field])) {
                 throw new UnexpectedValueException(
-                    'File Excel phải có đủ cột employee_code, actual_days, ot_hours (Mã nhân viên, Ngày công, Giờ OT)'
+                    'File Excel phải có đủ cột employee_code, ot_hours, reason (Mã nhân viên, Giờ OT, Lý do)'
                 );
             }
         }

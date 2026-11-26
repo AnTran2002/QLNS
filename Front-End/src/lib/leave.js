@@ -2,7 +2,7 @@
 
 export const LEAVE_TYPES = {
   ANNUAL: { label: "Phép năm", hint: "Trừ vào quỹ 12 ngày/năm (Điều 113 BLLĐ 2019)" },
-  SICK: { label: "Nghỉ ốm", hint: "BHXH chi trả, không trừ phép năm · khai bù tối đa 30 ngày" },
+  SICK: { label: "Nghỉ ốm", hint: "BHXH chi trả, không trừ phép năm" },
   UNPAID: { label: "Nghỉ không lương", hint: "Không trừ phép năm, không tính lương những ngày nghỉ" },
   OTHER: { label: "Việc riêng có lương", hint: "Kết hôn, tang… theo Điều 115 BLLĐ 2019" },
 };

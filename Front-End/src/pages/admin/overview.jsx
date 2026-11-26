@@ -487,7 +487,7 @@ export default function AdminOverview() {
         </Reveal>
         <Reveal delay={180} offset={14} className="h-full">
           <KpiCard
-            label={openPeriod ? `Nhập công · ${formatPeriod(openPeriod.month_year)}` : "Tiến độ nhập công"}
+            label={openPeriod ? `Nhập OT · ${formatPeriod(openPeriod.month_year)}` : "Tiến độ nhập OT"}
             icon={CalendarClock}
             value={
               <span>
@@ -499,7 +499,7 @@ export default function AdminOverview() {
             hint={
               openPeriod ? (
                 <Link to={`/admin/cham-cong?ky=${openPeriod.id}`} className="inline-flex items-center gap-1 text-primary hover:underline">
-                  {openEntered >= stats.total ? "Đã nhập đủ — xem lưới công" : "Tiếp tục nhập công"} <ArrowRight className="size-3.5" />
+                  {openEntered >= stats.total ? "Đã nhập đủ OT — xem kỳ lương" : "Tiếp tục nhập OT"} <ArrowRight className="size-3.5" />
                 </Link>
               ) : (
                 <Link to="/admin/cham-cong" className="inline-flex items-center gap-1 text-primary hover:underline">
@@ -508,7 +508,7 @@ export default function AdminOverview() {
               )
             }
           >
-            <Meter value={openProgress} label="Tiến độ nhập công" />
+            <Meter value={openProgress} label="Tiến độ nhập OT" />
           </KpiCard>
         </Reveal>
       </section>

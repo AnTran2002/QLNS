@@ -56,6 +56,7 @@ function LeaveForm({ balance, onDone }) {
     e.preventDefault();
     if (!form.start_date || !form.end_date) return setError("Hãy chọn ngày bắt đầu và kết thúc");
     if (form.end_date < form.start_date) return setError("Ngày kết thúc phải sau hoặc trùng ngày bắt đầu");
+    if (form.start_date < today) return setError("Ngày bắt đầu không được ở quá khứ");
     if (count === 0) return setError("Khoảng thời gian đã chọn không có ngày làm việc nào (T2–T6)");
     if (after !== null && after < 0) return setError(`Vượt quỹ phép năm: còn ${days(balance.remaining)}, đơn này cần ${days(count)}`);
     if (form.reason.trim().length < 3) return setError("Hãy ghi lý do (ít nhất 3 ký tự)");
@@ -84,7 +85,7 @@ function LeaveForm({ balance, onDone }) {
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="leave-start">Từ ngày</Label>
-          <Input id="leave-start" type="date" value={form.start_date} onChange={set("start_date")} />
+          <Input id="leave-start" type="date" min={today} value={form.start_date} onChange={set("start_date")} />
         </div>
         <div className="space-y-2">
           <Label htmlFor="leave-end">Đến ngày</Label>
@@ -258,7 +259,7 @@ export default function EmployeeLeavePage() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Tạo đơn nghỉ</DialogTitle>
-            <DialogDescription>Chỉ tính ngày làm việc T2–T6. Đơn sẽ được gửi tới quản trị để duyệt.</DialogDescription>
+            <DialogDescription>Ngày bắt đầu phải từ hôm nay trở đi. Chỉ tính ngày làm việc T2–T6; đơn sẽ được gửi tới quản trị để duyệt.</DialogDescription>
           </DialogHeader>
           {creating && balance && <LeaveForm balance={balance} onDone={() => setCreating(false)} />}
         </DialogContent>

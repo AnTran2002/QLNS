@@ -9,6 +9,7 @@ import { Progress } from "@/components/animate-ui/components/radix/progress";
 import { AutoHeight } from "@/components/animate-ui/primitives/effects/auto-height";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState, ErrorState, FormError, LoadingState, PageHeader, PeriodStatusBadge, PersonAvatar } from "@/components/app/kit";
@@ -19,13 +20,18 @@ import { formatMoney, formatNumber, formatPeriod } from "@/lib/format";
 
 function CalculateForm({ employee, period, item, onClose }) {
   const queryClient = useQueryClient();
-  const [actualDays, setActualDays] = useState(item?.actual_days ?? period.standard_days);
   const [otHours, setOtHours] = useState(item?.ot_hours ?? 0);
+  const [reason, setReason] = useState("");
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
+  const attendanceQuery = useQuery({
+    queryKey: ["payroll", "attendance", period.id],
+    queryFn: () => api.payrollAttendance(period.id),
+  });
+  const actualDays = attendanceQuery.data?.items?.find((row) => row.user_id === employee.id)?.actual_days ?? item?.actual_days ?? 0;
 
   const mutation = useMutation({
-    mutationFn: () => api.calculatePayroll({ user_id: employee.id, period_id: period.id, actual_days: actualDays, ot_hours: otHours }),
+    mutationFn: () => api.calculatePayroll({ user_id: employee.id, period_id: period.id, ot_hours: otHours, reason: reason.trim() }),
     onSuccess: (data) => {
       setResult(data.calculation);
       queryClient.invalidateQueries({ queryKey: ["payroll"] });
@@ -36,10 +42,9 @@ function CalculateForm({ employee, period, item, onClose }) {
 
   const submit = (e) => {
     e.preventDefault();
-    const d = Number(actualDays);
     const ot = Number(otHours);
-    if (!Number.isFinite(d) || d < 0) return setError("Ngày công phải là số không âm");
     if (!Number.isFinite(ot) || ot < 0) return setError("Giờ OT phải là số không âm");
+    if (reason.trim().length < 10 || reason.trim().length > 500) return setError("Lý do cần cụ thể, từ 10 đến 500 ký tự");
     setError("");
     mutation.mutate();
   };
@@ -77,8 +82,8 @@ function CalculateForm({ employee, period, item, onClose }) {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="actual_days">Ngày công thực tế</Label>
-                <Input id="actual_days" type="number" min="0" step="0.5" value={actualDays} onChange={(e) => setActualDays(e.target.value)} className="tabular" />
-                <p className="text-[12px] text-muted-foreground">Công chuẩn kỳ này: {period.standard_days} ngày</p>
+                <p id="actual_days" className="rounded-lg border border-input bg-muted/50 px-3 py-2 text-right tabular-nums">{formatNumber(actualDays)} ngày</p>
+                <p className="text-[12px] text-muted-foreground">Tự tính từ chấm công từng ngày · Công chuẩn: {period.standard_days} ngày</p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="ot_hours">Giờ làm thêm (OT)</Label>
@@ -99,10 +104,22 @@ function CalculateForm({ employee, period, item, onClose }) {
                 </div>
               ))}
             </dl>
-            <FormError message={error} />
+            <div className="space-y-2">
+              <Label htmlFor="payroll-change-reason">Lý do tính/cập nhật lương</Label>
+              <Textarea
+                id="payroll-change-reason"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                maxLength={500}
+                rows={3}
+                placeholder="Ghi rõ căn cứ điều chỉnh hoặc tính lương (10–500 ký tự)"
+                aria-invalid={Boolean(error) || undefined}
+              />
+            </div>
+            <FormError message={error || attendanceQuery.error?.message} />
             <DialogFooter>
               <Button type="button" variant="secondary" onClick={onClose}>Huỷ</Button>
-              <Button type="submit" disabled={mutation.isPending}>
+              <Button type="submit" disabled={mutation.isPending || attendanceQuery.isPending || Boolean(attendanceQuery.error)}>
                 {mutation.isPending ? <Loader2 className="animate-spin" /> : <Calculator />} Tính & lưu
               </Button>
             </DialogFooter>
@@ -168,7 +185,7 @@ export default function PayrollPage() {
       <PageHeader
         eyebrow="Tiền lương"
         title="Bảng lương"
-        description="Nhập ngày công và giờ OT — hệ thống tính Gross → Net theo quy định thuế của năm tính lương và lưu vào kỳ lương."
+        description="Ngày công lấy từ chấm công từng ngày; nhập giờ OT để hệ thống tính Gross → Net theo quy định thuế của năm tính lương."
         actions={
           <>
             {periods.length > 0 && (
@@ -191,7 +208,7 @@ export default function PayrollPage() {
       ) : periodsQuery.isPending || employeesQuery.isPending ? (
         <LoadingState rows={4} />
       ) : !period ? (
-        <EmptyState icon={Wallet} title="Chưa có kỳ lương" description="Vào mục Chấm công & OT để tạo kỳ lương mới (Tháng/Năm) và nhập ngày công." />
+        <EmptyState icon={Wallet} title="Chưa có kỳ lương" description="Vào mục Chấm công & OT để tạo kỳ lương mới (Tháng/Năm) và nhập OT." />
       ) : (
         <>
           <Reveal delay={80}>

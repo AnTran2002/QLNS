@@ -9,6 +9,7 @@ import {
   CircleDashed,
   Clock,
   FileSpreadsheet,
+  History,
   Loader2,
   Lock,
   Pencil,
@@ -16,7 +17,6 @@ import {
   Save,
   Sigma,
   Wallet,
-  Wand2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/animate-ui/components/buttons/button";
@@ -25,7 +25,9 @@ import { Reveal } from "@/components/app/motion";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/animate-ui/components/radix/dialog";
 import { api } from "@/lib/api";
 import { formatMoney, formatMoneyShort, formatNumber, formatPeriod } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -34,12 +36,11 @@ import { CreatePeriodDialog, daysInMonthOf, ImportDialog } from "./attendance-di
 /*
  * Chấm công & OT (Admin / Kế toán C&B)
  *   <<use>>    Tạo Kỳ lương mới (Tháng/Năm)         → CreatePeriodDialog
- *   <<use>>    Nhập liệu Ngày công & OT             → AttendanceGrid
+ *   <<use>>    Chấm công theo ngày + nhập OT        → AttendanceGrid
  *   <<extend>> Import file Excel công (.xlsx)       → ImportDialog
- *   <<extend>> Chỉnh sửa công thủ công trên Grid    → ô nhập trong AttendanceGrid + Lưu thay đổi
  */
 
-const FIELDS = ["actual_days", "ot_hours"];
+const FIELDS = ["ot_hours"];
 const toInput = (v) => (v === null || v === undefined ? "" : String(v));
 const parseNum = (s) => Number(String(s).trim().replace(",", "."));
 
@@ -50,7 +51,7 @@ function Stepper({ period, entered, eligible }) {
   const steps = [
     { title: "Tạo kỳ lương", desc: formatPeriod(period.month_year), done: true },
     {
-      title: "Nhập ngày công & OT",
+      title: "Nhập OT",
       desc: `${entered}/${eligible} nhân viên`,
       done: eligible > 0 && entered >= eligible,
       current: !closed,
@@ -147,17 +148,84 @@ function RowState({ row, dirty, error }) {
   return <Badge variant="warning"><CircleDashed /> Chưa nhập</Badge>;
 }
 
+function PayrollHistoryDialog({ period, row, onClose }) {
+  const historyQuery = useQuery({
+    queryKey: ["payroll", "changes", period.id, row.user_id],
+    queryFn: () => api.payrollChanges(period.id, row.user_id),
+  });
+  const history = historyQuery.data ?? [];
+  const amount = (value) => value === null || value === undefined ? "—" : formatMoney(value);
+  const number = (value) => value === null || value === undefined ? "—" : formatNumber(value);
+  const dateTime = (value) => new Date(String(value).replace(" ", "T")).toLocaleString("vi-VN");
+  const labels = {
+    INITIAL_CALCULATION: "Tính lương lần đầu",
+    INPUT_UPDATE: "Cập nhật OT",
+    RECALCULATION: "Tính lại lương",
+  };
+  const valuePairs = [
+    ["Ngày công", "previous_actual_days", "actual_days", number],
+    ["Giờ OT", "previous_ot_hours", "ot_hours", number],
+    ["Gross", "previous_gross_salary", "gross_salary", amount],
+    ["BHXH", "previous_social_insurance", "social_insurance", amount],
+    ["Giảm trừ", "previous_tax_deduction", "tax_deduction", amount],
+    ["Thuế TNCN", "previous_personal_tax", "personal_tax", amount],
+    ["Net", "previous_net_salary", "net_salary", amount],
+  ];
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[92svh] overflow-y-auto sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Lịch sử thay đổi lương</DialogTitle>
+          <DialogDescription>{row.full_name} · {row.employee_code} · {formatPeriod(period.month_year)}</DialogDescription>
+        </DialogHeader>
+        {historyQuery.isPending ? (
+          <LoadingState rows={2} />
+        ) : historyQuery.error ? (
+          <ErrorState error={historyQuery.error} onRetry={() => historyQuery.refetch()} />
+        ) : history.length === 0 ? (
+          <p className="py-6 text-center text-[13px] text-muted-foreground">Chưa có nhật ký thay đổi cho kỳ lương này.</p>
+        ) : (
+          <ol className="grid gap-3">
+            {history.map((entry) => (
+              <li key={entry.id} className="grid gap-3 rounded-xl border border-border/70 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="font-medium">{labels[entry.change_type] ?? "Thay đổi lương"}</p>
+                    <p className="text-[12px] text-muted-foreground">
+                      {entry.changed_by_name || "Người thao tác không còn trong hệ thống"} · {dateTime(entry.created_at)}
+                    </p>
+                  </div>
+                </div>
+                <p className="whitespace-pre-wrap rounded-lg bg-muted/60 px-3 py-2 text-[13px]">{entry.reason}</p>
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
+                  {valuePairs.map(([label, beforeKey, afterKey, format]) => (
+                    <div key={label}>
+                      <dt className="text-[11px] text-muted-foreground">{label}</dt>
+                      <dd className="text-[12px] tabular-nums">{format(entry[beforeKey])} → {format(entry[afterKey])}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </li>
+            ))}
+          </ol>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function AttendanceGrid({ period, rows, onDirtyChange }) {
   const queryClient = useQueryClient();
   const editable = period.status === "DRAFT";
-  const maxDays = daysInMonthOf(period.month_year);
-  const maxOt = maxDays * 24;
+  const maxOt = daysInMonthOf(period.month_year) * 24;
 
   const [drafts, setDrafts] = useState({});
   const [serverErrors, setServerErrors] = useState({});
   const [query, setQuery] = useState("");
   const [department, setDepartment] = useState("all");
   const [filter, setFilter] = useState("all");
+  const [historyRow, setHistoryRow] = useState(null);
 
   const original = useCallback(
     (row, field) => (row.payroll_item_id ? toInput(row[field]) : ""),
@@ -175,18 +243,15 @@ function AttendanceGrid({ period, rows, onDirtyChange }) {
   const validate = useCallback(
     (row) => {
       if (!isDirty(row)) return null;
-      const days = valueOf(row, "actual_days");
       const ot = valueOf(row, "ot_hours");
-      if (days === "") return "Nhập số ngày công";
-      const d = parseNum(days);
-      if (!Number.isFinite(d) || d < 0) return "Ngày công phải là số không âm";
-      if (d > maxDays) return `Ngày công tối đa ${maxDays}`;
       const o = ot === "" ? 0 : parseNum(ot);
       if (!Number.isFinite(o) || o < 0) return "Giờ OT phải là số không âm";
       if (o > maxOt) return `Giờ OT tối đa ${maxOt}`;
+      const reason = String(drafts[row.user_id]?.reason ?? "").trim();
+      if (reason.length < 10 || reason.length > 500) return "Lý do cần cụ thể, từ 10 đến 500 ký tự";
       return null;
     },
-    [isDirty, valueOf, maxDays, maxOt],
+    [isDirty, valueOf, maxOt, drafts],
   );
 
   const dirtyRows = useMemo(() => rows.filter(isDirty), [rows, isDirty]);
@@ -241,24 +306,6 @@ function AttendanceGrid({ period, rows, onDirtyChange }) {
     if (el && !el.disabled) el.focus();
   }, []);
 
-  const fillStandard = () => {
-    const targets = visible.filter(
-      (r) => editable && r.base_salary !== null && !r.payroll_item_id && !drafts[r.user_id]?.actual_days,
-    );
-    const n = targets.length;
-    if (n) {
-      setDrafts((d) => {
-        const next = { ...d };
-        for (const r of targets) {
-          next[r.user_id] = { actual_days: String(period.standard_days), ot_hours: d[r.user_id]?.ot_hours || "0" };
-        }
-        return next;
-      });
-    }
-    if (n) toast.success(`Đã điền ${period.standard_days} công chuẩn cho ${n} nhân viên chưa nhập`);
-    else toast.info("Không còn nhân viên nào chưa nhập công trong danh sách đang hiển thị");
-  };
-
   const reset = () => {
     setDrafts({});
     setServerErrors({});
@@ -288,14 +335,19 @@ function AttendanceGrid({ period, rows, onDirtyChange }) {
   const save = () => {
     if (invalid.length) {
       toast.error(`Còn ${invalid.length} dòng chưa hợp lệ — kiểm tra các ô viền đỏ`);
-      navigate(visible.indexOf(invalid[0]), "actual_days");
+      const firstInvalid = invalid[0];
+      if (validate(firstInvalid) === "Lý do cần cụ thể, từ 10 đến 500 ký tự") {
+        document.querySelector(`[data-reason="${firstInvalid.user_id}"]`)?.focus();
+      } else {
+        navigate(visible.findIndex((row) => row.user_id === firstInvalid.user_id), "ot_hours");
+      }
       return;
     }
     mutation.mutate(
       dirtyRows.map((r) => ({
         user_id: r.user_id,
-        actual_days: parseNum(valueOf(r, "actual_days")),
         ot_hours: valueOf(r, "ot_hours") === "" ? 0 : parseNum(valueOf(r, "ot_hours")),
+        reason: drafts[r.user_id]?.reason ?? "",
       })),
     );
   };
@@ -306,16 +358,9 @@ function AttendanceGrid({ period, rows, onDirtyChange }) {
         <CardTitle>Lưới ngày công & OT</CardTitle>
         <CardDescription>
           {editable
-            ? `Sửa trực tiếp trên lưới · Enter / ↑ ↓ để chuyển dòng · tối đa ${maxDays} ngày / ${maxOt} giờ OT`
+            ? `Ngày công lấy từ chấm công theo ngày · chỉ nhập OT trên lưới · tối đa ${maxOt} giờ OT`
             : "Kỳ lương đã chốt — chỉ xem, không thể chỉnh sửa"}
         </CardDescription>
-        {editable && (
-          <CardAction className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={fillStandard} title="Điền công chuẩn cho các nhân viên chưa nhập">
-              <Wand2 /> <span className="max-sm:hidden">Điền công chuẩn</span>
-            </Button>
-          </CardAction>
-        )}
       </CardHeader>
 
       <div className="flex flex-col gap-3 border-b border-border/70 px-4 py-3 sm:px-5 lg:flex-row lg:items-center">
@@ -355,6 +400,7 @@ function AttendanceGrid({ period, rows, onDirtyChange }) {
               <TableHead className="text-right max-md:hidden">Lương CB</TableHead>
               <TableHead className="text-right">Ngày công</TableHead>
               <TableHead className="text-right">Giờ OT</TableHead>
+              <TableHead className="min-w-[220px]">Lý do thay đổi</TableHead>
               <TableHead className="text-right max-lg:hidden">Gross</TableHead>
               <TableHead className="text-right">Net</TableHead>
               <TableHead className="pr-4 sm:pr-5">Trạng thái</TableHead>
@@ -363,7 +409,7 @@ function AttendanceGrid({ period, rows, onDirtyChange }) {
           <TableBody>
             {visible.length === 0 && (
               <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={7} className="py-12 text-center text-[13px] text-muted-foreground">
+                <TableCell colSpan={8} className="py-12 text-center text-[13px] text-muted-foreground">
                   Không có nhân viên phù hợp bộ lọc.
                 </TableCell>
               </TableRow>
@@ -388,6 +434,9 @@ function AttendanceGrid({ period, rows, onDirtyChange }) {
                   <TableCell className="text-right text-[13px] tabular-nums text-muted-foreground max-md:hidden">
                     {r.base_salary === null ? "—" : formatMoneyShort(r.base_salary)}
                   </TableCell>
+                  <TableCell className="text-right text-[13px] tabular-nums">
+                    <span aria-label={`Ngày công của ${r.full_name}`}>{formatNumber(r.actual_days)}</span>
+                  </TableCell>
                   {FIELDS.map((f) => (
                     <TableCell key={f} className="py-1.5">
                       <CellInput
@@ -400,10 +449,24 @@ function AttendanceGrid({ period, rows, onDirtyChange }) {
                         disabled={disabled}
                         onChange={change}
                         onNavigate={navigate}
-                        suffix={f === "actual_days" ? "ng" : "giờ"}
+                        suffix="giờ"
                       />
                     </TableCell>
                   ))}
+                  <TableCell className="py-1.5">
+                    <Textarea
+                      data-reason={r.user_id}
+                      value={drafts[r.user_id]?.reason ?? ""}
+                      onChange={(e) => change(r.user_id, "reason", e.target.value)}
+                      disabled={disabled}
+                      maxLength={500}
+                      rows={2}
+                      aria-label={`Lý do thay đổi lương của ${r.full_name}`}
+                      aria-invalid={Boolean(error) || undefined}
+                      placeholder="Ghi rõ lý do (10–500 ký tự)"
+                      className="min-h-16 min-w-[210px] resize-y text-[12px]"
+                    />
+                  </TableCell>
                   <TableCell className="text-right text-[13px] tabular-nums max-lg:hidden">
                     {dirty ? <span className="text-muted-foreground">—</span> : r.payroll_item_id ? formatMoney(r.gross_salary) : "—"}
                   </TableCell>
@@ -417,7 +480,19 @@ function AttendanceGrid({ period, rows, onDirtyChange }) {
                     )}
                   </TableCell>
                   <TableCell className="pr-4 sm:pr-5" title={error || undefined}>
-                    <RowState row={r} dirty={dirty} error={error} />
+                    <div className="flex items-center gap-1">
+                      <RowState row={r} dirty={dirty} error={error} />
+                      {r.payroll_item_id && (
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={`Xem lịch sử lương của ${r.full_name}`}
+                          onClick={() => setHistoryRow(r)}
+                        >
+                          <History />
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               );
@@ -453,6 +528,9 @@ function AttendanceGrid({ period, rows, onDirtyChange }) {
           </motion.div>
         )}
       </AnimatePresence>
+      {historyRow && (
+        <PayrollHistoryDialog period={period} row={historyRow} onClose={() => setHistoryRow(null)} />
+      )}
     </Card>
   );
 }
@@ -507,7 +585,7 @@ export default function AttendancePage() {
           <div className="space-y-1">
             <p className="text-eyebrow">Tiền lương</p>
             <h1 className="page-title">Chấm công & OT</h1>
-            <p className="text-[14px] text-muted-foreground">Tạo kỳ lương theo tháng, nhập ngày công và giờ làm thêm — lương được tính ngay khi lưu.</p>
+            <p className="text-[14px] text-muted-foreground">Ngày công được tính từ chấm công từng ngày; nhập OT theo kỳ để tính lương.</p>
           </div>
         </Reveal>
         <Reveal delay={80} offset={8}>
@@ -539,7 +617,7 @@ export default function AttendancePage() {
             </span>
             <div className="space-y-1">
               <p className="text-[17px] font-semibold">Chưa có kỳ lương nào</p>
-              <p className="max-w-sm text-[14px] text-muted-foreground">Tạo kỳ lương đầu tiên (Tháng/Năm) để bắt đầu nhập ngày công và OT.</p>
+              <p className="max-w-sm text-[14px] text-muted-foreground">Tạo kỳ lương đầu tiên (Tháng/Năm) để nhập OT. Ngày công lấy từ chấm công theo ngày.</p>
             </div>
             <Button onClick={() => setCreateOpen(true)}>
               <CalendarPlus /> Tạo kỳ lương mới
@@ -589,7 +667,7 @@ export default function AttendancePage() {
             {[
               {
                 icon: CalendarCheck2,
-                label: "Đã nhập công",
+                label: "Đã nhập OT",
                 value: (
                   <>
                     {stats.entered}
@@ -598,7 +676,7 @@ export default function AttendancePage() {
                 ),
                 hint: stats.missing ? `${stats.missing} nhân viên chưa có hợp đồng` : "Tất cả đều có hợp đồng",
               },
-              { icon: Sigma, label: "Tổng ngày công", value: formatNumber(stats.days), hint: "Cộng dồn các phiếu đã nhập" },
+              { icon: Sigma, label: "Tổng ngày công", value: formatNumber(stats.days), hint: "Theo dữ liệu chấm công từng ngày" },
               { icon: Clock, label: "Tổng giờ OT", value: `${formatNumber(stats.ot)} giờ`, hint: "Hệ số OT ×1,5" },
               { icon: Wallet, label: "Net tạm tính", value: formatMoneyShort(stats.net), hint: `Gross ${formatMoneyShort(stats.gross)}` },
             ].map((s, i) => (

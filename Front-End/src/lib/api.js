@@ -56,6 +56,8 @@ export const payslipDownloadUrl = (periodId) =>
 const MONEY_FIELDS = [
   "base_salary", "insurance_salary", "allowance", "dependents_count",
   "previous_base_salary", "previous_insurance_salary", "previous_allowance", "previous_dependents_count",
+  "previous_actual_days", "previous_ot_hours", "previous_gross_salary", "previous_social_insurance",
+  "previous_tax_deduction", "previous_personal_tax", "previous_net_salary",
   "gross_salary", "social_insurance", "tax_deduction", "personal_tax", "net_salary",
   "actual_days", "ot_hours", "standard_days",
   "items_count", "total_gross", "total_net",
@@ -169,29 +171,29 @@ export const api = {
       period: toNumbers(d?.period),
       items: toNumberList(d?.items),
     })),
-  /** Lưu chỉnh sửa thủ công trên Grid: entries = [{ user_id, actual_days, ot_hours }]. */
+  /** Lưu giờ OT kèm lý do riêng từng nhân viên; ngày công lấy từ chấm công theo ngày. */
   saveAttendance: (periodId, entries) =>
     callApi("payroll/attendance", {
       method: "PUT",
       data: {
         period_id: periodId,
-        entries: entries.map((e) => ({
-          user_id: e.user_id,
-          actual_days: Number(e.actual_days),
-          ot_hours: Number(e.ot_hours),
-        })),
+        entries: entries.map((e) => ({ user_id: e.user_id, ot_hours: Number(e.ot_hours), reason: e.reason })),
       },
     }),
-  /** Import file Excel công (.xlsx): cột Mã NV · Ngày công · Giờ OT. */
+  payrollChanges: (periodId, userId) =>
+    callApi("payroll/changes", { params: { period_id: periodId, user_id: userId } }).then(toNumberList),
+  /** Import file Excel OT (.xlsx): cột Mã NV · Giờ OT · Lý do. */
   importAttendance: (periodId, file) => {
     const form = new FormData();
     form.append("period_id", String(periodId));
     form.append("file", file);
     return callApi("payroll/import", { method: "POST", data: form, timeout: 60000 });
   },
-  calculatePayroll: ({ user_id, period_id, actual_days, ot_hours }) =>
+  calculatePayroll: ({ user_id, period_id, ot_hours, reason }) =>
     callApi("payroll/calculate", {
       method: "POST",
-      data: { user_id, period_id, actual_days: Number(actual_days), ot_hours: Number(ot_hours) },
+      data: { user_id, period_id, ot_hours: Number(ot_hours), reason },
     }),
+  runPayroll: (periodId, reasons) =>
+    callApi("payroll/run", { method: "POST", data: { period_id: periodId, reasons } }),
 };

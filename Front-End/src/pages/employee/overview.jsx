@@ -10,7 +10,7 @@ import { PayoutBar } from "@/components/app/payslip";
 import { todayShift, WeekSchedule } from "@/components/app/week-schedule";
 import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Meter } from "@/components/ui/meter";
-import { useEmployeeDashboard } from "@/hooks/use-employee-dashboard";
+import { useEmployeeAttendance, useEmployeeDashboard } from "@/hooks/use-employee-dashboard";
 import { monthToDateEarnings } from "@/lib/hr";
 import { formatMoney, formatNumber, formatPeriod, givenName, greeting, tenureLabel } from "@/lib/format";
 import { PayslipDialog } from "./payslip-dialog";
@@ -117,13 +117,20 @@ export default function EmployeeOverview() {
   const { data, isPending, error, refetch } = useEmployeeDashboard();
   const [payslip, setPayslip] = useState(null);
   const now = useNow();
+  const attendanceMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const attendance = useEmployeeAttendance(attendanceMonth);
 
-  if (error) return <ErrorState error={error} onRetry={refetch} />;
-  if (isPending) return <LoadingState rows={4} />;
+  if (error || attendance.error) {
+    return <ErrorState error={error ?? attendance.error} onRetry={() => { refetch(); attendance.refetch(); }} />;
+  }
+  if (isPending || attendance.isPending) return <LoadingState rows={4} />;
 
   const { user_info: user, contract, payroll_history: history = [], current_period: period, work_schedule: schedule = {}, team_members: team = [] } = data;
   const [latest, previous] = history;
-  const mtd = monthToDateEarnings({ contract, schedule, period, joinedAt: user.joined_at, now });
+  const attendanceAvailable = attendance.data?.available !== false;
+  const mtd = attendanceAvailable
+    ? monthToDateEarnings({ contract, schedule, period, attendanceRecords: attendance.data?.records ?? [], joinedAt: user.joined_at, now })
+    : null;
   const shift = todayShift(schedule);
   const attendancePct = latest?.standard_days ? (latest.actual_days / latest.standard_days) * 100 : 0;
 
@@ -160,12 +167,18 @@ export default function EmployeeOverview() {
       <section aria-label="Chỉ số chính" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Reveal delay={60} offset={10} className="h-full">
           <KpiCard
-            label={`Đã làm được · ${formatPeriod(mtd.monthYear)}`}
+            label={`Đã làm được · ${formatPeriod(mtd?.monthYear ?? attendanceMonth)}`}
             icon={Sparkles}
-            value={contract ? formatMoney(mtd.earned) : "—"}
-            hint={contract ? `${formatMoney(mtd.dailyRate)}/ngày · tạm tính, chưa trừ BH & thuế` : "Chưa có hợp đồng lao động"}
+            value={contract && mtd ? formatMoney(mtd.earned) : "—"}
+            hint={
+              !contract
+                ? "Chưa có hợp đồng lao động"
+                : mtd
+                  ? `${formatMoney(mtd.dailyRate)}/ngày · tạm tính, chưa trừ BH & thuế`
+                  : "Dữ liệu chấm công theo ngày chưa khả dụng"
+            }
           >
-            {contract && (
+            {contract && mtd && (
               <div className="space-y-1.5">
                 <Meter value={mtd.standardDays ? (mtd.workedDays / mtd.standardDays) * 100 : 0} label="Ngày công đã làm tháng này" />
                 <p className="text-[12px] text-muted-foreground tabular-nums">

@@ -1,6 +1,8 @@
 <?php
 
 require_once __DIR__ . '/PayrollEngine.php';
+require_once __DIR__ . '/PayrollChangePolicy.php';
+require_once __DIR__ . '/../models/AttendanceRecordModel.php';
 
 class AttendanceException extends RuntimeException
 {
@@ -24,7 +26,7 @@ class AttendanceService
         $this->payrollModel = $payrollModel ?? new PayrollModel();
     }
 
-    public function save(int $periodId, array $entries): array
+    public function save(int $periodId, array $entries, int $changedBy): array
     {
         $this->payrollModel->beginTransaction();
 
@@ -44,6 +46,11 @@ class AttendanceService
 
             $daysInMonth = (int) (new DateTimeImmutable($period['month_year'] . '-01'))->format('t');
             $normalizedEntries = $this->normalizeEntries($entries, $daysInMonth);
+            $attendanceModel = new AttendanceRecordModel();
+            if (!$attendanceModel->tableExists()) {
+                throw new AttendanceException(409, 'Chưa có bảng chấm công theo ngày — hãy chạy migration 004_avatar_daily_attendance.sql');
+            }
+            $workedDaysByUser = $attendanceModel->workedDaysByUserForMonth($period['month_year']);
             $userIds = array_column($normalizedEntries, 'user_id');
             $payrollInputs = $this->payrollModel->getPayrollInputsByUserIds($userIds, $period['month_year']);
 
@@ -70,10 +77,11 @@ class AttendanceService
             $calculations = [];
             foreach ($normalizedEntries as $entry) {
                 $employee = $payrollInputs[$entry['user_id']];
+                $actualDays = $workedDaysByUser[$entry['user_id']] ?? 0;
                 $calculation = PayrollEngine::calculateNetSalary(
                     (float) $employee['base_salary'],
                     (float) $employee['allowance'],
-                    $entry['actual_days'],
+                    $actualDays,
                     $standardDays,
                     $entry['ot_hours'],
                     1.5,
@@ -84,14 +92,14 @@ class AttendanceService
                 $calculations[$entry['user_id']] = $calculation;
 
                 $this->payrollModel->saveOrUpdate($periodId, $entry['user_id'], [
-                    'actual_days' => $entry['actual_days'],
+                    'actual_days' => $actualDays,
                     'ot_hours' => $entry['ot_hours'],
                     'gross_salary' => $calculation['gross_salary'],
                     'social_insurance' => $calculation['social_insurance'],
                     'tax_deduction' => $calculation['tax_deduction'],
                     'personal_tax' => $calculation['personal_tax'],
                     'net_salary' => $calculation['net_salary'],
-                ]);
+                ], $entry['reason'], $changedBy);
             }
 
             $items = $this->payrollModel->getAttendanceRows($periodId);
@@ -139,10 +147,17 @@ class AttendanceService
             }
             $seenUserIds[$userId] = true;
 
-            $actualDays = $this->nonNegativeNumber($entry['actual_days'] ?? null, 'actual_days', $index);
-            if ($actualDays > $daysInMonth) {
-                throw new AttendanceException(422, "actual_days không được vượt quá {$daysInMonth}", [
+            if (array_key_exists('actual_days', $entry)) {
+                throw new AttendanceException(422, 'actual_days được tính từ chấm công theo ngày, không thể nhập thủ công', [
                     'entry_index' => $index,
+                ]);
+            }
+
+            [$reasonError, $reason] = PayrollChangePolicy::validateReason($entry['reason'] ?? null);
+            if ($reasonError !== null) {
+                throw new AttendanceException(422, $reasonError, [
+                    'entry_index' => $index,
+                    'field' => 'reason',
                 ]);
             }
 
@@ -155,8 +170,8 @@ class AttendanceService
 
             $normalized[] = [
                 'user_id' => (int) $userId,
-                'actual_days' => $actualDays,
                 'ot_hours' => $otHours,
+                'reason' => $reason,
             ];
         }
 

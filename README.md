@@ -47,7 +47,7 @@ Sau khi rà các chức năng một hệ thống HR cần có, phần **đơn ng
 - **Quy tắc nghiệp vụ** (`Back-End/services/LeavePolicy.php`, hàm thuần, có kiểm thử):
   - 12 ngày phép năm; năm đầu tính theo tỉ lệ số tháng làm việc; +1 ngày cho mỗi 5 năm thâm niên.
   - Chỉ tính ngày T2–T6; tối đa 30 ngày làm việc mỗi đơn; không vắt sang năm khác.
-  - Phép năm không được ở quá khứ; nghỉ ốm khai bù tối đa 30 ngày.
+  - Mọi loại đơn nghỉ, kể cả nghỉ ốm, không được bắt đầu trong quá khứ.
   - Chặn đơn trùng ngày với đơn đang chờ / đã duyệt; chặn vượt quỹ phép (tính cả đơn đang chờ).
   - Duyệt / từ chối chạy trong transaction và chỉ áp dụng cho đơn `PENDING` (không duyệt 2 lần).
 - **Tệp mới:** `migrations/005_leave_requests.sql` (đã gộp vào `QLNS-Database.sql`), `LeavePolicy.php`, `LeaveRequestModel.php`, `LeaveController.php`, `Front-End/src/lib/leave.js`, `pages/employee/leave.jsx`, `pages/admin/leave.jsx`, `components/ui/textarea.jsx`.
@@ -104,6 +104,7 @@ mysql -u root -p qlns < Back-End/database/migrations/006_contract_salary_adjustm
 mysql -u root -p qlns < Back-End/database/seed_additional_demo_data.sql
 #    Tính lại thuế TNCN các kỳ từ 2026 trở đi (chạy sau khi đã thêm dữ liệu mẫu):
 mysql -u root -p qlns < Back-End/database/migrations/007_recalculate_pit_2026.sql
+mysql -u root -p qlns < Back-End/database/migrations/008_payroll_change_audit.sql
 
 # 2. Back-End
 cp Back-End/configs/env.example.php Back-End/configs/env.php   # sửa thông tin kết nối
@@ -160,6 +161,7 @@ npm run test:backend   # kiểm thử PHP thuần (= php ../test-backend.php)
 - Luật Bảo hiểm xã hội: nghỉ ốm do quỹ BHXH chi trả, không trừ phép năm; tỉ lệ người lao động đóng 10,5% (BHXH 8% + BHYT 1,5% + BHTN 1%).
 - Thuế TNCN tiền lương (cá nhân cư trú): kỳ tính thuế từ năm 2026 dùng biểu lũy tiến 5 bậc (5%, 10%, 20%, 30%, 35%) và mức giảm trừ gia cảnh 15,5 triệu đồng/tháng cho bản thân, 6,2 triệu đồng/tháng cho mỗi người phụ thuộc; các kỳ trước năm 2026 giữ biểu 7 bậc và mức giảm trừ cũ. Phần tiền làm thêm cao hơn tiền lương giờ bình thường được loại khỏi thu nhập tính thuế. Căn cứ: Luật Thuế TNCN số 109/2025/QH15 áp dụng từ kỳ tính thuế 2026; Nghị quyết 110/2025/UBTVQH15 về mức giảm trừ gia cảnh.
 - Kỳ lương 2026 trở đi trong database cũ cần chạy `Back-End/database/migrations/007_recalculate_pit_2026.sql` để cập nhật cả phiếu đã khóa/đã chi. Migration chỉ cập nhật khoản giảm trừ gia cảnh, thuế TNCN và net; không thay đổi gross hoặc khoản bảo hiểm đã lưu.
+- Mọi thay đổi OT/tính lại lương và điều chỉnh hợp đồng yêu cầu lý do riêng (10–500 ký tự); lịch sử bảng lương mới lưu người thao tác, thời điểm và giá trị trước/sau. Database cũ cần chạy `Back-End/database/migrations/008_payroll_change_audit.sql`; lịch sử cũ không thể khôi phục.
 - Các khoản phụ cấp hiện được lưu thành một số tổng, không có phân loại miễn thuế; do đó hệ thống đang xem toàn bộ phụ cấp này là thu nhập chịu thuế. Thuế khấu trừ tại nguồn giả định nhân viên là cá nhân cư trú làm việc theo hợp đồng từ 3 tháng trở lên; chưa xử lý cá nhân không cư trú, hợp đồng ngắn hạn hoặc tổng hợp nhiều nguồn thu nhập để quyết toán năm.
 
 **Thiết kế**

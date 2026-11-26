@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/PayrollChangePolicy.php';
+
 class ContractSalaryAdjustmentPolicy
 {
     private const SALARY_FIELDS = ['base_salary', 'insurance_salary', 'allowance'];
@@ -14,10 +16,9 @@ class ContractSalaryAdjustmentPolicy
 
     public static function validate(array $input): array
     {
-        $reason = trim((string) ($input['reason'] ?? ''));
-        $reasonLength = mb_strlen($reason);
-        if ($reasonLength < 3 || $reasonLength > 500) {
-            return ['Lý do cần từ 3 đến 500 ký tự', null];
+        [$reasonError, $reason] = PayrollChangePolicy::validateReason($input['reason'] ?? null);
+        if ($reasonError !== null) {
+            return [$reasonError, null];
         }
 
         $values = [];

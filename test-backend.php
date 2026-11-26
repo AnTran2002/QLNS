@@ -10,6 +10,7 @@ $services = __DIR__ . '/Back-End/services/';
 require $services . 'LeavePolicy.php';
 require $services . 'PayrollEngine.php';
 require $services . 'PayrollPeriodPolicy.php';
+require $services . 'PayrollChangePolicy.php';
 require $services . 'ContractSalaryAdjustmentPolicy.php';
 
 $passed = 0;
@@ -59,8 +60,8 @@ check('ngày sai định dạng', LeavePolicy::validate(['start_date' => '07/12/
 check('kết thúc trước bắt đầu', LeavePolicy::validate(['end_date' => '2026-12-01'] + $ok, $today)[0], 'Ngày kết thúc phải sau hoặc trùng ngày bắt đầu');
 check('vắt sang năm khác', LeavePolicy::validate(['end_date' => '2027-01-04'] + $ok, $today)[0], 'Đơn không được kéo dài sang năm khác — hãy tách thành 2 đơn');
 check('phép năm ở quá khứ', LeavePolicy::validate(['start_date' => '2026-11-19', 'end_date' => '2026-11-19'] + $ok, $today)[0], 'Ngày bắt đầu không được ở quá khứ');
-check('nghỉ ốm khai bù 10 ngày → hợp lệ', LeavePolicy::validate(['type' => 'SICK', 'start_date' => '2026-11-10', 'end_date' => '2026-11-10'] + $ok, $today)[0], null);
-check('nghỉ ốm khai bù 40 ngày → lỗi', LeavePolicy::validate(['type' => 'SICK', 'start_date' => '2026-10-09', 'end_date' => '2026-10-09'] + $ok, $today)[0], 'Nghỉ ốm chỉ khai bù tối đa 30 ngày trước hôm nay');
+check('nghỉ ốm ở quá khứ cũng bị chặn', LeavePolicy::validate(['type' => 'SICK', 'start_date' => '2026-11-10', 'end_date' => '2026-11-10'] + $ok, $today)[0], 'Ngày bắt đầu không được ở quá khứ');
+check('nghỉ ốm bắt đầu hôm nay hợp lệ', LeavePolicy::validate(['type' => 'SICK', 'start_date' => $today, 'end_date' => $today] + $ok, $today)[0], null);
 check('chỉ cuối tuần', LeavePolicy::validate(['start_date' => '2026-12-05', 'end_date' => '2026-12-06'] + $ok, $today)[0], 'Khoảng thời gian đã chọn không có ngày làm việc nào (T2–T6)');
 check('quá 30 ngày làm việc (05/01 → 20/02)', LeavePolicy::validate(['start_date' => '2026-01-05', 'end_date' => '2026-02-20'] + $ok, '2026-01-01')[0], 'Mỗi đơn tối đa 30 ngày làm việc');
 check('lý do quá ngắn', LeavePolicy::validate(['reason' => ' a '] + $ok, $today)[0], 'Lý do cần từ 3 đến 500 ký tự');
@@ -75,7 +76,10 @@ check('từ chối tháng không hợp lệ', PayrollPeriodPolicy::validateCreat
 check('điều chỉnh lương hiệu lực tháng kế tiếp', ContractSalaryAdjustmentPolicy::effectiveMonth($periodToday), '2026-12');
 check('tháng 12 chuyển hiệu lực sang tháng 1 năm sau', ContractSalaryAdjustmentPolicy::effectiveMonth(new DateTimeImmutable('2026-12-22')), '2027-01');
 $salaryInput = ['base_salary' => '20000000', 'insurance_salary' => '18000000', 'allowance' => '2000000', 'dependents_count' => '1', 'reason' => 'Điều chỉnh lương'];
-check('bắt buộc lý do điều chỉnh lương', ContractSalaryAdjustmentPolicy::validate(array_merge($salaryInput, ['reason' => '  ']))[0], 'Lý do cần từ 3 đến 500 ký tự');
+check('lý do quá ngắn bị từ chối', PayrollChangePolicy::validateReason('lý do')[0], 'Lý do cần cụ thể, từ 10 đến 500 ký tự');
+check('lý do dài hơn giới hạn bị từ chối', PayrollChangePolicy::validateReason(str_repeat('a', 501))[0], 'Lý do cần cụ thể, từ 10 đến 500 ký tự');
+check('lý do tiếng Việt cụ thể hợp lệ', PayrollChangePolicy::validateReason('Điều chỉnh mức OT')[0], null);
+check('bắt buộc lý do điều chỉnh lương', ContractSalaryAdjustmentPolicy::validate(array_merge($salaryInput, ['reason' => '  ']))[0], 'Lý do cần cụ thể, từ 10 đến 500 ký tự');
 check('chấp nhận điều chỉnh lương hợp lệ', ContractSalaryAdjustmentPolicy::validate($salaryInput)[0], null);
 check('phải có thay đổi mới tạo điều chỉnh', ContractSalaryAdjustmentPolicy::hasChanges($salaryInput, $salaryInput), false);
 check('điều chỉnh có thay đổi so với hiện tại', ContractSalaryAdjustmentPolicy::hasChanges($salaryInput, array_merge($salaryInput, ['base_salary' => '21000000'])), true);
