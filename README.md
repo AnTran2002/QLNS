@@ -62,7 +62,7 @@ Sau khi rà các chức năng một hệ thống HR cần có, phần **đơn ng
 - Định dạng lại 4 tệp dài bằng Prettier (`Front-End/.prettierrc.json`).
 - Kết quả: **−~5.000 dòng**, `npm run build` vẫn thành công, toàn bộ kiểm thử vẫn đạt.
 
-### 1.4 Back-End
+### 1.4 Back-End.
 
 - `BaseModel` nay dùng `DB_PORT` khi kết nối (trước đây bỏ qua → MAMP cổng 8889 không kết nối được nếu không có socket).
 - Endpoint mới: chấm công theo ngày (`employee/attendance`), ảnh đại diện (`profile/avatar`), nghỉ phép (mục 1.2).
