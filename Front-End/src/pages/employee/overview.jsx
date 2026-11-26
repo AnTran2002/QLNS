@@ -228,7 +228,7 @@ export default function EmployeeOverview() {
         </Reveal>
       </section>
 
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3 [&>*]:min-w-0">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3 *:min-w-0">
         <Reveal delay={120} offset={14} className="h-full lg:col-span-2">
           <EarningsChart history={history} />
         </Reveal>
@@ -237,7 +237,7 @@ export default function EmployeeOverview() {
         </Reveal>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3 [&>*]:min-w-0">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3 *:min-w-0">
         <Reveal delay={120} offset={14} className="h-full lg:col-span-2">
           <Card className="h-full gap-5">
             <CardHeader>

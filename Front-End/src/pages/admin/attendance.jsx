@@ -107,7 +107,7 @@ function MiniStat({ icon: Icon, label, value, hint }) {
 
 function CellInput({ row, field, value, error, dirty, disabled, rowIndex, onChange, onNavigate, suffix }) {
   return (
-    <div className="relative ml-auto w-[92px]">
+    <div className="relative ml-auto w-23">
       <input
         data-cell={`${rowIndex}:${field}`}
         inputMode="decimal"
@@ -131,7 +131,7 @@ function CellInput({ row, field, value, error, dirty, disabled, rowIndex, onChan
         className={cn(
           "h-8 w-full rounded-lg border bg-background pr-8 pl-2.5 text-right text-[13.5px] tabular-nums outline-none transition-[border-color,box-shadow,background-color]",
           "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/15 disabled:cursor-not-allowed disabled:bg-muted/50 disabled:text-muted-foreground",
-          dirty ? "border-primary/50 bg-primary/[0.04]" : "border-input",
+          dirty ? "border-primary/50 bg-primary/4" : "border-input",
           error && "border-destructive bg-destructive/5 focus-visible:ring-destructive/15",
         )}
       />
@@ -400,7 +400,7 @@ function AttendanceGrid({ period, rows, onDirtyChange }) {
               <TableHead className="text-right max-md:hidden">Lương CB</TableHead>
               <TableHead className="text-right">Ngày công</TableHead>
               <TableHead className="text-right">Giờ OT</TableHead>
-              <TableHead className="min-w-[220px]">Lý do thay đổi</TableHead>
+              <TableHead className="min-w-55">Lý do thay đổi</TableHead>
               <TableHead className="text-right max-lg:hidden">Gross</TableHead>
               <TableHead className="text-right">Net</TableHead>
               <TableHead className="pr-4 sm:pr-5">Trạng thái</TableHead>
@@ -419,9 +419,9 @@ function AttendanceGrid({ period, rows, onDirtyChange }) {
               const error = serverErrors[r.user_id] || validate(r);
               const disabled = !editable || r.base_salary === null;
               return (
-                <TableRow key={r.user_id} className={cn(dirty && "bg-primary/[0.025]", error && "bg-destructive/[0.03]")}>
+                <TableRow key={r.user_id} className={cn(dirty && "bg-primary/2.5", error && "bg-destructive/3")}>
                   <TableCell className="pl-4 sm:pl-5">
-                    <div className="flex min-w-[180px] items-center gap-2.5">
+                    <div className="flex min-w-45 items-center gap-2.5">
                       <PersonAvatar name={r.full_name} seed={r.employee_code} src={r.avatar} size="xs" />
                       <div className="grid min-w-0 leading-tight">
                         <span className="truncate text-[13.5px] font-medium">{r.full_name}</span>
@@ -464,7 +464,7 @@ function AttendanceGrid({ period, rows, onDirtyChange }) {
                       aria-label={`Lý do thay đổi lương của ${r.full_name}`}
                       aria-invalid={Boolean(error) || undefined}
                       placeholder="Ghi rõ lý do (10–500 ký tự)"
-                      className="min-h-16 min-w-[210px] resize-y text-[12px]"
+                      className="min-h-16 min-w-52.5 resize-y text-[12px]"
                     />
                   </TableCell>
                   <TableCell className="text-right text-[13px] tabular-nums max-lg:hidden">
@@ -632,7 +632,7 @@ export default function AttendancePage() {
               <CardHeader className="px-5 sm:grid-cols-[1fr_auto]">
                 <div className="flex flex-wrap items-center gap-3">
                   <Select value={String(period.id)} onValueChange={selectPeriod}>
-                    <SelectTrigger className="h-10 min-w-[190px] font-medium" aria-label="Chọn kỳ lương">
+                    <SelectTrigger className="h-10 min-w-47.5 font-medium" aria-label="Chọn kỳ lương">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>

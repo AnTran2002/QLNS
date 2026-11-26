@@ -70,9 +70,9 @@ function PeriodChart({ periods }) {
       </CardHeader>
       <CardContent className="px-3 sm:px-6">
         {data.length === 0 ? (
-          <p className="flex h-[240px] items-center justify-center text-[13px] text-muted-foreground">Chưa có kỳ lương nào được tính.</p>
+          <p className="flex h-60 items-center justify-center text-[13px] text-muted-foreground">Chưa có kỳ lương nào được tính.</p>
         ) : data.length === 1 ? (
-          <div className="flex h-[240px] flex-col justify-center gap-4 px-1">
+          <div className="flex h-60 flex-col justify-center gap-4 px-1">
             <p className="text-[12.5px] text-muted-foreground">Kỳ {data[0].label.replace("T", "")} — kỳ duy nhất đã tính</p>
             <dl className="grid grid-cols-2 gap-4">
               {["gross", "net"].map((k) => (
@@ -90,7 +90,7 @@ function PeriodChart({ periods }) {
             <p className="text-[12px] text-muted-foreground">Biểu đồ đường hiển thị khi có từ 2 kỳ lương trở lên.</p>
           </div>
         ) : (
-          <ChartContainer config={PERIOD_CHART} className="aspect-auto h-[260px] w-full">
+          <ChartContainer config={PERIOD_CHART} className="aspect-auto h-65 w-full">
             <LineChart data={data} margin={{ left: 4, right: 12, top: 10 }}>
               <CartesianGrid vertical={false} strokeDasharray="0" />
               <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} padding={{ left: 12, right: 12 }} />
@@ -122,7 +122,7 @@ function StatusDonut({ employees }) {
         <CardDescription>Theo cột users.status</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-1 flex-col justify-center gap-5">
-        <div className="relative mx-auto aspect-square w-full max-w-[200px]">
+        <div className="relative mx-auto aspect-square w-full max-w-50">
           <ChartContainer config={STATUS_CHART} className="aspect-square h-full w-full">
             <PieChart>
               <ChartTooltip content={<ChartTooltipContent hideLabel nameKey="status" valueFormatter={(v) => `${v} người`} />} />
@@ -251,7 +251,7 @@ function PayoutStructure({ period, items }) {
           <p className="text-[12px] text-muted-foreground">Tổng Gross</p>
           <p className="font-display text-[24px] font-semibold tracking-[-0.02em] tabular-nums">{formatMoney(gross)}</p>
         </div>
-        <div className="flex h-3 w-full gap-[2px] overflow-hidden rounded-full bg-muted" aria-hidden="true">
+        <div className="flex h-3 w-full gap-0.5 overflow-hidden rounded-full bg-muted" aria-hidden="true">
           {gross > 0 &&
             STRUCTURE.map((s) => (
               <div
@@ -514,7 +514,7 @@ export default function AdminOverview() {
       </section>
 
       {/* Biểu đồ */}
-      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3 [&>*]:min-w-0">
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3 *:min-w-0">
         <Reveal delay={120} offset={14} className="h-full lg:col-span-2">
           <PeriodChart periods={periods} />
         </Reveal>
@@ -523,7 +523,7 @@ export default function AdminOverview() {
         </Reveal>
       </section>
 
-      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3 [&>*]:min-w-0">
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3 *:min-w-0">
         <Reveal offset={14} className="h-full lg:col-span-2">
           <DepartmentChart employees={employees} />
         </Reveal>
@@ -532,7 +532,7 @@ export default function AdminOverview() {
         </Reveal>
       </section>
 
-      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3 [&>*]:min-w-0">
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3 *:min-w-0">
         <Reveal offset={14} className="h-full lg:col-span-2">
           <PeriodsTable periods={periods} headcount={stats.total} />
         </Reveal>
