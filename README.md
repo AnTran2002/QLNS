@@ -9,7 +9,7 @@ QLNS/
 ├── Back-End/           PHP 8 thuần (router ?action=…, PDO), không framework
 │   ├── controllers/    Auth · Employee · Contract · Payroll · Profile · Leave · Home
 │   ├── models/         User · Contract · SalaryAdjustment · Payroll · AttendanceRecord · LeaveRequest
-│   ├── services/       PayrollEngine · PayrollPeriodPolicy · ContractSalaryAdjustmentPolicy · LeavePolicy · Attendance · Payslip · Xlsx…
+│   ├── services/       PayrollEngine · PayrollPeriodPolicy · ContractSalaryAdjustmentPolicy · LeavePolicy · Attendance (đồng bộ chấm công) · Payslip · XlsxExport
 │   └── database/       migrations/001…007, seed_passwords.php
 ├── test-backend.php    Kiểm thử PHP thuần (nghỉ phép, kỳ lương và tính lương/thuế), không cần CSDL
 ├── QLNS-Database.sql   Dump đầy đủ database `qlns` (đã gồm migration 004–007 + lương T1–T10/2026)
@@ -44,6 +44,7 @@ Sau khi rà các chức năng một hệ thống HR cần có, phần **đơn ng
 - **Nhân viên** (`/nhan-vien/nghi-phep`): xem quỹ phép năm (tổng / đã nghỉ / đang chờ / còn lại), tạo đơn (phép năm, nghỉ ốm, không lương, việc riêng có lương) với xem trước số ngày làm việc và phép còn lại, huỷ đơn đang chờ.
 - **Quản trị** (`/admin/nghi-phep`): thống kê (chờ duyệt, đang nghỉ hôm nay, số ngày đã duyệt trong năm, đã từ chối), lọc theo trạng thái, tìm kiếm, **duyệt** hoặc **từ chối** (bắt buộc ghi lý do).
 - **Đơn được duyệt tự ghi trạng thái `LEAVE`** vào `attendance_records` → hiện ngay trên lịch chấm công tháng của nhân viên.
+- **Ngày công & OT của kỳ lương tự đồng bộ** từ `attendance_records` (trang "Chấm công & OT" chỉ đọc, không nhập tay / import Excel): công chuẩn = số ngày T2–T6; công thực tế = PRESENT + LATE + REMOTE + nghỉ phép có lương (không tính đơn UNPAID/SICK), tối đa bằng công chuẩn; OT = tổng `ot_hours` của tháng. Kỳ `DRAFT` được đồng bộ mỗi lần mở bảng, tính lương và trước khi khoá sổ.
 - **Quy tắc nghiệp vụ** (`Back-End/services/LeavePolicy.php`, hàm thuần, có kiểm thử):
   - 12 ngày phép năm; năm đầu tính theo tỉ lệ số tháng làm việc; +1 ngày cho mỗi 5 năm thâm niên.
   - Chỉ tính ngày T2–T6; tối đa 30 ngày làm việc mỗi đơn; không vắt sang năm khác.
@@ -80,11 +81,12 @@ test-backend.php                 60 kiểm thử LeavePolicy + PayrollEngine (kh
 
 Cấu hình Vitest nằm ngay trong `Front-End/vite.config.js` (khối `test`). Các script phụ (`serve.sh`, `smoke.sh`, `migrate.php`, `link-frontend.js`) đã bỏ — thay bằng `npm run backend` và phpMyAdmin / `mysql`.
 
-Kết quả lần chạy gần nhất: **Back-End 60/60** (bao gồm các biên biểu thuế, giảm trừ và OT miễn thuế).
+Kết quả lần chạy gần nhất: **Back-End 64/64**, **Front-End 27/27** (bao gồm các biên biểu thuế, giảm trừ và OT miễn thuế).
 
 ### 1.6 Chạy trên nhiều máy (Windows + macOS) a
 
 - Front-End dùng Vite proxy tới `http://localhost:8000` theo mặc định. Nếu đổi địa chỉ backend, cập nhật `BACKEND_URL` trong `Front-End/.env`.
+- Cổng 8000 phải chạy **`Back-End/` của repo**. Nếu XAMPP/MAMP đang phục vụ một bản copy cũ (ví dụ `htdocs/QLNS/Back-End`) trên cổng đó, giao diện sẽ báo "Không tìm thấy API" hoặc hiện số liệu không khớp SQL → dừng server đó rồi chạy `npm run backend`, hoặc trỏ `BACKEND_URL` tới đúng thư mục.
 - `package-lock.json` tạo trên macOS thiếu binary native cho Windows (rolldown, lightningcss, tailwind oxide) → đã đưa mọi lock file vào `.gitignore`; mỗi máy tự `npm install`.
 - `.gitignore` còn bỏ qua cache Vite, `coverage/`, tệp rác của Windows/macOS (`Thumbs.db`, `desktop.ini`, `._*`, `.DS_Store`) và các tệp bí mật (`env.php`, `.env`).
 

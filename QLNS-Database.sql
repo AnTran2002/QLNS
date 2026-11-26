@@ -227,7 +227,7 @@ INSERT INTO `contracts` (`id`, `user_id`, `base_salary`, `insurance_salary`, `de
 
 INSERT INTO `payroll_periods` (`id`, `month_year`, `standard_days`, `status`, `created_at`) VALUES
 (1, '2026-10', 22, 'PAID', '2026-10-01 09:00:00'),
-(2, '2026-11', 22, 'DRAFT', '2026-11-01 09:00:00'),
+(2, '2026-11', 21, 'DRAFT', '2026-11-01 09:00:00'),
 -- Các kỳ đã trả từ tháng 1/2026 (lương tăng dần mỗi tháng tới mức hợp đồng hiện tại)
 (3, '2026-01', 22, 'PAID', '2026-01-01 09:00:00'),
 (4, '2026-02', 20, 'PAID', '2026-02-01 09:00:00'),

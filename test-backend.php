@@ -11,6 +11,7 @@ require $services . 'LeavePolicy.php';
 require $services . 'PayrollEngine.php';
 require $services . 'PayrollPeriodPolicy.php';
 require $services . 'ContractSalaryAdjustmentPolicy.php';
+require $services . 'AttendanceService.php';
 
 $passed = 0;
 $failed = [];
@@ -112,6 +113,12 @@ check('thu nhập dưới giảm trừ → thuế 0', $r['personal_tax'], 0.0);
 $r = PayrollEngine::calculateNetSalary(18_500_000, 2_500_000, 22, 22, 8, 1.5, 1, 15_000_000);
 check('mẫu NV002 tháng 10 dùng giảm trừ và biểu thuế 2026', $r['personal_tax'], 0.0);
 check('mẫu NV002 tháng 10 net theo quy tắc 2026', near($r['net_salary'], 20_686_363.64), true);
+echo "\nCông chuẩn tự động (số ngày T2–T6 của tháng)\n";
+check('11/2026 = 21 ngày', AttendanceService::weekdaysInMonth('2026-11'), 21);
+check('12/2026 = 23 ngày', AttendanceService::weekdaysInMonth('2026-12'), 23);
+check('02/2026 = 20 ngày', AttendanceService::weekdaysInMonth('2026-02'), 20);
+check('08/2026 = 21 ngày', AttendanceService::weekdaysInMonth('2026-08'), 21);
+
 $r = PayrollEngine::calculateNetSalary(20_000_000, 0, 22, 22, 8, 1.5, 0, 0, 2026);
 check('phần OT cao hơn lương giờ bình thường được miễn thuế', $r['tax_exempt_overtime'], 454_545.45);
 check('OT miễn thuế không bị cộng vào thu nhập tính thuế', $r['taxable_income'], 5_409_090.91);

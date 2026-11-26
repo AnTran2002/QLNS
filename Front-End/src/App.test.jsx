@@ -8,6 +8,7 @@ import { AuthProvider } from "@/hooks/use-auth";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { ApiError, api } from "@/lib/api";
 import { formatMoney, formatMoneyShort, formatPeriod, initials } from "@/lib/format";
+import { allowedPeriodMonths, weekdaysInMonth } from "@/pages/admin/attendance-dialogs";
 
 vi.mock("@/lib/api", async (importOriginal) => {
   const mod = await importOriginal();
@@ -114,36 +115,33 @@ const ATT_ROW = {
   payroll_item_id: null, actual_days: 0, ot_hours: 0, gross_salary: 0, social_insurance: 0, tax_deduction: 0, personal_tax: 0, net_salary: 0,
 };
 
-describe("Chấm công & OT", () => {
-  it("sửa công trên Grid → lưu gửi đúng entries", async () => {
+describe("Chấm công & OT (tự động, chỉ xem)", () => {
+  const period = { id: 2, month_year: "2026-11", standard_days: 21, status: "DRAFT" };
+  const synced = {
+    ...ATT_ROW, payroll_item_id: 9, actual_days: 19, ot_hours: 4, gross_salary: 20000000, net_salary: 18000000,
+    breakdown: { present: 17, late: 1, remote: 1, paid_leave: 0, unpaid_leave: 0, absent: 0, recorded_days: 19 },
+  };
+
+  it("hiện số liệu tổng hợp từ chấm công, không có ô nhập / import / lưu", async () => {
     api.me.mockResolvedValue({ user: ADMIN });
-    const period = { id: 2, month_year: "2026-11", standard_days: 22, status: "DRAFT" };
-    api.payrollAttendance.mockResolvedValue({ period, items: [ATT_ROW] });
-    api.saveAttendance.mockResolvedValue({
-      period, updated_count: 1,
-      items: [{ ...ATT_ROW, payroll_item_id: 9, actual_days: 21, ot_hours: 4, gross_salary: 20000000, net_salary: 18000000 }],
-    });
+    api.payrollAttendance.mockResolvedValue({ period, items: [synced], syncedUntil: "2026-11-20", missingContracts: [] });
     renderApp("/admin/cham-cong?ky=2");
-    const user = userEvent.setup();
     expect(await screen.findByRole("heading", { name: "Chấm công & OT" })).toBeInTheDocument();
-    const days = await screen.findByLabelText("Ngày công của Trần Thị Bình");
-    await user.type(days, "21");
-    await user.type(screen.getByLabelText("Giờ OT của Trần Thị Bình"), "4");
-    expect(screen.getByText(/thay đổi chưa lưu/)).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /Lưu thay đổi/ }));
-    await waitFor(() => expect(api.saveAttendance).toHaveBeenCalledWith(2, [{ user_id: 2, actual_days: 21, ot_hours: 4 }]));
     expect(await screen.findByText("18.000.000 ₫")).toBeInTheDocument();
+    expect(screen.getByText(/Có mặt 17 · Muộn 1 · Remote 1/)).toBeInTheDocument();
+    expect(screen.getByText(/dữ liệu đến/)).toBeInTheDocument();
+    expect(screen.queryAllByRole("textbox")).toHaveLength(0);
+    expect(screen.queryAllByRole("spinbutton")).toHaveLength(0);
+    expect(screen.queryByRole("button", { name: /Import|Lưu thay đổi/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Đồng bộ lại/ })).toBeInTheDocument();
   });
 
-  it("chặn ngày công vượt số ngày trong tháng", async () => {
-    api.me.mockResolvedValue({ user: ADMIN });
-    api.payrollAttendance.mockResolvedValue({ period: { id: 2, month_year: "2026-11", standard_days: 22, status: "DRAFT" }, items: [ATT_ROW] });
-    renderApp("/admin/cham-cong");
-    const user = userEvent.setup();
-    await user.type(await screen.findByLabelText("Ngày công của Trần Thị Bình"), "45");
-    await user.click(screen.getByRole("button", { name: /Lưu thay đổi/ }));
-    expect(api.saveAttendance).not.toHaveBeenCalled();
-    expect(screen.getByLabelText("Ngày công của Trần Thị Bình")).toHaveAttribute("aria-invalid", "true");
+  it("tạo kỳ chỉ cho tháng hiện tại / kế tiếp, công chuẩn = số ngày T2–T6", () => {
+    const opts = allowedPeriodMonths(new Date(2026, 10, 21));
+    expect(opts.map((o) => o.monthYear)).toEqual(["2026-11", "2026-12"]);
+    expect(allowedPeriodMonths(new Date(2026, 11, 5)).map((o) => o.monthYear)).toEqual(["2026-12", "2027-01"]);
+    expect(weekdaysInMonth("2026-11")).toBe(21);
+    expect(weekdaysInMonth("2026-02")).toBe(20);
   });
 });
 

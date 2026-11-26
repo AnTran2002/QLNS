@@ -196,23 +196,27 @@ Tất cả gọi tới `index.php?action=<tên>`. Các API có dấu 🔒 cần 
 | `employees/create` | POST | 🔒 ADMIN | Xem ví dụ bên dưới | Nhân viên vừa tạo (HTTP 201). Mật khẩu mặc định `123456` |
 | `employees/update` | PUT | 🔒 ADMIN | `?id=2` + thông tin hồ sơ (không gồm lương) | Nhân viên sau khi sửa |
 | `employees/delete` | DELETE | 🔒 ADMIN | `?id=2` | `null` (không cho tự xoá hoặc xoá nhân viên đã có kỳ lương khóa sổ/đã trả) |
-| `payroll/periods` | POST | 🔒 ADMIN | `{ "month_year": "2026-12", "standard_days": 22 }` | Kỳ lương mới ở trạng thái `DRAFT`; không nhận tháng đã qua |
-| `payroll/attendance` | GET | 🔒 ADMIN | `?period_id=2` | Kỳ lương và danh sách nhân viên đầy đủ cùng ngày công/OT hiện tại |
-| `payroll/attendance` | PUT/POST | 🔒 ADMIN | `{ "period_id": 2, "entries": [{ "user_id": 2, "actual_days": 22, "ot_hours": 4 }] }` | Lưu lô ngày công/OT và tính lại lương trong cùng transaction |
-| `payroll/import` | POST | 🔒 ADMIN | `multipart/form-data`: `period_id`, `file` (.xlsx) | Kiểm tra toàn file rồi nhập nguyên tử, không lưu dở một phần |
-| `payroll/run` | POST | 🔒 ADMIN | `{ "period_id": 2 }` | Tính lại và lưu Gross, BHXH 10.5%, TNCN 7 bậc và Net cho toàn kỳ |
-| `payroll/lock` | POST | 🔒 ADMIN | `{ "period_id": 2 }` | Chuyển kỳ `DRAFT` sang `LOCKED` sau khi kiểm tra dữ liệu đầy đủ |
+| `payroll/periods` | POST | 🔒 ADMIN | `{ "month_year": "2026-12" }` | Kỳ lương mới ở trạng thái `DRAFT`; không nhận tháng đã qua; công chuẩn tự tính = số ngày T2–T6 của tháng |
+| `payroll/attendance` | GET | 🔒 ADMIN | `?period_id=2` | **Chỉ đọc.** Kỳ `DRAFT` được đồng bộ ngày công/OT từ `attendance_records` rồi tính lại lương mỗi lần gọi. Trả `{ period, synced_until, missing_contracts[], items[] }`, mỗi dòng có `breakdown` (present, late, remote, paid_leave, unpaid_leave, absent) |
+| `payroll/run` | POST | 🔒 ADMIN | `{ "period_id": 2 }` | Đồng bộ chấm công rồi tính lại và lưu Gross, BHXH 10.5%, TNCN và Net cho toàn kỳ |
+| `payroll/lock` | POST | 🔒 ADMIN | `{ "period_id": 2 }` | Đồng bộ lần cuối rồi chuyển kỳ `DRAFT` sang `LOCKED` (số liệu cố định từ đây) |
 | `payroll/bank-account` | PUT/POST | 🔒 ADMIN | `{ "user_id": 2, "bank_name": "...", "bank_account_name": "...", "bank_account_number": "..." }` | Cập nhật tài khoản nhận lương của nhân viên |
 | `payroll/export-bank-transfers` | GET | 🔒 ADMIN | `?period_id=2` | Tải workbook `.xlsx` chuyển khoản; chỉ cho kỳ `LOCKED` và đủ tài khoản ngân hàng |
 | `payroll/payslip` | GET | 🔒 EMPLOYEE | `?period_id=2` | Phiếu lương của chính nhân viên đăng nhập; chỉ kỳ `LOCKED`/`PAID` |
 | `payroll/payslip/download` | GET | 🔒 EMPLOYEE | `?period_id=2` | Tải phiếu lương HTML tự chứa để mở/in hoặc lưu thành PDF |
-| `payroll/calculate` | POST | 🔒 ADMIN | `{ user_id, period_id, actual_days, ot_hours }` | Kết quả tính lương (kỳ phải ở trạng thái `DRAFT`) |
 
 Điều chỉnh lương gửi đủ `base_salary`, `insurance_salary`, `allowance`, `dependents_count` và `reason` (3–500 ký tự). Backend lưu mức cũ/mới, người điều chỉnh và lý do; mức mới chỉ áp dụng từ tháng kế tiếp. Mỗi hợp đồng chỉ có một điều chỉnh cho cùng tháng hiệu lực.
 
-File Excel UC-02 cần có worksheet đầu tiên với hàng tiêu đề `employee_code`, `actual_days`, `ot_hours` (hoặc `Mã nhân viên`, `Ngày công`, `Giờ OT`). Mỗi mã nhân viên chỉ xuất hiện một lần; file tối đa 10 MB và 10.000 dòng. Backend yêu cầu bật PHP extension `zip` để đọc `.xlsx`; cấu hình PHP cần cho phép `upload_max_filesize=10M` và `post_max_size` lớn hơn 10 MB. Nhập Excel và chỉnh sửa grid đều chỉ ghi vào kỳ `DRAFT`, từ chối nhân viên không tồn tại/không có hợp đồng và rollback toàn bộ nếu có lỗi.
+Ngày công & OT **không nhập tay, không import Excel**. Với kỳ `DRAFT`, backend (`AttendanceService::sync`) tổng hợp từ bảng chấm công theo ngày `attendance_records`:
 
-UC-03 chỉ chạy trên kỳ `DRAFT`, yêu cầu mọi nhân viên đều có dòng công/OT và hợp đồng. Hệ thống tính lại toàn bộ kỳ trong một transaction; thiếu dữ liệu, công/OT ngoài giới hạn hoặc lỗi database sẽ không lưu kết quả dở dang. API trả `calculated_count`, tổng Gross/BHXH/TNCN/Net và các dòng lương đã tính. Engine dùng công thức prorate theo ngày công, OT hệ số 1.5, bảo hiểm 10.5% trên lương đóng bảo hiểm và biểu thuế lũy tiến 7 bậc hiện có trong `PayrollEngine`.
+- Công chuẩn = số ngày T2–T6 của tháng (ghi lại vào `payroll_periods.standard_days`).
+- Ngày công thực tế = số ngày T2–T6 có trạng thái `PRESENT`, `LATE`, `REMOTE`, cộng `LEAVE` có lương (ngày nghỉ thuộc đơn `UNPAID`/`SICK` đã duyệt không tính), tối đa bằng công chuẩn.
+- Giờ OT = tổng `ot_hours` của cả tháng (kể cả cuối tuần).
+- Lương, phụ cấp, người phụ thuộc lấy theo điều chỉnh lương có hiệu lực tại tháng của kỳ (`contract_salary_adjustments`), nếu không có thì theo hợp đồng.
+
+Việc đồng bộ chạy khi gọi `payroll/attendance`, `payroll/items`, `payroll/run` và `payroll/lock` trên kỳ `DRAFT`. Kỳ `LOCKED`/`PAID` giữ nguyên số liệu đã chốt.
+
+UC-03 chỉ chạy trên kỳ `DRAFT` (đã đồng bộ chấm công ngay trước đó), yêu cầu mọi nhân viên đều có hợp đồng. Hệ thống tính lại toàn bộ kỳ trong một transaction; thiếu dữ liệu, công/OT ngoài giới hạn hoặc lỗi database sẽ không lưu kết quả dở dang. API trả `calculated_count`, tổng Gross/BHXH/TNCN/Net và các dòng lương đã tính. Engine dùng công thức prorate theo ngày công, OT hệ số 1.5, bảo hiểm 10.5% trên lương đóng bảo hiểm và biểu thuế TNCN theo năm của kỳ trong `PayrollEngine` (từ 2026: 5 bậc, giảm trừ 15,5tr/6,2tr).
 
 UC-04 chỉ khóa sổ kỳ `DRAFT` sau khi tất cả nhân viên có dữ liệu công/OT, hợp đồng và kết quả khớp với công thức hiện tại; nếu có thay đổi sau lần tính lương, cần chạy lại UC-03 trước khi khóa. Khóa sổ được thực hiện nguyên tử và các API nhập/chỉnh sửa công tiếp tục từ chối kỳ `LOCKED`. API dashboard/lịch sử nhân viên chỉ trả phiếu của kỳ `LOCKED` hoặc `PAID`, không lộ số lương nháp. File chuyển khoản bao gồm mã nhân viên, tên, ngân hàng, chủ tài khoản, số tài khoản, số tiền Net và nội dung chuyển khoản; chỉ xuất kỳ `LOCKED` để tránh chi trùng. Nếu chưa có tài khoản của bất kỳ nhân viên nào, API trả mã nhân viên thiếu và không tạo file. Bật PHP extension `zip` để xuất `.xlsx`.
 
@@ -389,7 +393,7 @@ import { callApi } from "@/lib/api-client";
 
 export const payrollApi = {
   periods: () => callApi("payroll/periods"),
-  calculate: (body) => callApi("payroll/calculate", { method: "POST", data: body }),
+  run: (periodId) => callApi("payroll/run", { method: "POST", data: { period_id: periodId } }),
 };
 ```
 
@@ -429,6 +433,7 @@ Thêm nhân viên trong phpMyAdmin:
 
 | Triệu chứng | Nguyên nhân và cách sửa |
 | --- | --- |
+| Giao diện báo *"Không tìm thấy API: payroll/attendance"* hoặc bảng toàn số 0 dù SQL có dữ liệu | Cổng 8000 đang chạy một bản Back-End **cũ** (ví dụ bản copy trong `htdocs` của XAMPP), không phải `Back-End/` của repo. Dừng server đó rồi chạy `npm run backend` trong `Front-End`, hoặc đặt `BACKEND_URL` trỏ tới server đang chạy `Back-End/` của repo |
 | Backend trả trang HTML **404 Not Found** | PHP server chưa được khởi chạy với router của dự án. Trong `Front-End`, chạy `npm run backend` (hoặc trong `Back-End`, chạy `php -S localhost:8000 index.php`), rồi thử lại |
 | Vite báo **HTTP 502** / `ECONNREFUSED` | Backend chưa chạy hoặc `BACKEND_URL` không khớp địa chỉ backend. Chạy `php -S localhost:8000 index.php` trong thư mục `Back-End` và đặt `BACKEND_URL=http://localhost:8000` |
 | Giao diện báo *"Không thể kết nối máy chủ…"* hoặc Vite báo `ECONNREFUSED` | Backend PHP chưa chạy hoặc không nghe trên cổng 8000. Chạy `php -S localhost:8000 index.php` trong thư mục `Back-End`, kiểm tra `BACKEND_URL=http://localhost:8000`, rồi khởi động lại Vite |

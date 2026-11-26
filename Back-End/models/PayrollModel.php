@@ -60,59 +60,10 @@ class PayrollModel extends BaseModel {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public function getPayrollInputsByUserIds(array $userIds, string $effectiveMonth): array
+    public function updateStandardDays(int $periodId, int $standardDays): void
     {
-        if ($userIds === []) {
-            return [];
-        }
-
-        $userIds = array_values($userIds);
-        $placeholders = implode(', ', array_map(fn ($index) => ':user_' . $index, array_keys($userIds)));
-        $stmt = $this->db->prepare(
-            "SELECT u.id AS user_id, u.employee_code, c.id AS contract_id,
-                    " . SalaryAdjustmentSql::selectedFields() . "
-             FROM users u
-             LEFT JOIN contracts c ON c.id = (
-                 SELECT c2.id
-                 FROM contracts c2
-                 WHERE c2.user_id = u.id
-                 ORDER BY c2.created_at DESC, c2.id DESC
-                 LIMIT 1
-             )
-             " . SalaryAdjustmentSql::effectiveJoin('c', 'sa', ':effective_month') . "
-             WHERE u.id IN ({$placeholders})"
-        );
-        $params = ['effective_month' => $effectiveMonth];
-        foreach (array_values($userIds) as $index => $userId) {
-            $params['user_' . $index] = $userId;
-        }
-        $stmt->execute($params);
-        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        $byUserId = [];
-        foreach ($rows as $row) {
-            $byUserId[(int) $row['user_id']] = $row;
-        }
-        return $byUserId;
-    }
-
-    public function getUsersByEmployeeCodes(array $employeeCodes): array
-    {
-        if ($employeeCodes === []) {
-            return [];
-        }
-
-        $placeholders = implode(', ', array_fill(0, count($employeeCodes), '?'));
-        $stmt = $this->db->prepare(
-            "SELECT id, employee_code
-             FROM users
-             WHERE employee_code IN ({$placeholders})"
-        );
-        $stmt->execute($employeeCodes);
-        $users = [];
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $users[$row['employee_code']] = (int) $row['id'];
-        }
-        return $users;
+        $stmt = $this->db->prepare("UPDATE payroll_periods SET standard_days = :days WHERE id = :id");
+        $stmt->execute(['days' => $standardDays, 'id' => $periodId]);
     }
 
     public function getItemsByPeriod($periodId)
