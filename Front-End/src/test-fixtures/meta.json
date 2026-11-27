@@ -73,26 +73,11 @@
   "Nữ",
   "Khác"
  ],
- "education_levels": [
-  "Trung học phổ thông",
-  "Trung cấp",
-  "Cao đẳng",
-  "Đại học",
-  "Thạc sĩ",
-  "Tiến sĩ"
- ],
  "leave_types": [
   "ANNUAL",
   "SICK",
   "UNPAID",
   "OTHER"
- ],
- "application_statuses": [
-  "PENDING",
-  "APPROVED",
-  "REJECTED",
-  "CONTRACT_SUBMITTED",
-  "HIRED"
  ],
  "contract_types": {
   "INDEFINITE": "Không xác định thời hạn",

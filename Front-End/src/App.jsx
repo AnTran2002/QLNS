@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MotionConfig } from "motion/react";
@@ -8,7 +8,6 @@ import {
   ClipboardList,
   FileSignature,
   FileStack,
-  UserPlus,
   FileText,
   LayoutDashboard,
   Plane,
@@ -40,10 +39,7 @@ const EmployeePayslips = lazy(() => import("@/pages/employee/payslips"));
 const EmployeeAttendance = lazy(() => import("@/pages/employee/attendance"));
 const EmployeeTeam = lazy(() => import("@/pages/employee/team"));
 const EmployeeLeave = lazy(() => import("@/pages/employee/leave"));
-const RecruitmentPage = lazy(() => import("@/pages/admin/recruitment"));
 const ContractDocumentsPage = lazy(() => import("@/pages/admin/contract-documents"));
-const ApplyPage = lazy(() => import("@/pages/public/apply"));
-const OfferPage = lazy(() => import("@/pages/public/offer"));
 
 const ADMIN_NAV = [
   {
@@ -53,7 +49,6 @@ const ADMIN_NAV = [
   {
     label: "Nhân sự",
     items: [
-      { to: "/admin/tuyen-dung", label: "Tuyển dụng", icon: UserPlus },
       { to: "/admin/ho-so-hop-dong", label: "Hồ sơ hợp đồng", icon: FileStack },
       { to: "/admin/nhan-vien", label: "Nhân viên", icon: Users },
       { to: "/admin/phong-ban", label: "Phòng ban", icon: Building2 },
@@ -137,13 +132,9 @@ export function AppRoutes() {
     <Routes>
       <Route path="/" element={<RootRedirect />} />
       <Route path="/login" element={<GuestOnly><LoginPage /></GuestOnly>} />
-      {/* Công khai — ứng viên không cần tài khoản */}
-      <Route path="/tuyen-dung" element={<Suspense fallback={<FullScreenLoader />}><ApplyPage /></Suspense>} />
-      <Route path="/hop-dong/:token" element={<Suspense fallback={<FullScreenLoader />}><OfferPage /></Suspense>} />
 
       <Route path="/admin" element={<RequireRole role="ADMIN"><AdminShell groups={ADMIN_NAV} title="Quản trị" /></RequireRole>}>
         <Route index element={<AdminOverview />} />
-        <Route path="tuyen-dung" element={<RecruitmentPage />} />
         <Route path="ho-so-hop-dong" element={<ContractDocumentsPage />} />
         <Route path="nhan-vien" element={<EmployeesPage />} />
         <Route path="phong-ban" element={<DepartmentsPage />} />

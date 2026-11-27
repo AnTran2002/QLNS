@@ -13,7 +13,7 @@ class ContractIntakeException extends RuntimeException
 
 /**
  * Nhận file hợp đồng tải lên: kiểm tra định dạng → đọc .docx → kiểm tra pháp lý → lưu file + bản ghi contract_documents.
- * Dùng chung cho ứng viên (qua link hợp đồng) và nhân sự (tải lên trực tiếp).
+ * Nhân sự tải hợp đồng lên trực tiếp (Quản trị → Hồ sơ hợp đồng).
  */
 class ContractIntake
 {
@@ -36,7 +36,7 @@ class ContractIntake
      * @return array [document_id, validation, dữ liệu đã chuẩn hoá]
      * @throws ContractIntakeException
      */
-    public static function handle(?array $docx, ?array $scan, string $source, ?int $applicationId, ?int $uploadedBy, array $expect = []): array
+    public static function handle(?array $docx, ?array $scan, ?int $uploadedBy): array
     {
         if (!$docx || ($docx['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
             throw new ContractIntakeException('Chưa chọn file hợp đồng (.docx)');
@@ -63,7 +63,7 @@ class ContractIntake
             throw new ContractIntakeException($e->getMessage());
         }
 
-        $result = (new ContractValidator())->validate($raw, $expect);
+        $result = (new ContractValidator())->validate($raw);
         $validation = self::summary($result);
         if (!$result['ok']) {
             throw new ContractIntakeException(
@@ -96,9 +96,8 @@ class ContractIntake
         }
 
         $id = $model->create([
-            'application_id' => $applicationId,
             'contract_number' => $result['data']['contract_number'],
-            'source' => $source,
+            'source' => 'HR',
             'original_filename' => self::safeName($docx['name']),
             'stored_path' => $stored,
             'file_hash' => $hash,

@@ -20,10 +20,9 @@ class ContractValidator extends BaseModel
     private array $warnings = [];
 
     /**
-     * @param array $raw    [key => chuỗi] từ ContractReader hoặc form
-     * @param array $expect Ràng buộc từ hồ sơ ứng tuyển: email, national_id, branch_id
+     * @param array $raw [key => chuỗi] từ ContractReader hoặc form
      */
-    public function validate(array $raw, array $expect = []): array
+    public function validate(array $raw): array
     {
         $this->data = $this->missing = $this->errors = $this->warnings = [];
         $fields = ContractSchema::fields();
@@ -45,7 +44,6 @@ class ContractValidator extends BaseModel
         $this->checkSalary();
         $this->checkCommitments();
         $this->checkDuplicates();
-        $this->checkExpectations($expect);
         $this->fillDefaults();
 
         return [
@@ -384,23 +382,6 @@ class ContractValidator extends BaseModel
                     $this->error($field, $message);
                 }
             }
-        }
-    }
-
-    private function checkExpectations(array $expect): void
-    {
-        $d = $this->data;
-        if (!empty($expect['email']) && $d['email'] && mb_strtolower($expect['email']) !== $d['email']) {
-            $this->error('email', 'Email trong hợp đồng khác email đã ứng tuyển (' . $expect['email'] . ')');
-        }
-        if (!empty($expect['national_id']) && $d['national_id'] && $expect['national_id'] !== $d['national_id']) {
-            $this->error('national_id', 'Số CCCD trong hợp đồng khác số CCCD đã ứng tuyển');
-        }
-        if (!empty($expect['branch_id']) && $d['branch_id'] && (int) $expect['branch_id'] !== $d['branch_id']) {
-            $this->warn('branch', 'Chi nhánh trong hợp đồng khác chi nhánh đã ứng tuyển');
-        }
-        if (!empty($expect['base_salary']) && $d['base_salary'] !== null && (float) $expect['base_salary'] !== $d['base_salary']) {
-            $this->warn('base_salary', 'Mức lương khác mức lương trong thư mời (' . number_format((float) $expect['base_salary'], 0, ',', '.') . 'đ)');
         }
     }
 

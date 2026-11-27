@@ -58,28 +58,16 @@ class ContractDocumentController
         json_response(200, $this->format($doc, true), 'Lấy hồ sơ hợp đồng thành công');
     }
 
-    /** POST contracts/documents/upload (multipart: contract, scan?, application_id?) */
+    /** POST contracts/documents/upload (multipart: contract, scan?) */
     public function upload()
     {
         if (!require_method('POST') || !require_auth('ADMIN')) {
             return;
         }
-        $applicationId = (int) ($_POST['application_id'] ?? 0) ?: null;
-        $expect = [];
-        if ($applicationId) {
-            $app = (new JobApplicationModel())->find($applicationId);
-            if (!$app || !in_array($app['status'], ['APPROVED', 'CONTRACT_SUBMITTED'], true)) {
-                return json_response(409, null, 'Hồ sơ ứng tuyển chưa được duyệt hoặc đã hoàn tất');
-            }
-            $expect = ['email' => $app['email'], 'national_id' => $app['national_id'], 'branch_id' => $app['branch_id']];
-        }
         try {
-            [$id] = ContractIntake::handle($_FILES['contract'] ?? null, $_FILES['scan'] ?? null, 'HR', $applicationId, (int) $_SESSION['user_id'], $expect);
+            [$id] = ContractIntake::handle($_FILES['contract'] ?? null, $_FILES['scan'] ?? null, (int) $_SESSION['user_id']);
         } catch (ContractIntakeException $e) {
             return json_response($e->status, $e->payload, $e->getMessage());
-        }
-        if ($applicationId) {
-            (new JobApplicationModel())->setStatus($applicationId, 'CONTRACT_SUBMITTED');
         }
         json_response(201, $this->format((new ContractDocumentModel())->find($id), true), 'Đã đọc và lưu hợp đồng — kiểm tra lại thông tin rồi duyệt');
     }
@@ -166,13 +154,8 @@ class ContractDocumentController
                 return json_response(422, null, 'Cần tải lên bản scan hợp đồng có chữ ký trước khi duyệt');
             }
             $raw = json_decode($doc['extracted_data'], true)['raw'] ?? [];
-            $expect = [];
-            if ($doc['application_id']) {
-                $app = (new JobApplicationModel())->find((int) $doc['application_id']);
-                $expect = $app ? ['email' => $app['email'], 'national_id' => $app['national_id']] : [];
-            }
             // Kiểm tra lại tại thời điểm duyệt (VD CCCD/email vừa bị trùng).
-            $result = (new ContractValidator())->validate($raw, $expect);
+            $result = (new ContractValidator())->validate($raw);
             $docs->updateValidation($id, json_encode(ContractIntake::summary($result), JSON_UNESCAPED_UNICODE));
             if (!$result['complete']) {
                 $docs->commit();
@@ -187,9 +170,6 @@ class ContractDocumentController
             $userId = $users->createFromContract($d);
             (new ContractModel())->createFromDocument($userId, $d, $id);
             $docs->review($id, 'APPROVED', (int) $_SESSION['user_id'], $note, $userId);
-            if ($doc['application_id']) {
-                (new JobApplicationModel())->setStatus((int) $doc['application_id'], 'HIRED', $userId);
-            }
             $docs->commit();
         } catch (Throwable $e) {
             $docs->rollBack();
@@ -222,10 +202,6 @@ class ContractDocumentController
             return json_response(409, null, 'Hồ sơ đã được xử lý');
         }
         $docs->review((int) $doc['id'], 'REJECTED', (int) $_SESSION['user_id'], mb_substr($note, 0, 500));
-        // Ứng viên được nộp lại qua link cũ.
-        if ($doc['application_id']) {
-            (new JobApplicationModel())->setStatus((int) $doc['application_id'], 'APPROVED');
-        }
         json_response(200, $this->format($docs->find((int) $doc['id']), true), 'Đã từ chối hồ sơ hợp đồng');
     }
 
@@ -235,14 +211,13 @@ class ContractDocumentController
         $data = $extracted['data'] ?? [];
         $out = [
             'id' => (int) $d['id'],
-            'application_id' => $d['application_id'] !== null ? (int) $d['application_id'] : null,
             'user_id' => $d['user_id'] !== null ? (int) $d['user_id'] : null,
             'hired_employee_code' => $d['hired_employee_code'],
             'contract_number' => $d['contract_number'],
             'source' => $d['source'],
             'status' => $d['status'],
-            'full_name' => $data['full_name'] ?? $d['applicant_name'],
-            'email' => $data['email'] ?? $d['applicant_email'],
+            'full_name' => $data['full_name'] ?? null,
+            'email' => $data['email'] ?? null,
             'position' => $data['position'] ?? null,
             'department' => $data['department'] ?? null,
             'base_salary' => $data['base_salary'] ?? null,

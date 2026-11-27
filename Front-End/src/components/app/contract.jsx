@@ -4,15 +4,6 @@ import { Badge } from "@/components/ui/badge";
 import { formatDate, formatMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-/** Trạng thái hồ sơ ứng tuyển (ENUM job_applications.status). */
-export const APPLICATION_STATUS = {
-  PENDING: { label: "Chờ duyệt", variant: "warning" },
-  APPROVED: { label: "Đã duyệt · chờ hợp đồng", variant: "secondary" },
-  CONTRACT_SUBMITTED: { label: "Đã nộp hợp đồng", variant: "default" },
-  HIRED: { label: "Đã tuyển", variant: "success" },
-  REJECTED: { label: "Từ chối", variant: "destructive" },
-};
-
 /** Trạng thái hồ sơ hợp đồng (ENUM contract_documents.status). */
 export const DOCUMENT_STATUS = {
   PENDING_REVIEW: { label: "Chờ kiểm tra", variant: "warning" },

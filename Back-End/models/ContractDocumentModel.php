@@ -4,11 +4,9 @@ class ContractDocumentModel extends BaseModel
 {
     protected $table = 'contract_documents';
 
-    private const SELECT = "SELECT d.*, a.full_name AS applicant_name, a.email AS applicant_email,
-                                   up.full_name AS uploader_name, rv.full_name AS reviewer_name,
+    private const SELECT = "SELECT d.*, up.full_name AS uploader_name, rv.full_name AS reviewer_name,
                                    u.employee_code AS hired_employee_code
                             FROM contract_documents d
-                            LEFT JOIN job_applications a ON a.id = d.application_id
                             LEFT JOIN users up ON up.id = d.uploaded_by
                             LEFT JOIN users rv ON rv.id = d.reviewed_by
                             LEFT JOIN users u ON u.id = d.user_id";
@@ -17,9 +15,9 @@ class ContractDocumentModel extends BaseModel
     {
         $stmt = $this->db->prepare(
             "INSERT INTO contract_documents
-                (application_id, contract_number, source, original_filename, stored_path, file_hash,
+                (contract_number, source, original_filename, stored_path, file_hash,
                  scan_filename, scan_path, extracted_data, validation, uploaded_by)
-             VALUES (:application_id, :contract_number, :source, :original_filename, :stored_path, :file_hash,
+             VALUES (:contract_number, :source, :original_filename, :stored_path, :file_hash,
                  :scan_filename, :scan_path, :extracted_data, :validation, :uploaded_by)"
         );
         $stmt->execute($d);
@@ -45,13 +43,6 @@ class ContractDocumentModel extends BaseModel
     {
         $stmt = $this->db->prepare("SELECT id FROM contract_documents WHERE file_hash = ? AND status <> 'REJECTED' LIMIT 1");
         $stmt->execute([$hash]);
-        return $stmt->fetch() ?: null;
-    }
-
-    public function pendingForApplication(int $applicationId): ?array
-    {
-        $stmt = $this->db->prepare("SELECT * FROM contract_documents WHERE application_id = ? AND status = 'PENDING_REVIEW' ORDER BY id DESC LIMIT 1");
-        $stmt->execute([$applicationId]);
         return $stmt->fetch() ?: null;
     }
 

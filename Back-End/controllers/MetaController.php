@@ -2,11 +2,10 @@
 
 require_once __DIR__ . '/../services/PayrollConfig.php';
 require_once __DIR__ . '/../services/ContractSchema.php';
-require_once __DIR__ . '/RecruitmentController.php';
 
 /**
  * GET meta — Danh mục dùng chung cho Front-End, lấy từ database + cấu hình Back-End (không mã cứng ở giao diện).
- * Công khai vì trang tuyển dụng cần danh sách chi nhánh/phòng ban; không chứa dữ liệu cá nhân.
+ * Công khai (trang đăng nhập dùng tên ứng dụng); không chứa dữ liệu cá nhân.
  */
 class MetaController
 {
@@ -25,9 +24,7 @@ class MetaController
             'employee_statuses' => $m->enumValues('users', 'status') ?: ['Đang làm việc', 'Thử việc', 'Nghỉ phép'],
             'roles' => $m->enumValues('users', 'role'),
             'genders' => ContractSchema::GENDERS,
-            'education_levels' => RecruitmentController::EDUCATION,
             'leave_types' => $m->enumValues('leave_requests', 'type'),
-            'application_statuses' => $m->enumValues('job_applications', 'status'),
             'contract_types' => ContractSchema::CONTRACT_TYPES,
             'holidays' => array_merge($m->holidays($year), $m->holidays($year + 1)),
             'payroll' => PayrollConfig::toArray($year),

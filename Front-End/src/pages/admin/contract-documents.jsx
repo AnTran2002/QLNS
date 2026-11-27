@@ -8,7 +8,6 @@ import { DOCUMENT_STATUS, DOCX_ACCEPT, ExtractedData, FilePicker, SCAN_ACCEPT, S
 import { EmptyState, ErrorState, FormError, LoadingState, PageHeader, SearchField, Segmented, StatTile } from "@/components/app/kit";
 import { Reveal, RevealGroup } from "@/components/app/motion";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { useMeta } from "@/hooks/use-meta";
@@ -17,7 +16,6 @@ import { formatDate, formatMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const FILTERS = ["PENDING_REVIEW", "APPROVED", "REJECTED", "ALL"];
-const NO_APP = "none";
 
 const issueCount = (v) => (v ? (v.errors?.length ?? 0) + (v.missing?.length ?? 0) : 0);
 
@@ -34,27 +32,18 @@ function UploadDialog({ open, onOpenChange, onUploaded }) {
   const { contractSchema } = useMeta();
   const [contract, setContract] = useState(null);
   const [scan, setScan] = useState(null);
-  const [applicationId, setApplicationId] = useState(NO_APP);
   const [rejected, setRejected] = useState(null);
-  const applications = useQuery({
-    queryKey: ["applications"],
-    queryFn: () => api.applications(),
-    enabled: open,
-  });
-  const linkable = (applications.data ?? []).filter((a) => ["APPROVED", "CONTRACT_SUBMITTED"].includes(a.status));
 
   const reset = () => {
     setContract(null);
     setScan(null);
-    setApplicationId(NO_APP);
     setRejected(null);
     upload.reset();
   };
   const upload = useMutation({
-    mutationFn: () => api.uploadContractDocument({ contract, scan, application_id: applicationId === NO_APP ? undefined : applicationId }),
+    mutationFn: () => api.uploadContractDocument({ contract, scan }),
     onSuccess: (doc) => {
       queryClient.invalidateQueries({ queryKey: ["contract-documents"] });
-      queryClient.invalidateQueries({ queryKey: ["applications"] });
       toast.success(`Đã đọc hợp đồng của ${doc.full_name ?? "người lao động"} — kiểm tra rồi duyệt`);
       reset();
       onUploaded(doc.id);
@@ -81,23 +70,6 @@ function UploadDialog({ open, onOpenChange, onUploaded }) {
         <div className="grid gap-4">
           <FilePicker label="Hợp đồng (.docx)" hint="Điền theo mẫu của hệ thống — tối đa 5MB" accept={DOCX_ACCEPT} file={contract} onChange={setContract} required />
           <FilePicker label="Bản scan có chữ ký" hint="PDF/JPG/PNG — có thể bổ sung sau" accept={SCAN_ACCEPT} file={scan} onChange={setScan} />
-          <div className="grid gap-1.5">
-            <Label htmlFor="doc-application">Gắn với hồ sơ ứng tuyển</Label>
-            <Select value={String(applicationId)} onValueChange={setApplicationId}>
-              <SelectTrigger id="doc-application" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={NO_APP}>Không — nhân sự nhập trực tiếp</SelectItem>
-                {linkable.map((a) => (
-                  <SelectItem key={a.id} value={String(a.id)}>
-                    #{a.id} · {a.full_name} · {a.position}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-[12px] text-muted-foreground">Khi gắn hồ sơ, email / CCCD / chi nhánh trong hợp đồng phải khớp hồ sơ ứng tuyển.</p>
-          </div>
           <FormError message={upload.error?.message} />
           {rejected && (
             <>
@@ -155,7 +127,7 @@ function DocumentDialog({ id, onClose }) {
     mutationFn: () => api.approveContractDocument(id, note.trim() || undefined),
     onSuccess: (res) => {
       refresh();
-      ["employees", "contracts", "applications", "overview"].forEach((k) => queryClient.invalidateQueries({ queryKey: [k] }));
+      ["employees", "contracts", "overview"].forEach((k) => queryClient.invalidateQueries({ queryKey: [k] }));
       setAccount(res.account);
       setMode(null);
       toast.success(`Đã tạo tài khoản ${res.account.employee_code}`);
@@ -166,7 +138,6 @@ function DocumentDialog({ id, onClose }) {
     mutationFn: () => api.rejectContractDocument(id, note.trim()),
     onSuccess: () => {
       refresh();
-      queryClient.invalidateQueries({ queryKey: ["applications"] });
       setMode(null);
       toast.success("Đã từ chối hồ sơ hợp đồng");
     },
@@ -195,7 +166,7 @@ function DocumentDialog({ id, onClose }) {
           </DialogTitle>
           <DialogDescription>
             {doc
-              ? `#${doc.id} · ${doc.contract_number ?? "chưa có số HĐ"} · ${doc.source === "APPLICANT" ? "ứng viên nộp qua link" : `nhân sự tải lên (${doc.uploader_name ?? "—"})`} · ${formatDate(doc.created_at)}`
+              ? `#${doc.id} · ${doc.contract_number ?? "chưa có số HĐ"} · tải lên bởi ${doc.uploader_name ?? "—"} · ${formatDate(doc.created_at)}`
               : "Đang tải…"}
           </DialogDescription>
         </DialogHeader>
@@ -403,7 +374,7 @@ export default function ContractDocumentsPage() {
                       <TableHead>Người lao động</TableHead>
                       <TableHead className="hidden md:table-cell">Vị trí · Lương</TableHead>
                       <TableHead>Kiểm tra</TableHead>
-                      <TableHead className="hidden lg:table-cell">Nguồn</TableHead>
+                      <TableHead className="hidden lg:table-cell">Người tải lên</TableHead>
                       <TableHead>Trạng thái</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -437,7 +408,7 @@ export default function ContractDocumentsPage() {
                             </span>
                           </TableCell>
                           <TableCell className="hidden text-[13px] text-muted-foreground lg:table-cell">
-                            {d.source === "APPLICANT" ? "Ứng viên" : "Nhân sự"} · {formatDate(d.created_at)}
+                            {d.uploader_name ?? "—"} · {formatDate(d.created_at)}
                           </TableCell>
                           <TableCell>
                             <StatusBadge map={DOCUMENT_STATUS} status={d.status} />

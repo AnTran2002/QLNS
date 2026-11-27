@@ -70,7 +70,6 @@ beforeEach(() => {
   api.myLeave.mockResolvedValue({ available: true, balance: LEAVE_BALANCE, requests: [LEAVE_REQ] });
   api.meta.mockResolvedValue(META);
   api.payrollEstimate.mockResolvedValue(PAYROLL_ESTIMATE);
-  api.applications.mockResolvedValue([]);
   api.contractDocuments.mockResolvedValue([]);
   api.completeTutorial.mockResolvedValue(null);
   api.resetTutorial.mockResolvedValue(null);

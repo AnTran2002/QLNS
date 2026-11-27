@@ -65,16 +65,6 @@ match ($action) {
     // Danh mục dùng chung (công khai)
     'meta'               => (new MetaController)->index(),
 
-    // Tuyển dụng — công khai cho ứng viên
-    'recruitment/apply'           => (new RecruitmentController)->apply(),
-    'recruitment/offer'           => (new RecruitmentController)->offer(),
-    'recruitment/offer/template'  => (new RecruitmentController)->offerTemplate(),
-    'recruitment/offer/upload'    => (new RecruitmentController)->offerUpload(),
-    // Tuyển dụng — quản trị
-    'recruitment/applications'    => (new RecruitmentController)->applications(),
-    'recruitment/review'          => (new RecruitmentController)->review(),
-    'recruitment/mark-emailed'    => (new RecruitmentController)->markEmailed(),
-
     // Xác thực
     'login'              => (new AuthController)->login(),
     'me'                 => (new AuthController)->me(),
