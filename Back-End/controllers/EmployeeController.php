@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/../services/ContractSalaryAdjustmentPolicy.php';
+require_once __DIR__ . '/../services/PayrollInputs.php';
 
 class EmployeeController
 {
@@ -44,15 +45,15 @@ class EmployeeController
             $totalOtHours    += (float) $item['ot_hours'];
         }
 
-        $workSchedule = [
-            'monday'    => '08:30 - 17:30',
-            'tuesday'   => '08:30 - 17:30',
-            'wednesday' => '08:30 - 17:30',
-            'thursday'  => '08:30 - 17:30',
-            'friday'    => '08:30 - 17:30',
-            'saturday'  => 'Nghỉ tuần',
-            'sunday'    => 'Nghỉ tuần',
-        ];
+        // Lịch làm việc theo hợp đồng (số ngày/tuần, số giờ/ngày) — không mã cứng.
+        $daysPerWeek  = (int) ($contract['working_days_per_week'] ?? 5) ?: 5;
+        $hoursPerDay  = (float) ($contract['working_hours_per_day'] ?? 8) ?: 8;
+        $endMinutes   = 8 * 60 + 30 + (int) round($hoursPerDay * 60) + 60; // 08:30 + giờ làm + 1 giờ nghỉ trưa
+        $shift        = sprintf('08:30 - %02d:%02d', intdiv($endMinutes, 60), $endMinutes % 60);
+        $workSchedule = [];
+        foreach (['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as $i => $day) {
+            $workSchedule[$day] = $i < $daysPerWeek ? $shift : 'Nghỉ tuần';
+        }
 
         json_response(200, [
             'user_info' => [
@@ -74,6 +75,20 @@ class EmployeeController
                 'allowance'        => (float) $contract['allowance'],
                 'dependents_count' => (int) $contract['dependents_count'],
                 'created_at'       => $contract['created_at'],
+                'contract_number'  => $contract['contract_number'] ?? null,
+                'contract_type'    => $contract['contract_type'] ?? null,
+                'start_date'       => $contract['start_date'] ?? null,
+                'end_date'         => $contract['end_date'] ?? null,
+                'probation_days'   => (int) ($contract['probation_days'] ?? 0),
+                'probation_salary_rate' => (float) ($contract['probation_salary_rate'] ?? 1),
+                'job_title'        => $contract['job_title'] ?? null,
+                'working_hours_per_day' => $contract['working_hours_per_day'] !== null ? (float) $contract['working_hours_per_day'] : null,
+                'working_days_per_week' => $contract['working_days_per_week'] !== null ? (int) $contract['working_days_per_week'] : null,
+                'annual_leave_days' => $contract['annual_leave_days'] !== null ? (int) $contract['annual_leave_days'] : null,
+                'payment_method'   => $contract['payment_method'] ?? null,
+                'pay_day'          => $contract['pay_day'] !== null ? (int) $contract['pay_day'] : null,
+                'commitments'      => $contract['commitments'] ?? null,
+                'signed_date'      => $contract['signed_date'] ?? null,
             ] : null,
             'payroll_history' => array_map([$this, 'formatPayrollItem'], $payroll),
             'attendance_summary' => [
@@ -194,6 +209,11 @@ class EmployeeController
             return;
         }
 
+        // Tài khoản chỉ được tạo khi duyệt hồ sơ hợp đồng (contracts/documents/approve).
+        if (!defined('ALLOW_DIRECT_EMPLOYEE_CREATE') || ALLOW_DIRECT_EMPLOYEE_CREATE !== true) {
+            return json_response(409, null, 'Tạo tài khoản phải thông qua hợp đồng: tải hợp đồng lên ở mục Hợp đồng → Hồ sơ hợp đồng, kiểm tra và duyệt');
+        }
+
         [$data, $error] = $this->validate(read_json_body());
         if ($error) {
             return json_response(422, null, $error);
@@ -218,6 +238,83 @@ class EmployeeController
         }
 
         json_response(201, $this->formatEmployee($userModel->findWithContract($id)), 'Đã thêm nhân viên');
+    }
+
+    /**
+     * GET ?action=employee/payroll-estimate — Lương tạm tính theo tiến trình tháng hiện tại
+     * (chấm công, OT, phép, lễ đến hôm nay) + dự kiến cả tháng nếu đi làm đủ các ngày còn lại.
+     */
+    public function payrollEstimate()
+    {
+        if (!require_method('GET') || !require_auth('EMPLOYEE')) {
+            return;
+        }
+        $userId = (int) $_SESSION['user_id'];
+        $month  = $_GET['month'] ?? date('Y-m');
+        if (!is_string($month) || !preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $month) || $month > date('Y-m')) {
+            $month = date('Y-m');
+        }
+
+        $payrollModel = new PayrollModel();
+        $row = $payrollModel->getPayrollInputsByUserIds([$userId], $month)[$userId] ?? null;
+        if (!$row || $row['contract_id'] === null) {
+            return json_response(404, null, 'Chưa có hợp đồng để tính lương');
+        }
+
+        $inputs = new PayrollInputs($month);
+        $period = null;
+        foreach ($payrollModel->getAllPeriods() as $p) {
+            if ($p['month_year'] === $month) {
+                $period = $p;
+                break;
+            }
+        }
+        $standardDays = $period ? (int) $period['standard_days'] : $inputs->standardDays();
+        $otHours      = $inputs->otHours($userId);
+        $toDate       = $inputs->calculate($row, $standardDays, $otHours);
+        $remaining    = $inputs->remainingWorkdays();
+        $projection   = $inputs->calculate($row, $standardDays, $otHours, $remaining);
+
+        json_response(200, [
+            'month'              => $month,
+            'through_date'       => $inputs->throughDate(),
+            'standard_days'      => $standardDays,
+            'standard_days_source' => $period ? 'period' : 'calendar',
+            'worked_days'        => $inputs->actualDays($userId),
+            'remaining_workdays' => $remaining,
+            'ot_hours'           => $otHours,
+            'holidays'           => $inputs->holidays(),
+            'period'             => $period ? ['id' => (int) $period['id'], 'status' => $period['status']] : null,
+            'to_date'            => $toDate,
+            'projection'         => [
+                'assumed_extra_days' => $remaining,
+                'gross_salary'       => $projection['gross_salary'],
+                'social_insurance'   => $projection['social_insurance'],
+                'personal_tax'       => $projection['personal_tax'],
+                'net_salary'         => $projection['net_salary'],
+                'breakdown'          => $projection['breakdown'],
+            ],
+        ], 'Tính lương tạm tính thành công');
+    }
+
+    /** POST ?action=tutorial/complete — đánh dấu đã xem hướng dẫn lần đầu. */
+    public function completeTutorial()
+    {
+        if (!require_method('POST') || !require_auth()) {
+            return;
+        }
+        (new UserModel())->completeTutorial((int) $_SESSION['user_id']);
+        json_response(200, ['tutorial_completed_at' => date('Y-m-d H:i:s')], 'Đã hoàn thành hướng dẫn');
+    }
+
+    /** POST ?action=tutorial/reset — xem lại hướng dẫn. */
+    public function resetTutorial()
+    {
+        if (!require_method('POST') || !require_auth()) {
+            return;
+        }
+        (new UserModel())->resetTutorial((int) $_SESSION['user_id']);
+        json_response(200, ['tutorial_completed_at' => null], 'Đã bật lại hướng dẫn');
     }
 
     /**
@@ -403,6 +500,7 @@ class EmployeeController
             'tax_deduction'    => (float) $item['tax_deduction'],
             'personal_tax'     => (float) $item['personal_tax'],
             'net_salary'       => (float) $item['net_salary'],
+            'breakdown'        => $item['breakdown'] ?? null,
         ];
     }
 }

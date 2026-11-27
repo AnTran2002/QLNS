@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FormError } from "@/components/app/kit";
 import { api } from "@/lib/api";
-import { DEPARTMENT_SUGGESTIONS, EMPLOYEE_STATUSES } from "@/lib/constants";
+import { useMeta } from "@/hooks/use-meta";
 import { formatMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -88,6 +88,7 @@ function EmployeeForm({ employee, employees, onDone }) {
       : { ...EMPTY, employee_code: suggestCode(employees), joined_at: today() },
   );
   const [error, setError] = useState("");
+  const meta = useMeta();
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e?.target ? e.target.value : e }));
 
   const mutation = useMutation({
@@ -109,7 +110,7 @@ function EmployeeForm({ employee, employees, onDone }) {
     mutation.mutate(form);
   };
 
-  const departments = [...new Set([...employees.map((e) => e.department), ...DEPARTMENT_SUGGESTIONS])].filter(Boolean);
+  const departments = [...new Set([...employees.map((e) => e.department), ...meta.departments])].filter(Boolean);
   const money = (key) => (form[key] ? formatMoney(form[key]) : null);
 
   return (
@@ -138,7 +139,7 @@ function EmployeeForm({ employee, employees, onDone }) {
           <Select value={form.status} onValueChange={set("status")}>
             <SelectTrigger id="status" className="w-full"><SelectValue /></SelectTrigger>
             <SelectContent>
-              {EMPLOYEE_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              {meta.employeeStatuses.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
             </SelectContent>
           </Select>
         </Field>

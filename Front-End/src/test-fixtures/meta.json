@@ -1,0 +1,583 @@
+{
+ "app_name": "PeopleOS",
+ "company": {
+  "name": "Công ty Cổ phần PeopleOS",
+  "tax_code": "0109999999",
+  "address": "Tầng 12, 54 Liễu Giai, Ba Đình, Hà Nội",
+  "phone": "024 3999 9999",
+  "representative": "Trần Minh Quân",
+  "representative_title": "Giám đốc Nhân sự"
+ },
+ "branches": [
+  {
+   "id": 1,
+   "code": "HN",
+   "name": "Chi nhánh Hà Nội",
+   "address": "Tầng 12, 54 Liễu Giai, Ba Đình",
+   "city": "Hà Nội",
+   "region": "I"
+  },
+  {
+   "id": 2,
+   "code": "HCM",
+   "name": "Chi nhánh TP.HCM",
+   "address": "Tầng 8, 2 Hải Triều, Bến Nghé, Quận 1",
+   "city": "TP. Hồ Chí Minh",
+   "region": "I"
+  },
+  {
+   "id": 3,
+   "code": "DN",
+   "name": "Chi nhánh Đà Nẵng",
+   "address": "255 Nguyễn Văn Linh, Thanh Khê",
+   "city": "Đà Nẵng",
+   "region": "I"
+  },
+  {
+   "id": 4,
+   "code": "HP",
+   "name": "Chi nhánh Hải Phòng",
+   "address": "15 Lê Hồng Phong, Ngô Quyền",
+   "city": "Hải Phòng",
+   "region": "I"
+  },
+  {
+   "id": 5,
+   "code": "CT",
+   "name": "Chi nhánh Cần Thơ",
+   "address": "209 Đường 30/4, Ninh Kiều",
+   "city": "Cần Thơ",
+   "region": "II"
+  }
+ ],
+ "departments": [
+  "Kế toán",
+  "Kinh doanh",
+  "Kỹ thuật",
+  "Marketing",
+  "Nhân sự",
+  "Thiết kế",
+  "Vận hành"
+ ],
+ "employee_statuses": [
+  "Đang làm việc",
+  "Thử việc",
+  "Nghỉ phép"
+ ],
+ "roles": [
+  "ADMIN",
+  "EMPLOYEE"
+ ],
+ "genders": [
+  "Nam",
+  "Nữ",
+  "Khác"
+ ],
+ "education_levels": [
+  "Trung học phổ thông",
+  "Trung cấp",
+  "Cao đẳng",
+  "Đại học",
+  "Thạc sĩ",
+  "Tiến sĩ"
+ ],
+ "leave_types": [
+  "ANNUAL",
+  "SICK",
+  "UNPAID",
+  "OTHER"
+ ],
+ "application_statuses": [
+  "PENDING",
+  "APPROVED",
+  "REJECTED",
+  "CONTRACT_SUBMITTED",
+  "HIRED"
+ ],
+ "contract_types": {
+  "INDEFINITE": "Không xác định thời hạn",
+  "FIXED_TERM": "Xác định thời hạn"
+ },
+ "holidays": [
+  {
+   "holiday_date": "2026-01-01",
+   "name": "Tết Dương lịch"
+  },
+  {
+   "holiday_date": "2026-02-16",
+   "name": "Tết Nguyên đán"
+  },
+  {
+   "holiday_date": "2026-02-17",
+   "name": "Tết Nguyên đán"
+  },
+  {
+   "holiday_date": "2026-02-18",
+   "name": "Tết Nguyên đán"
+  },
+  {
+   "holiday_date": "2026-02-19",
+   "name": "Tết Nguyên đán"
+  },
+  {
+   "holiday_date": "2026-02-20",
+   "name": "Tết Nguyên đán"
+  },
+  {
+   "holiday_date": "2026-04-27",
+   "name": "Giỗ Tổ Hùng Vương (nghỉ bù)"
+  },
+  {
+   "holiday_date": "2026-04-30",
+   "name": "Ngày Chiến thắng"
+  },
+  {
+   "holiday_date": "2026-05-01",
+   "name": "Quốc tế Lao động"
+  },
+  {
+   "holiday_date": "2026-09-01",
+   "name": "Quốc khánh"
+  },
+  {
+   "holiday_date": "2026-09-02",
+   "name": "Quốc khánh"
+  }
+ ],
+ "payroll": {
+  "tax_year": 2026,
+  "reference_salary": 2340000,
+  "regional_minimum_wage": {
+   "I": 5310000,
+   "II": 4730000,
+   "III": 4140000,
+   "IV": 3700000
+  },
+  "social_insurance_cap": 46800000,
+  "unemployment_insurance_cap": 106200000,
+  "employee_rates": {
+   "bhxh": 0.08,
+   "bhyt": 0.015,
+   "bhtn": 0.01
+  },
+  "employer_rates": {
+   "bhxh": 0.175,
+   "bhyt": 0.03,
+   "bhtn": 0.01
+  },
+  "insurance_rate": 0.105,
+  "employer_insurance_rate": 0.215,
+  "ot_multipliers": {
+   "weekday": 1.5,
+   "weekend": 2,
+   "holiday": 3
+  },
+  "standard_hours_per_day": 8,
+  "max_hours_per_week": 48,
+  "max_ot_hours_per_month": 40,
+  "max_ot_hours_per_year": 300,
+  "min_annual_leave_days": 12,
+  "min_probation_salary_rate": 0.85,
+  "max_probation_days": {
+   "MANAGER": 180,
+   "HIGH_SKILL": 60,
+   "MID_SKILL": 30,
+   "OTHER": 6
+  },
+  "personal_deduction": 15500000,
+  "dependent_deduction": 6200000,
+  "tax_brackets": [
+   {
+    "from": 0,
+    "to": 10000000,
+    "rate": 0.05
+   },
+   {
+    "from": 10000000,
+    "to": 30000000,
+    "rate": 0.1
+   },
+   {
+    "from": 30000000,
+    "to": 60000000,
+    "rate": 0.2
+   },
+   {
+    "from": 60000000,
+    "to": 100000000,
+    "rate": 0.3
+   },
+   {
+    "from": 100000000,
+    "to": null,
+    "rate": 0.35
+   }
+  ]
+ },
+ "contract_schema": {
+  "company": {
+   "name": "Công ty Cổ phần PeopleOS",
+   "tax_code": "0109999999",
+   "address": "Tầng 12, 54 Liễu Giai, Ba Đình, Hà Nội",
+   "phone": "024 3999 9999",
+   "representative": "Trần Minh Quân",
+   "representative_title": "Giám đốc Nhân sự"
+  },
+  "sections": {
+   "employee": "I. THÔNG TIN NGƯỜI LAO ĐỘNG (BÊN B)",
+   "contract": "II. CÔNG VIỆC, THỜI HẠN VÀ THỜI GIỜ LÀM VIỆC",
+   "salary": "III. TIỀN LƯƠNG VÀ HÌNH THỨC TRẢ LƯƠNG",
+   "commitment": "IV. CAM KẾT",
+   "signing": "V. KÝ KẾT"
+  },
+  "fields": [
+   {
+    "key": "full_name",
+    "label": "Họ và tên",
+    "section": "employee",
+    "required": true,
+    "type": "text",
+    "hint": "VD: Nguyễn Văn An"
+   },
+   {
+    "key": "date_of_birth",
+    "label": "Ngày sinh",
+    "section": "employee",
+    "required": true,
+    "type": "date",
+    "hint": "dd/mm/yyyy"
+   },
+   {
+    "key": "gender",
+    "label": "Giới tính",
+    "section": "employee",
+    "required": true,
+    "type": "enum",
+    "hint": "Nam / Nữ / Khác"
+   },
+   {
+    "key": "national_id",
+    "label": "Số CCCD",
+    "section": "employee",
+    "required": true,
+    "type": "text",
+    "hint": "12 chữ số"
+   },
+   {
+    "key": "national_id_issued_date",
+    "label": "Ngày cấp CCCD",
+    "section": "employee",
+    "required": true,
+    "type": "date",
+    "hint": "dd/mm/yyyy"
+   },
+   {
+    "key": "national_id_issued_place",
+    "label": "Nơi cấp CCCD",
+    "section": "employee",
+    "required": true,
+    "type": "text",
+    "hint": "VD: Cục Cảnh sát QLHC về TTXH"
+   },
+   {
+    "key": "address",
+    "label": "Địa chỉ thường trú",
+    "section": "employee",
+    "required": true,
+    "type": "text",
+    "hint": "Số nhà, đường, phường/xã, tỉnh/thành"
+   },
+   {
+    "key": "phone",
+    "label": "Số điện thoại",
+    "section": "employee",
+    "required": true,
+    "type": "phone",
+    "hint": "10 số, bắt đầu bằng 0"
+   },
+   {
+    "key": "email",
+    "label": "Email",
+    "section": "employee",
+    "required": true,
+    "type": "email",
+    "hint": "Dùng để đăng nhập và nhận phiếu lương"
+   },
+   {
+    "key": "tax_code",
+    "label": "Mã số thuế cá nhân",
+    "section": "employee",
+    "required": false,
+    "type": "text",
+    "hint": "Từ 01/07/2025 có thể dùng số CCCD"
+   },
+   {
+    "key": "dependents_count",
+    "label": "Số người phụ thuộc",
+    "section": "employee",
+    "required": false,
+    "type": "int",
+    "hint": "Đăng ký giảm trừ gia cảnh, mặc định 0"
+   },
+   {
+    "key": "bank_name",
+    "label": "Ngân hàng nhận lương",
+    "section": "employee",
+    "required": false,
+    "type": "text",
+    "hint": "VD: Vietcombank"
+   },
+   {
+    "key": "bank_account_number",
+    "label": "Số tài khoản",
+    "section": "employee",
+    "required": false,
+    "type": "text",
+    "hint": ""
+   },
+   {
+    "key": "bank_account_name",
+    "label": "Chủ tài khoản",
+    "section": "employee",
+    "required": false,
+    "type": "text",
+    "hint": "Viết in hoa không dấu"
+   },
+   {
+    "key": "contract_number",
+    "label": "Số hợp đồng",
+    "section": "contract",
+    "required": true,
+    "type": "text",
+    "hint": "VD: 015/2026/HĐLĐ-PEOPLEOS"
+   },
+   {
+    "key": "employee_code",
+    "label": "Mã nhân viên",
+    "section": "contract",
+    "required": false,
+    "type": "text",
+    "hint": "Để trống để hệ thống tự cấp"
+   },
+   {
+    "key": "contract_type",
+    "label": "Loại hợp đồng",
+    "section": "contract",
+    "required": true,
+    "type": "enum",
+    "hint": "Không xác định thời hạn / Xác định thời hạn"
+   },
+   {
+    "key": "start_date",
+    "label": "Ngày bắt đầu làm việc",
+    "section": "contract",
+    "required": true,
+    "type": "date",
+    "hint": "dd/mm/yyyy"
+   },
+   {
+    "key": "end_date",
+    "label": "Ngày kết thúc hợp đồng",
+    "section": "contract",
+    "required": false,
+    "type": "date",
+    "hint": "Bắt buộc với HĐ xác định thời hạn (tối đa 36 tháng)"
+   },
+   {
+    "key": "branch",
+    "label": "Chi nhánh làm việc",
+    "section": "contract",
+    "required": true,
+    "type": "text",
+    "hint": "Mã chi nhánh, VD: HN / HCM / DN"
+   },
+   {
+    "key": "department",
+    "label": "Phòng ban",
+    "section": "contract",
+    "required": true,
+    "type": "text",
+    "hint": ""
+   },
+   {
+    "key": "position",
+    "label": "Chức danh",
+    "section": "contract",
+    "required": true,
+    "type": "text",
+    "hint": "Vị trí công việc"
+   },
+   {
+    "key": "job_description",
+    "label": "Mô tả công việc",
+    "section": "contract",
+    "required": false,
+    "type": "text",
+    "hint": "Các nhiệm vụ chính"
+   },
+   {
+    "key": "qualification",
+    "label": "Trình độ",
+    "section": "contract",
+    "required": true,
+    "type": "enum",
+    "hint": "Quản lý doanh nghiệp / Cao đẳng trở lên / Trung cấp / Công việc khác"
+   },
+   {
+    "key": "probation_days",
+    "label": "Thời gian thử việc (ngày)",
+    "section": "contract",
+    "required": true,
+    "type": "int",
+    "hint": "0 nếu không thử việc"
+   },
+   {
+    "key": "probation_salary_rate",
+    "label": "Lương thử việc (% lương chính)",
+    "section": "contract",
+    "required": false,
+    "type": "rate",
+    "hint": "Tối thiểu 85%"
+   },
+   {
+    "key": "working_hours_per_day",
+    "label": "Số giờ làm việc mỗi ngày",
+    "section": "contract",
+    "required": true,
+    "type": "int",
+    "hint": "Tối đa 8 giờ"
+   },
+   {
+    "key": "working_days_per_week",
+    "label": "Số ngày làm việc mỗi tuần",
+    "section": "contract",
+    "required": true,
+    "type": "int",
+    "hint": "Tối đa 6 ngày, tổng ≤ 48 giờ/tuần"
+   },
+   {
+    "key": "annual_leave_days",
+    "label": "Số ngày nghỉ phép năm",
+    "section": "contract",
+    "required": true,
+    "type": "int",
+    "hint": "Tối thiểu 12 ngày"
+   },
+   {
+    "key": "base_salary",
+    "label": "Mức lương chính (VNĐ/tháng)",
+    "section": "salary",
+    "required": true,
+    "type": "money",
+    "hint": "Không thấp hơn lương tối thiểu vùng"
+   },
+   {
+    "key": "allowance",
+    "label": "Phụ cấp cố định (VNĐ/tháng)",
+    "section": "salary",
+    "required": false,
+    "type": "money",
+    "hint": "Ăn trưa, đi lại…"
+   },
+   {
+    "key": "insurance_salary",
+    "label": "Lương đóng BHXH (VNĐ/tháng)",
+    "section": "salary",
+    "required": true,
+    "type": "money",
+    "hint": "Không thấp hơn mức lương chính"
+   },
+   {
+    "key": "payment_method",
+    "label": "Hình thức trả lương",
+    "section": "salary",
+    "required": true,
+    "type": "enum",
+    "hint": "Chuyển khoản / Tiền mặt"
+   },
+   {
+    "key": "pay_day",
+    "label": "Ngày trả lương hằng tháng",
+    "section": "salary",
+    "required": true,
+    "type": "int",
+    "hint": "1–31"
+   },
+   {
+    "key": "confidentiality",
+    "label": "Cam kết bảo mật thông tin",
+    "section": "commitment",
+    "required": true,
+    "type": "yesno",
+    "hint": "Có / Không"
+   },
+   {
+    "key": "training_commitment",
+    "label": "Cam kết đào tạo, bồi hoàn",
+    "section": "commitment",
+    "required": false,
+    "type": "text",
+    "hint": "Nếu có"
+   },
+   {
+    "key": "other_commitments",
+    "label": "Cam kết khác",
+    "section": "commitment",
+    "required": false,
+    "type": "text",
+    "hint": ""
+   },
+   {
+    "key": "employee_confirmation",
+    "label": "Người lao động xác nhận đã đọc và đồng ý toàn bộ điều khoản",
+    "section": "commitment",
+    "required": true,
+    "type": "yesno",
+    "hint": "Ghi \"Có\""
+   },
+   {
+    "key": "signed_date",
+    "label": "Ngày ký hợp đồng",
+    "section": "signing",
+    "required": true,
+    "type": "date",
+    "hint": "dd/mm/yyyy — trước hoặc bằng ngày bắt đầu"
+   },
+   {
+    "key": "employee_signature",
+    "label": "Người lao động ký tên",
+    "section": "signing",
+    "required": true,
+    "type": "text",
+    "hint": "Ghi rõ họ tên"
+   },
+   {
+    "key": "employer_representative",
+    "label": "Đại diện người sử dụng lao động",
+    "section": "signing",
+    "required": true,
+    "type": "text",
+    "hint": ""
+   }
+  ],
+  "qualifications": {
+   "MANAGER": "Quản lý doanh nghiệp",
+   "HIGH_SKILL": "Cao đẳng trở lên",
+   "MID_SKILL": "Trung cấp / công nhân kỹ thuật",
+   "OTHER": "Công việc khác"
+  },
+  "contract_types": {
+   "INDEFINITE": "Không xác định thời hạn",
+   "FIXED_TERM": "Xác định thời hạn"
+  },
+  "payment_methods": [
+   "Chuyển khoản",
+   "Tiền mặt"
+  ],
+  "genders": [
+   "Nam",
+   "Nữ",
+   "Khác"
+  ]
+ }
+}

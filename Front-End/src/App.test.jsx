@@ -8,6 +8,8 @@ import { AuthProvider } from "@/hooks/use-auth";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { ApiError, api } from "@/lib/api";
 import { formatMoney, formatMoneyShort, formatPeriod, initials } from "@/lib/format";
+import META from "./test-fixtures/meta.json";
+import PAYROLL_ESTIMATE from "./test-fixtures/payroll-estimate.json";
 
 vi.mock("@/lib/api", async (importOriginal) => {
   const mod = await importOriginal();
@@ -16,7 +18,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
 });
 
 const ADMIN = { id: 1, employee_code: "NV001", full_name: "Nguyễn Văn An", email: "an@x.vn", role: "ADMIN", department: "Nhân sự", position: "Giám đốc nhân sự", status: "Đang làm việc", joined_at: "2026-01-01" };
-const EMPLOYEE = { id: 2, employee_code: "NV002", full_name: "Trần Thị Bình", email: "binh@x.vn", role: "EMPLOYEE", department: "Thiết kế", position: "Designer", status: "Đang làm việc", joined_at: "2026-01-02" };
+const EMPLOYEE = { id: 2, employee_code: "NV002", full_name: "Trần Thị Bình", email: "binh@x.vn", role: "EMPLOYEE", department: "Thiết kế", position: "Designer", status: "Đang làm việc", joined_at: "2026-01-02", tutorial_completed_at: "2026-01-02 09:00:00" };
 
 const DASHBOARD = {
   user_info: EMPLOYEE,
@@ -66,6 +68,12 @@ beforeEach(() => {
   });
   api.payrollAttendance.mockResolvedValue({ period: { id: 2, month_year: "2026-11", standard_days: 22, status: "DRAFT" }, items: [] });
   api.myLeave.mockResolvedValue({ available: true, balance: LEAVE_BALANCE, requests: [LEAVE_REQ] });
+  api.meta.mockResolvedValue(META);
+  api.payrollEstimate.mockResolvedValue(PAYROLL_ESTIMATE);
+  api.applications.mockResolvedValue([]);
+  api.contractDocuments.mockResolvedValue([]);
+  api.completeTutorial.mockResolvedValue(null);
+  api.resetTutorial.mockResolvedValue(null);
   api.leaveRequests.mockResolvedValue({ available: true, requests: [LEAVE_REQ, { ...LEAVE_REQ, id: 8, status: "APPROVED", reason: "Khám sức khoẻ", type: "SICK" }] });
 });
 

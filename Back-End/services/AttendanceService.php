@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/PayrollEngine.php';
+require_once __DIR__ . '/PayrollInputs.php';
 require_once __DIR__ . '/PayrollChangePolicy.php';
 require_once __DIR__ . '/../models/AttendanceRecordModel.php';
 
@@ -50,7 +51,7 @@ class AttendanceService
             if (!$attendanceModel->tableExists()) {
                 throw new AttendanceException(409, 'Chưa có bảng chấm công theo ngày — hãy chạy migration 004_avatar_daily_attendance.sql');
             }
-            $workedDaysByUser = $attendanceModel->workedDaysByUserForMonth($period['month_year']);
+            $inputs = new PayrollInputs($period['month_year']);
             $userIds = array_column($normalizedEntries, 'user_id');
             $payrollInputs = $this->payrollModel->getPayrollInputsByUserIds($userIds, $period['month_year']);
 
@@ -77,18 +78,8 @@ class AttendanceService
             $calculations = [];
             foreach ($normalizedEntries as $entry) {
                 $employee = $payrollInputs[$entry['user_id']];
-                $actualDays = $workedDaysByUser[$entry['user_id']] ?? 0;
-                $calculation = PayrollEngine::calculateNetSalary(
-                    (float) $employee['base_salary'],
-                    (float) $employee['allowance'],
-                    $actualDays,
-                    $standardDays,
-                    $entry['ot_hours'],
-                    1.5,
-                    (int) $employee['dependents_count'],
-                    (float) $employee['insurance_salary'],
-                    (int) substr($period['month_year'], 0, 4)
-                );
+                $actualDays = $inputs->actualDays($entry['user_id']);
+                $calculation = $inputs->calculate(array_merge($employee, ['user_id' => $entry['user_id']]), $standardDays, $entry['ot_hours']);
                 $calculations[$entry['user_id']] = $calculation;
 
                 $this->payrollModel->saveOrUpdate($periodId, $entry['user_id'], [
@@ -99,6 +90,7 @@ class AttendanceService
                     'tax_deduction' => $calculation['tax_deduction'],
                     'personal_tax' => $calculation['personal_tax'],
                     'net_salary' => $calculation['net_salary'],
+                    'breakdown' => $calculation['breakdown'],
                 ], $entry['reason'], $changedBy);
             }
 

@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/PayrollEngine.php';
+require_once __DIR__ . '/PayrollInputs.php';
 require_once __DIR__ . '/../models/AttendanceRecordModel.php';
 
 class PayrollPeriodException extends RuntimeException
@@ -50,7 +51,7 @@ class PayrollPeriodService
             if (!$attendanceModel->tableExists()) {
                 throw new PayrollPeriodException(409, 'Chưa có bảng chấm công theo ngày — hãy chạy migration 004_avatar_daily_attendance.sql');
             }
-            $workedDaysByUser = $attendanceModel->workedDaysByUserForMonth($period['month_year']);
+            $inputs = new PayrollInputs($period['month_year']);
 
             $standardDays = (int) $period['standard_days'];
             if ($standardDays < 1 || $standardDays > 31) {
@@ -71,7 +72,7 @@ class PayrollPeriodService
                 }
 
                 $actualDays = (float) $row['actual_days'];
-                $currentActualDays = $workedDaysByUser[(int) $row['user_id']] ?? 0;
+                $currentActualDays = $inputs->actualDays((int) $row['user_id']);
                 if ($actualDays !== (float) $currentActualDays) {
                     $staleAttendance[] = $row['employee_code'];
                 }
@@ -84,17 +85,7 @@ class PayrollPeriodService
                     ]);
                 }
 
-                $calculation = PayrollEngine::calculateNetSalary(
-                    (float) $row['base_salary'],
-                    (float) $row['allowance'],
-                    $actualDays,
-                    $standardDays,
-                    $otHours,
-                    1.5,
-                    (int) $row['dependents_count'],
-                    (float) $row['insurance_salary'],
-                    (int) substr($period['month_year'], 0, 4)
-                );
+                $calculation = $inputs->calculate($row, $standardDays, $otHours);
                 foreach (['gross_salary', 'social_insurance', 'tax_deduction', 'personal_tax', 'net_salary'] as $field) {
                     if (abs((float) $row[$field] - $calculation[$field]) >= 0.01) {
                         $staleCalculations[] = $row['employee_code'];

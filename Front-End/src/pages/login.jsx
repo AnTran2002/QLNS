@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router";
+import { Link, Navigate, useLocation, useNavigate } from "react-router";
 import { ArrowRight, Eye, EyeOff, KeyRound, Loader2, ShieldCheck, UserRound } from "lucide-react";
 import { AnimatePresence, motion, useAnimate } from "motion/react";
 import { toast } from "sonner";
@@ -191,9 +191,18 @@ export default function LoginPage() {
             </Card>
           </Reveal>
 
+          <Reveal delay={160} offset={8}>
+            <p className="mt-5 text-center text-[13.5px] text-muted-foreground">
+              Bạn là ứng viên?{" "}
+              <Link to="/tuyen-dung" className="font-medium text-primary underline-offset-4 hover:underline">
+                Nộp hồ sơ ứng tuyển
+              </Link>
+            </p>
+          </Reveal>
+
           <Reveal delay={200} offset={8}>
-            <p className="mt-6 text-center text-[12px] text-muted-foreground">
-              © {new Date().getFullYear()} QLNS · Hệ thống quản trị nhân sự & tiền lương
+            <p className="mt-4 text-center text-[12px] text-muted-foreground">
+              © {new Date().getFullYear()} PeopleOS · Hệ thống quản trị nhân sự & tiền lương
             </p>
           </Reveal>
         </div>

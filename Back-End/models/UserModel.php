@@ -11,6 +11,11 @@ class UserModel extends BaseModel
         u.department, u.position, u.status,
         COALESCE(u.joined_at, DATE(u.created_at)) AS joined_at, u.created_at";
 
+    /** Thông tin cá nhân lấy từ hợp đồng (migration 009) — chỉ trả cho chính chủ và quản trị. */
+    private const PROFILE_COLUMNS = ", u.phone, u.date_of_birth, u.gender, u.national_id, u.national_id_issued_date,
+        u.national_id_issued_place, u.address, u.tax_code, u.branch_id, u.tutorial_completed_at,
+        (SELECT b.name FROM branches b WHERE b.id = u.branch_id) AS branch_name";
+
     private static ?bool $hasAvatar = null;
 
     /** true khi đã chạy migration 004 (cột users.avatar). */
@@ -27,6 +32,77 @@ class UserModel extends BaseModel
     private function publicColumns(): string
     {
         return self::BASE_COLUMNS . ($this->hasAvatarColumn() ? ", u.avatar" : ", NULL AS avatar");
+    }
+
+    private function privateColumns(): string
+    {
+        return $this->publicColumns() . self::PROFILE_COLUMNS;
+    }
+
+    /** Đánh dấu đã xem hướng dẫn sử dụng lần đầu. */
+    public function completeTutorial(int $id): void
+    {
+        $stmt = $this->db->prepare("UPDATE {$this->table} SET tutorial_completed_at = NOW() WHERE id = :id");
+        $stmt->execute(['id' => $id]);
+    }
+
+    /** Mở lại hướng dẫn (nhân viên muốn xem lại). */
+    public function resetTutorial(int $id): void
+    {
+        $stmt = $this->db->prepare("UPDATE {$this->table} SET tutorial_completed_at = NULL WHERE id = :id");
+        $stmt->execute(['id' => $id]);
+    }
+
+    public function existsNationalId(string $nationalId): bool
+    {
+        $stmt = $this->db->prepare("SELECT COUNT(*) FROM {$this->table} WHERE national_id = :nid");
+        $stmt->execute(['nid' => $nationalId]);
+        return (int) $stmt->fetchColumn() > 0;
+    }
+
+    /** Mã nhân viên kế tiếp dạng NV0xx. */
+    public function nextEmployeeCode(): string
+    {
+        $max = (int) $this->db->query("SELECT COALESCE(MAX(CAST(SUBSTRING(employee_code, 3) AS UNSIGNED)), 0) FROM {$this->table} WHERE employee_code REGEXP '^NV[0-9]+$'")->fetchColumn();
+        return 'NV' . str_pad((string) ($max + 1), 3, '0', STR_PAD_LEFT);
+    }
+
+    /** Tạo tài khoản từ hợp đồng đã duyệt — đầy đủ thông tin pháp lý. */
+    public function createFromContract(array $d): int
+    {
+        $stmt = $this->db->prepare(
+            "INSERT INTO {$this->table}
+                (employee_code, full_name, email, phone, date_of_birth, gender, national_id, national_id_issued_date,
+                 national_id_issued_place, address, tax_code, password, role, department, position, branch_id, status, joined_at,
+                 bank_name, bank_account_name, bank_account_number, tutorial_completed_at)
+             VALUES
+                (:employee_code, :full_name, :email, :phone, :date_of_birth, :gender, :national_id, :national_id_issued_date,
+                 :national_id_issued_place, :address, :tax_code, :password, 'EMPLOYEE', :department, :position, :branch_id, :status, :joined_at,
+                 :bank_name, :bank_account_name, :bank_account_number, NULL)"
+        );
+        $stmt->execute([
+            'employee_code' => $d['employee_code'],
+            'full_name' => $d['full_name'],
+            'email' => $d['email'],
+            'phone' => $d['phone'],
+            'date_of_birth' => $d['date_of_birth'],
+            'gender' => $d['gender'],
+            'national_id' => $d['national_id'],
+            'national_id_issued_date' => $d['national_id_issued_date'],
+            'national_id_issued_place' => $d['national_id_issued_place'],
+            'address' => $d['address'],
+            'tax_code' => $d['tax_code'] ?: null,
+            'password' => password_hash($d['password'], PASSWORD_DEFAULT),
+            'department' => $d['department'],
+            'position' => $d['position'],
+            'branch_id' => $d['branch_id'],
+            'status' => $d['status'],
+            'joined_at' => $d['joined_at'],
+            'bank_name' => $d['bank_name'] ?: null,
+            'bank_account_name' => $d['bank_account_name'] ?: null,
+            'bank_account_number' => $d['bank_account_number'] ?: null,
+        ]);
+        return (int) $this->db->lastInsertId();
     }
 
     /** Cập nhật ảnh đại diện (data URL) hoặc xoá (null). */
@@ -61,7 +137,7 @@ class UserModel extends BaseModel
      */
     public function findById($id)
     {
-        $stmt = $this->db->prepare("SELECT " . $this->publicColumns() . " FROM {$this->table} u WHERE u.id = :id LIMIT 1");
+        $stmt = $this->db->prepare("SELECT " . $this->privateColumns() . " FROM {$this->table} u WHERE u.id = :id LIMIT 1");
         $stmt->execute(['id' => $id]);
         return $stmt->fetch();
     }
@@ -80,8 +156,8 @@ class UserModel extends BaseModel
      */
     public function getAllWithContract()
     {
-        $sql = "SELECT " . $this->publicColumns() . ",
-                       c.id AS contract_id, " . SalaryAdjustmentSql::selectedFields() . "
+        $sql = "SELECT " . $this->privateColumns() . ",
+                       c.id AS contract_id, c.contract_number, c.contract_type, c.start_date, c.end_date, " . SalaryAdjustmentSql::selectedFields() . "
                 FROM {$this->table} u
                 LEFT JOIN contracts c ON c.id = (
                     SELECT c2.id FROM contracts c2
@@ -101,8 +177,8 @@ class UserModel extends BaseModel
      */
     public function findWithContract($id)
     {
-        $sql = "SELECT " . $this->publicColumns() . ",
-                       c.id AS contract_id, " . SalaryAdjustmentSql::selectedFields() . "
+        $sql = "SELECT " . $this->privateColumns() . ",
+                       c.id AS contract_id, c.contract_number, c.contract_type, c.start_date, c.end_date, " . SalaryAdjustmentSql::selectedFields() . "
                 FROM {$this->table} u
                 LEFT JOIN contracts c ON c.id = (
                     SELECT c2.id FROM contracts c2

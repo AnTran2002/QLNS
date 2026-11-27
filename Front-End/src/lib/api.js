@@ -52,6 +52,55 @@ async function callApi(action, { method = "GET", data, params, timeout } = {}) {
 export const payslipDownloadUrl = (periodId) =>
   `${API_BASE_URL.replace(/\/$/, "")}/?action=payroll/payslip/download&period_id=${encodeURIComponent(periodId)}`;
 
+/** URL tuyệt đối tới một action của Back-End (dùng cho link tải file — cùng origin nên gửi kèm cookie). */
+export const apiFileUrl = (action, params = {}) => {
+  const q = new URLSearchParams({ action, ...params });
+  return `${API_BASE_URL.replace(/\/$/, "")}/?${q.toString()}`;
+};
+
+/** Tải file nhị phân (DOCX/PDF) qua API; lỗi JSON từ Back-End được đọc ra thành ApiError. */
+async function downloadFile(action, params, fallbackName) {
+  try {
+    const res = await http.request({ url: "/", params: { action, ...params }, responseType: "blob", timeout: 30000 });
+    const type = res.headers["content-type"] || "";
+    if (type.includes("application/json")) {
+      const body = JSON.parse(await res.data.text());
+      throw new ApiError(body.message || "Không tải được file", res.status);
+    }
+    const disposition = res.headers["content-disposition"] || "";
+    const match = disposition.match(/filename="?([^";]+)"?/i);
+    const name = match ? decodeURIComponent(match[1]) : fallbackName;
+    const url = URL.createObjectURL(res.data);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return name;
+  } catch (err) {
+    if (err instanceof ApiError) throw err;
+    if (err.response?.data instanceof Blob) {
+      try {
+        const body = JSON.parse(await err.response.data.text());
+        throw new ApiError(body.message || "Không tải được file", err.response.status);
+      } catch (inner) {
+        if (inner instanceof ApiError) throw inner;
+      }
+    }
+    throw new ApiError(err.response ? `Không tải được file (HTTP ${err.response.status}).` : "Không thể kết nối máy chủ.", err.response?.status ?? 0);
+  }
+}
+
+function multipart(fields) {
+  const form = new FormData();
+  for (const [k, v] of Object.entries(fields)) {
+    if (v !== undefined && v !== null && v !== "") form.append(k, v instanceof Blob ? v : String(v));
+  }
+  return form;
+}
+
 /** Ép các trường số (Back-End có chỗ trả DECIMAL dạng chuỗi) về number. */
 const MONEY_FIELDS = [
   "base_salary", "insurance_salary", "allowance", "dependents_count",
@@ -196,4 +245,42 @@ export const api = {
     }),
   runPayroll: (periodId, reasons) =>
     callApi("payroll/run", { method: "POST", data: { period_id: periodId, reasons } }),
+
+  // ---- Danh mục dùng chung từ CSDL (MetaController) ----
+  /** Chi nhánh, phòng ban, ENUM trạng thái, ngày lễ, tham số luật tính lương, cấu trúc hợp đồng… */
+  meta: () => callApi("meta"),
+
+  // ---- Lương tạm tính theo tiến trình chấm công ----
+  payrollEstimate: (month) => callApi("employee/payroll-estimate", { params: month ? { month } : undefined }),
+
+  // ---- Hướng dẫn lần đầu đăng nhập ----
+  completeTutorial: () => callApi("tutorial/complete", { method: "POST" }),
+  resetTutorial: () => callApi("tutorial/reset", { method: "POST" }),
+
+  // ---- Tuyển dụng (RecruitmentController) ----
+  /** Công khai: ứng viên nộp hồ sơ. */
+  applyJob: (form) => callApi("recruitment/apply", { method: "POST", data: form }),
+  /** Công khai: xem thư mời theo token gửi qua email. */
+  offer: (token) => callApi("recruitment/offer", { params: { token } }),
+  downloadOfferTemplate: (token) => downloadFile("recruitment/offer/template", { token }, "Hop-dong-lao-dong.docx"),
+  uploadOfferContract: (token, contract, scan) =>
+    callApi("recruitment/offer/upload", { method: "POST", data: multipart({ token, contract, scan }), timeout: 60000 }),
+  applications: (status) => callApi("recruitment/applications", { params: status ? { status } : undefined }),
+  /** decision: "APPROVE" (kèm offer) | "REJECT" (bắt buộc note). */
+  reviewApplication: ({ id, decision, note, offer }) =>
+    callApi("recruitment/review", { method: "POST", data: { id, decision, note, offer } }),
+  markApplicationEmailed: (id) => callApi("recruitment/mark-emailed", { method: "POST", data: { id } }),
+
+  // ---- Hồ sơ hợp đồng: tải lên → đọc → kiểm tra pháp lý → duyệt tạo tài khoản ----
+  downloadContractTemplate: () => downloadFile("contracts/template", {}, "Mau-hop-dong-lao-dong-PeopleOS.docx"),
+  contractDocuments: (status) => callApi("contracts/documents", { params: status ? { status } : undefined }),
+  contractDocument: (id) => callApi("contracts/documents/show", { params: { id } }),
+  uploadContractDocument: ({ contract, scan, application_id }) =>
+    callApi("contracts/documents/upload", { method: "POST", data: multipart({ contract, scan, application_id }), timeout: 60000 }),
+  attachContractScan: (id, scan) =>
+    callApi("contracts/documents/scan", { method: "POST", data: multipart({ id, scan }), timeout: 60000 }),
+  downloadContractFile: (id, kind) => downloadFile("contracts/documents/file", { id, kind }, kind === "scan" ? "scan" : "hop-dong.docx"),
+  contractFileUrl: (id, kind) => apiFileUrl("contracts/documents/file", { id, kind }),
+  approveContractDocument: (id, note) => callApi("contracts/documents/approve", { method: "POST", data: { id, note } }),
+  rejectContractDocument: (id, note) => callApi("contracts/documents/reject", { method: "POST", data: { id, note } }),
 };

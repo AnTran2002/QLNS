@@ -1,6 +1,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
-import { ChevronsUpDown, LogOut, Monitor, Moon, Search, Sun } from "lucide-react";
+import { ChevronsUpDown, GraduationCap, LogOut, Monitor, Moon, Search, Sun } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
 import { toast } from "sonner";
 import { PageTransition } from "@/components/animate-ui/components/page-transition";
@@ -18,6 +19,8 @@ import { BrandMark } from "@/components/app/brand";
 import { LoadingState, PersonAvatar } from "@/components/app/kit";
 import { Spotlight } from "@/components/app/spotlight";
 import { ThemeToggle } from "@/components/app/theme-toggle";
+import { EmployeeTutorial } from "@/components/app/tutorial";
+import { api } from "@/lib/api";
 import { Separator } from "@/components/ui/separator";
 import {
   Sidebar,
@@ -68,9 +71,19 @@ function NavGroups({ groups }) {
 
 function SidebarUser() {
   const { user, logout } = useAuth();
+  const queryClient = useQueryClient();
   const { theme, setTheme } = useTheme();
   const { isMobile } = useSidebar();
   const navigate = useNavigate();
+
+  const replayTutorial = async () => {
+    try {
+      await api.resetTutorial();
+      await queryClient.invalidateQueries({ queryKey: ["me"] });
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -112,6 +125,11 @@ function SidebarUser() {
           <DropdownMenuRadioItem value="system"><Monitor /> Theo hệ thống</DropdownMenuRadioItem>
         </DropdownMenuRadioGroup>
         <DropdownMenuSeparator />
+        {user?.role === "EMPLOYEE" && (
+          <DropdownMenuItem onSelect={replayTutorial}>
+            <GraduationCap /> Xem lại hướng dẫn
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem onSelect={handleLogout} variant="destructive">
           <LogOut /> Đăng xuất
         </DropdownMenuItem>
@@ -239,7 +257,7 @@ export function AdminShell({
           <motion.div initial="rest" animate="rest" whileHover="hover" className="flex h-10 items-center gap-2.5 px-1.5">
             <BrandMark className="size-7" hoverFromParent />
             <span className="grid leading-tight whitespace-nowrap group-data-[state=collapsed]/sidebar:hidden">
-              <span className="font-display text-[15px] font-semibold tracking-[-0.02em]">QLNS</span>
+              <span className="font-display text-[15px] font-semibold tracking-[-0.02em]">PeopleOS</span>
               <span className="text-[11.5px] text-sidebar-foreground/60">{subtitle}</span>
             </span>
           </motion.div>
@@ -265,6 +283,7 @@ export function AdminShell({
       </SidebarInset>
 
       <Spotlight open={searchOpen} onOpenChange={setSearchOpen} items={items} />
+      <EmployeeTutorial />
     </SidebarProvider>
   );
 }

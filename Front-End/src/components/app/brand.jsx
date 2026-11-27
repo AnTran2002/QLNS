@@ -2,7 +2,7 @@ import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
 
 /*
- * Logo QLNS — "Đội ngũ đi lên": ba cột tăng dần (bảng lương / sự phát triển),
+ * Logo PeopleOS — "Đội ngũ đi lên": ba cột tăng dần (bảng lương / sự phát triển),
  * mỗi cột đội một "cái đầu" tròn (con người). Rê chuột → các cột lần lượt thụt xuống rồi bật lên,
  * nền xoay nhẹ. Người bật "giảm chuyển động" sẽ không thấy hiệu ứng (MotionConfig reducedMotion="user").
  */
@@ -32,7 +32,7 @@ const head = {
 };
 
 /**
- * Biểu tượng QLNS.
+ * Biểu tượng PeopleOS.
  * - Mặc định tự xử lý hover. Đặt `hoverFromParent` khi cha là motion có `whileHover="hover"` (cả cụm logo + chữ).
  * - `playing`: lặp hiệu ứng liên tục (màn hình chờ).
  */
@@ -71,8 +71,8 @@ function loop(variants, i) {
   return { rest: variants.rest, hover: { ...v, transition: { ...v.transition, repeat: Infinity, repeatDelay: 0.5 } } };
 }
 
-/** Logo + chữ QLNS; rê vào bất kỳ đâu trong cụm đều chạy hiệu ứng. */
-export function Brand({ className, label = "QLNS" }) {
+/** Logo + chữ PeopleOS; rê vào bất kỳ đâu trong cụm đều chạy hiệu ứng. */
+export function Brand({ className, label = "PeopleOS" }) {
   return (
     <motion.span initial="rest" animate="rest" whileHover="hover" className={cn("inline-flex cursor-default items-center gap-2", className)}>
       <BrandMark hoverFromParent />

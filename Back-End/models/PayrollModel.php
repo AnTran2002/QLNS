@@ -126,7 +126,7 @@ class PayrollModel extends BaseModel {
                 ORDER BY u.employee_code";
         $stmt = $this->db->prepare($sql);
         $stmt->execute(['period_id' => $periodId]);
-        return $stmt->fetchAll();
+        return array_map([self::class, 'decodeBreakdown'], $stmt->fetchAll());
     }
 
     public function getBankTransferRows(int $periodId): array
@@ -219,7 +219,21 @@ class PayrollModel extends BaseModel {
             'user_id' => $userId,
         ]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $row ?: null;
+        return $row ? self::decodeBreakdown($row) : null;
+    }
+
+    public static function encodeBreakdown($breakdown): ?string
+    {
+        return is_array($breakdown) ? json_encode($breakdown, JSON_UNESCAPED_UNICODE) : null;
+    }
+
+    /** Giải mã cột JSON `breakdown` của payroll_items thành mảng cho API. */
+    public static function decodeBreakdown(array $row): array
+    {
+        if (array_key_exists('breakdown', $row)) {
+            $row['breakdown'] = is_string($row['breakdown']) ? json_decode($row['breakdown'], true) : null;
+        }
+        return $row;
     }
 
     // Lưu hoặc cập nhật kết quả lương và ghi nhật ký nếu có thay đổi.
@@ -232,9 +246,9 @@ class PayrollModel extends BaseModel {
     ): bool {
         $previous = $this->getByPeriodAndUser($periodId, $userId);
         $sql = "INSERT INTO payroll_items
-                    (period_id, user_id, actual_days, ot_hours, gross_salary, social_insurance, tax_deduction, personal_tax, net_salary)
+                    (period_id, user_id, actual_days, ot_hours, gross_salary, social_insurance, tax_deduction, personal_tax, net_salary, breakdown)
                 VALUES
-                    (:period_id, :user_id, :actual_days, :ot_hours, :gross_salary, :social_insurance, :tax_deduction, :personal_tax, :net_salary)
+                    (:period_id, :user_id, :actual_days, :ot_hours, :gross_salary, :social_insurance, :tax_deduction, :personal_tax, :net_salary, :breakdown)
                 ON DUPLICATE KEY UPDATE
                     actual_days = VALUES(actual_days),
                     ot_hours = VALUES(ot_hours),
@@ -242,7 +256,8 @@ class PayrollModel extends BaseModel {
                     social_insurance = VALUES(social_insurance),
                     tax_deduction = VALUES(tax_deduction),
                     personal_tax = VALUES(personal_tax),
-                    net_salary = VALUES(net_salary)";
+                    net_salary = VALUES(net_salary),
+                    breakdown = VALUES(breakdown)";
 
         $stmt = $this->db->prepare($sql);
         $saved = $stmt->execute([
@@ -255,6 +270,7 @@ class PayrollModel extends BaseModel {
             'tax_deduction' => $data['tax_deduction'],
             'personal_tax' => $data['personal_tax'],
             'net_salary' => $data['net_salary'],
+            'breakdown' => self::encodeBreakdown($data['breakdown'] ?? null),
         ]);
         if ($saved && $this->hasPayrollChanges($previous, $data)) {
             $this->insertPayrollChangeLog(
@@ -289,7 +305,8 @@ class PayrollModel extends BaseModel {
                  social_insurance = :social_insurance,
                  tax_deduction = :tax_deduction,
                  personal_tax = :personal_tax,
-                 net_salary = :net_salary
+                 net_salary = :net_salary,
+                 breakdown = :breakdown
              WHERE period_id = :period_id AND user_id = :user_id"
         );
         $stmt->execute([
@@ -301,6 +318,7 @@ class PayrollModel extends BaseModel {
             'tax_deduction' => $calculation['tax_deduction'],
             'personal_tax' => $calculation['personal_tax'],
             'net_salary' => $calculation['net_salary'],
+            'breakdown' => self::encodeBreakdown($calculation['breakdown'] ?? null),
         ]);
         if ($this->hasPayrollChanges($previous, $calculation)) {
             $this->insertPayrollChangeLog(
@@ -446,7 +464,7 @@ class PayrollModel extends BaseModel {
                 ORDER BY pp.month_year DESC";
         $stmt = $this->db->prepare($sql);
         $stmt->execute(['user_id' => $userId]);
-        return $stmt->fetchAll();
+        return array_map([self::class, 'decodeBreakdown'], $stmt->fetchAll());
     }
 
     public function getCurrentPeriod()
