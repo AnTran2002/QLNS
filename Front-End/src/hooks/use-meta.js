@@ -20,7 +20,6 @@ export function useMeta() {
     departments: meta.departments ?? EMPTY,
     employeeStatuses: meta.employee_statuses ?? EMPTY,
     genders: meta.genders ?? EMPTY,
-    educationLevels: meta.education_levels ?? EMPTY,
     contractTypes: meta.contract_types ?? {},
     holidays: meta.holidays ?? EMPTY,
     payroll: meta.payroll ?? null,

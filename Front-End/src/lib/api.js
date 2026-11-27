@@ -257,26 +257,12 @@ export const api = {
   completeTutorial: () => callApi("tutorial/complete", { method: "POST" }),
   resetTutorial: () => callApi("tutorial/reset", { method: "POST" }),
 
-  // ---- Tuyển dụng (RecruitmentController) ----
-  /** Công khai: ứng viên nộp hồ sơ. */
-  applyJob: (form) => callApi("recruitment/apply", { method: "POST", data: form }),
-  /** Công khai: xem thư mời theo token gửi qua email. */
-  offer: (token) => callApi("recruitment/offer", { params: { token } }),
-  downloadOfferTemplate: (token) => downloadFile("recruitment/offer/template", { token }, "Hop-dong-lao-dong.docx"),
-  uploadOfferContract: (token, contract, scan) =>
-    callApi("recruitment/offer/upload", { method: "POST", data: multipart({ token, contract, scan }), timeout: 60000 }),
-  applications: (status) => callApi("recruitment/applications", { params: status ? { status } : undefined }),
-  /** decision: "APPROVE" (kèm offer) | "REJECT" (bắt buộc note). */
-  reviewApplication: ({ id, decision, note, offer }) =>
-    callApi("recruitment/review", { method: "POST", data: { id, decision, note, offer } }),
-  markApplicationEmailed: (id) => callApi("recruitment/mark-emailed", { method: "POST", data: { id } }),
-
   // ---- Hồ sơ hợp đồng: tải lên → đọc → kiểm tra pháp lý → duyệt tạo tài khoản ----
   downloadContractTemplate: () => downloadFile("contracts/template", {}, "Mau-hop-dong-lao-dong-PeopleOS.docx"),
   contractDocuments: (status) => callApi("contracts/documents", { params: status ? { status } : undefined }),
   contractDocument: (id) => callApi("contracts/documents/show", { params: { id } }),
-  uploadContractDocument: ({ contract, scan, application_id }) =>
-    callApi("contracts/documents/upload", { method: "POST", data: multipart({ contract, scan, application_id }), timeout: 60000 }),
+  uploadContractDocument: ({ contract, scan }) =>
+    callApi("contracts/documents/upload", { method: "POST", data: multipart({ contract, scan }), timeout: 60000 }),
   attachContractScan: (id, scan) =>
     callApi("contracts/documents/scan", { method: "POST", data: multipart({ id, scan }), timeout: 60000 }),
   downloadContractFile: (id, kind) => downloadFile("contracts/documents/file", { id, kind }, kind === "scan" ? "scan" : "hop-dong.docx"),

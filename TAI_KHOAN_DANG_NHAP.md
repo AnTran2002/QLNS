@@ -63,14 +63,10 @@ Database mẫu có 5 tài khoản `NV001`–`NV005`, đều dùng mật khẩu `
 | `NV008` | Phạm Thu Mai | EMPLOYEE | Nhân sự | Chuyên viên tuyển dụng | Đang làm việc |
 | `NV009` | Đỗ Anh Tuấn | EMPLOYEE | Kinh doanh | Chuyên viên kinh doanh | Nghỉ phép |
 | `NV010` | Bùi Thảo Linh | EMPLOYEE | Thiết kế | Graphic Designer | Đang làm việc |
-| `NV011` | Lê Thị Ứng Viên | EMPLOYEE | Marketing | Chuyên viên Marketing | Thử việc *(tạo qua luồng tuyển dụng → duyệt hợp đồng)* |
+| `NV011` | Lê Thị Ứng Viên | EMPLOYEE | Marketing | Chuyên viên Marketing | Thử việc *(tạo qua duyệt hồ sơ hợp đồng)* |
 | `TEST01` | Phạm Minh Test | EMPLOYEE | Kỹ thuật | Kỹ sư phần mềm | Thử việc |
 
 > Tài khoản mới **chỉ được tạo khi HR duyệt hồ sơ hợp đồng** (Quản trị → Hồ sơ hợp đồng). Mật khẩu mặc định hiển thị một lần khi duyệt.
-
-### 5. 🌐 Trang Công Khai (không cần đăng nhập)
-- `/tuyen-dung` — ứng viên nộp hồ sơ ứng tuyển.
-- `/hop-dong/<token>` — ứng viên tải mẫu và nộp hợp đồng (link gửi qua email sau khi được duyệt).
 
 ---
 
