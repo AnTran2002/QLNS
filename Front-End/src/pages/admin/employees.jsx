@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSearchParams } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { AnimatePresence, motion } from "motion/react";
-import { Eye, MoreHorizontal, Pencil, Plus, Trash2, UsersRound } from "lucide-react";
+import { Eye, FileUp, MoreHorizontal, Pencil, Trash2, UsersRound } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -39,7 +39,8 @@ import {
 import { Reveal, RevealGroup, SPRING } from "@/components/app/motion";
 import { useAuth } from "@/hooks/use-auth";
 import { api } from "@/lib/api";
-import { EMPLOYEE_STATUSES, ROLES } from "@/lib/constants";
+import { ROLES } from "@/lib/constants";
+import { useMeta } from "@/hooks/use-meta";
 import { formatDate, formatMoney, tenureLabel } from "@/lib/format";
 import { EmployeeFormDialog } from "./employee-form-dialog";
 
@@ -100,6 +101,7 @@ export default function EmployeesPage() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: employees = [], isPending, error, refetch } = useQuery({ queryKey: ["employees"], queryFn: api.employees });
+  const { employeeStatuses } = useMeta();
 
   const [query, setQuery] = useState("");
   const [department, setDepartment] = useState(ALL);
@@ -128,8 +130,8 @@ export default function EmployeesPage() {
   const departments = useMemo(() => [...new Set(employees.map((e) => e.department))].sort((a, b) => a.localeCompare(b, "vi")), [employees]);
 
   const counts = useMemo(
-    () => Object.fromEntries(EMPLOYEE_STATUSES.map((s) => [s, employees.filter((e) => e.status === s).length])),
-    [employees],
+    () => Object.fromEntries(employeeStatuses.map((s) => [s, employees.filter((e) => e.status === s).length])),
+    [employees, employeeStatuses],
   );
 
   const filtered = useMemo(() => {
@@ -154,12 +156,11 @@ export default function EmployeesPage() {
     onError: (err) => toast.error(err.message),
   });
 
-  const openCreate = () => { setEditing(null); setFormOpen(true); };
   const openEdit = (e) => { setViewing(null); setEditing(e); setFormOpen(true); };
 
   const statusOptions = [
     { value: ALL, label: "Tất cả", count: employees.length },
-    ...EMPLOYEE_STATUSES.map((s) => ({ value: s, label: s, count: counts[s] })),
+    ...employeeStatuses.map((s) => ({ value: s, label: s, count: counts[s] })),
   ];
 
   return (
@@ -167,8 +168,12 @@ export default function EmployeesPage() {
       <PageHeader
         eyebrow="Nhân sự"
         title="Nhân viên"
-        description="Toàn bộ hồ sơ trong bảng users, kèm hợp đồng mới nhất của từng người."
-        actions={<Button onClick={openCreate}><Plus /> Thêm nhân viên</Button>}
+        description="Toàn bộ hồ sơ trong bảng users, kèm hợp đồng mới nhất của từng người. Tài khoản mới chỉ được tạo khi duyệt hồ sơ hợp đồng hợp lệ."
+        actions={
+          <Button asChild>
+            <Link to="/admin/ho-so-hop-dong"><FileUp /> Thêm nhân viên qua hợp đồng</Link>
+          </Button>
+        }
       />
 
       <Reveal delay={120}>

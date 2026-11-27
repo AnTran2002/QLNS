@@ -2,7 +2,7 @@
 @import "tw-animate-css";
 
 /*
- * QLNS — hệ thống thiết kế theo DESIGN.md (npx getdesign@latest add apple).
+ * PeopleOS — hệ thống thiết kế theo DESIGN.md (npx getdesign@latest add apple).
  * Một màu nhấn duy nhất (Action Blue), nền trắng / parchment, tile tối,
  * chữ SF Pro (Inter làm phương án dự phòng ngoài hệ Apple), nút pill.
  * Chế độ tối bật bằng class `.dark` trên <html> (xem hooks/use-theme.jsx).
@@ -184,7 +184,16 @@
   html {
     -webkit-text-size-adjust: 100%;
     scroll-behavior: smooth;
-    scrollbar-gutter: stable;
+  }
+  /* Ẩn thanh cuộn trên mọi trang nhưng vẫn cuộn được (chuột, bàn phím, cảm ứng). */
+  * {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  *::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
   }
   body {
     @apply bg-background font-sans text-foreground antialiased;
@@ -441,4 +450,13 @@
   .no-print {
     display: none !important;
   }
+}
+
+/* Hướng dẫn lần đầu: làm nổi bật mục menu của bước hiện tại. */
+[data-tour-active] {
+  position: relative;
+  z-index: 51;
+  background: var(--color-sidebar-accent);
+  box-shadow: 0 0 0 2px var(--color-primary);
+  transition: box-shadow 0.2s ease;
 }

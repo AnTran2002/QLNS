@@ -1,0 +1,348 @@
+{
+ "month": "2026-11",
+ "through_date": "2026-11-27",
+ "standard_days": 22,
+ "standard_days_source": "period",
+ "worked_days": 16,
+ "remaining_workdays": 1,
+ "ot_hours": 8,
+ "holidays": [],
+ "period": {
+  "id": 2,
+  "status": "DRAFT"
+ },
+ "to_date": {
+  "base_salary": 20000000,
+  "actual_days": 16,
+  "standard_days": 22,
+  "ot_hours": 8,
+  "pro_rated_salary": 12363636.36,
+  "allowance": 1500000,
+  "ot_pay": 1352272.73,
+  "gross_salary": 15215909.09,
+  "social_insurance": 2100000,
+  "tax_deduction": 21700000,
+  "tax_exempt_overtime": 579545.45,
+  "total_deduction": 23800000,
+  "taxable_income": 0,
+  "personal_tax": 0,
+  "net_salary": 13115909.09,
+  "breakdown": {
+   "version": 2,
+   "tax_year": 2026,
+   "inputs": {
+    "base_salary": 20000000,
+    "salary_rate": 0.85,
+    "effective_base_salary": 17000000,
+    "insurance_salary": 20000000,
+    "allowance": 1500000,
+    "dependents": 1,
+    "standard_days": 22,
+    "standard_hours": 176,
+    "daily_rate": 772727.27,
+    "hourly_rate": 96590.91,
+    "region": "I"
+   },
+   "attendance": {
+    "actual_days": 16,
+    "paid_leave_days": 0,
+    "paid_leave_days_counted": 0,
+    "holiday_days": 0,
+    "holiday_days_counted": 0,
+    "paid_days": 16,
+    "unpaid_days": 6,
+    "late_count": 2,
+    "remote_days": 1,
+    "unpaid_leave_days": 0,
+    "sick_leave_days": 0,
+    "absent_days": 0,
+    "ot_hours": 8,
+    "ot_weekday_hours": 4,
+    "ot_weekend_hours": 4,
+    "ot_holiday_hours": 0
+   },
+   "earnings": [
+    {
+     "key": "worked_pay",
+     "label": "Lương theo ngày đi làm thực tế",
+     "formula": "17.000.000đ ÷ 22 công × 16 ngày",
+     "quantity": 16,
+     "unit_rate": 772727.27,
+     "amount": 12363636.36
+    },
+    {
+     "key": "allowance",
+     "label": "Phụ cấp cố định theo hợp đồng",
+     "formula": "Theo hợp đồng lao động",
+     "quantity": 1,
+     "unit_rate": 1500000,
+     "amount": 1500000
+    },
+    {
+     "key": "ot_weekday",
+     "label": "Làm thêm ngày thường (150%)",
+     "formula": "4 giờ × 96.591đ × 150%",
+     "quantity": 4,
+     "unit_rate": 144886.36,
+     "amount": 579545.45,
+     "taxable": 386363.64
+    },
+    {
+     "key": "ot_weekend",
+     "label": "Làm thêm ngày nghỉ hằng tuần (200%)",
+     "formula": "4 giờ × 96.591đ × 200%",
+     "quantity": 4,
+     "unit_rate": 193181.82,
+     "amount": 772727.27,
+     "taxable": 386363.64
+    }
+   ],
+   "insurance": [
+    {
+     "key": "bhxh",
+     "label": "Bảo hiểm xã hội (BHXH)",
+     "rate": 0.08,
+     "base": 20000000,
+     "cap": 46800000,
+     "capped": false,
+     "formula": "20.000.000đ × 8%",
+     "amount": 1600000
+    },
+    {
+     "key": "bhyt",
+     "label": "Bảo hiểm y tế (BHYT)",
+     "rate": 0.015,
+     "base": 20000000,
+     "cap": 46800000,
+     "capped": false,
+     "formula": "20.000.000đ × 1,5%",
+     "amount": 300000
+    },
+    {
+     "key": "bhtn",
+     "label": "Bảo hiểm thất nghiệp (BHTN)",
+     "rate": 0.01,
+     "base": 20000000,
+     "cap": 106200000,
+     "capped": false,
+     "formula": "20.000.000đ × 1%",
+     "amount": 200000
+    }
+   ],
+   "tax": {
+    "gross_income": 15215909.09,
+    "insurance_deduction": 2100000,
+    "personal_deduction": 15500000,
+    "dependent_deduction_each": 6200000,
+    "dependents": 1,
+    "dependent_deduction": 6200000,
+    "tax_exempt_overtime": 579545.45,
+    "taxable_income": 0,
+    "brackets": [],
+    "personal_tax": 0,
+    "effective_rate": 0
+   },
+   "employer": {
+    "lines": [
+     {
+      "key": "bhxh",
+      "label": "Bảo hiểm xã hội (BHXH)",
+      "rate": 0.175,
+      "formula": "20.000.000đ × 17,5%",
+      "amount": 3500000
+     },
+     {
+      "key": "bhyt",
+      "label": "Bảo hiểm y tế (BHYT)",
+      "rate": 0.03,
+      "formula": "20.000.000đ × 3%",
+      "amount": 600000
+     },
+     {
+      "key": "bhtn",
+      "label": "Bảo hiểm thất nghiệp (BHTN)",
+      "rate": 0.01,
+      "formula": "20.000.000đ × 1%",
+      "amount": 200000
+     }
+    ],
+    "total": 4300000,
+    "total_cost": 19515909.09
+   },
+   "summary": {
+    "gross_salary": 15215909.09,
+    "total_insurance": 2100000,
+    "personal_tax": 0,
+    "total_withheld": 2100000,
+    "net_salary": 13115909.09
+   },
+   "notes": [
+    "Đang trong thời gian thử việc: hưởng 85% mức lương hợp đồng (tối thiểu 85% theo Điều 26 BLLĐ 2019).",
+    "Phần tiền làm thêm cao hơn lương giờ bình thường (579.545đ) được miễn thuế TNCN.",
+    "Thu nhập sau giảm trừ chưa đến ngưỡng chịu thuế nên thuế TNCN = 0đ."
+   ]
+  }
+ },
+ "projection": {
+  "assumed_extra_days": 1,
+  "gross_salary": 15988636.36,
+  "social_insurance": 2100000,
+  "personal_tax": 0,
+  "net_salary": 13888636.36,
+  "breakdown": {
+   "version": 2,
+   "tax_year": 2026,
+   "inputs": {
+    "base_salary": 20000000,
+    "salary_rate": 0.85,
+    "effective_base_salary": 17000000,
+    "insurance_salary": 20000000,
+    "allowance": 1500000,
+    "dependents": 1,
+    "standard_days": 22,
+    "standard_hours": 176,
+    "daily_rate": 772727.27,
+    "hourly_rate": 96590.91,
+    "region": "I"
+   },
+   "attendance": {
+    "actual_days": 17,
+    "paid_leave_days": 0,
+    "paid_leave_days_counted": 0,
+    "holiday_days": 0,
+    "holiday_days_counted": 0,
+    "paid_days": 17,
+    "unpaid_days": 5,
+    "late_count": 2,
+    "remote_days": 1,
+    "unpaid_leave_days": 0,
+    "sick_leave_days": 0,
+    "absent_days": 0,
+    "ot_hours": 8,
+    "ot_weekday_hours": 4,
+    "ot_weekend_hours": 4,
+    "ot_holiday_hours": 0
+   },
+   "earnings": [
+    {
+     "key": "worked_pay",
+     "label": "Lương theo ngày đi làm thực tế",
+     "formula": "17.000.000đ ÷ 22 công × 17 ngày",
+     "quantity": 17,
+     "unit_rate": 772727.27,
+     "amount": 13136363.64
+    },
+    {
+     "key": "allowance",
+     "label": "Phụ cấp cố định theo hợp đồng",
+     "formula": "Theo hợp đồng lao động",
+     "quantity": 1,
+     "unit_rate": 1500000,
+     "amount": 1500000
+    },
+    {
+     "key": "ot_weekday",
+     "label": "Làm thêm ngày thường (150%)",
+     "formula": "4 giờ × 96.591đ × 150%",
+     "quantity": 4,
+     "unit_rate": 144886.36,
+     "amount": 579545.45,
+     "taxable": 386363.64
+    },
+    {
+     "key": "ot_weekend",
+     "label": "Làm thêm ngày nghỉ hằng tuần (200%)",
+     "formula": "4 giờ × 96.591đ × 200%",
+     "quantity": 4,
+     "unit_rate": 193181.82,
+     "amount": 772727.27,
+     "taxable": 386363.64
+    }
+   ],
+   "insurance": [
+    {
+     "key": "bhxh",
+     "label": "Bảo hiểm xã hội (BHXH)",
+     "rate": 0.08,
+     "base": 20000000,
+     "cap": 46800000,
+     "capped": false,
+     "formula": "20.000.000đ × 8%",
+     "amount": 1600000
+    },
+    {
+     "key": "bhyt",
+     "label": "Bảo hiểm y tế (BHYT)",
+     "rate": 0.015,
+     "base": 20000000,
+     "cap": 46800000,
+     "capped": false,
+     "formula": "20.000.000đ × 1,5%",
+     "amount": 300000
+    },
+    {
+     "key": "bhtn",
+     "label": "Bảo hiểm thất nghiệp (BHTN)",
+     "rate": 0.01,
+     "base": 20000000,
+     "cap": 106200000,
+     "capped": false,
+     "formula": "20.000.000đ × 1%",
+     "amount": 200000
+    }
+   ],
+   "tax": {
+    "gross_income": 15988636.36,
+    "insurance_deduction": 2100000,
+    "personal_deduction": 15500000,
+    "dependent_deduction_each": 6200000,
+    "dependents": 1,
+    "dependent_deduction": 6200000,
+    "tax_exempt_overtime": 579545.45,
+    "taxable_income": 0,
+    "brackets": [],
+    "personal_tax": 0,
+    "effective_rate": 0
+   },
+   "employer": {
+    "lines": [
+     {
+      "key": "bhxh",
+      "label": "Bảo hiểm xã hội (BHXH)",
+      "rate": 0.175,
+      "formula": "20.000.000đ × 17,5%",
+      "amount": 3500000
+     },
+     {
+      "key": "bhyt",
+      "label": "Bảo hiểm y tế (BHYT)",
+      "rate": 0.03,
+      "formula": "20.000.000đ × 3%",
+      "amount": 600000
+     },
+     {
+      "key": "bhtn",
+      "label": "Bảo hiểm thất nghiệp (BHTN)",
+      "rate": 0.01,
+      "formula": "20.000.000đ × 1%",
+      "amount": 200000
+     }
+    ],
+    "total": 4300000,
+    "total_cost": 20288636.36
+   },
+   "summary": {
+    "gross_salary": 15988636.36,
+    "total_insurance": 2100000,
+    "personal_tax": 0,
+    "total_withheld": 2100000,
+    "net_salary": 13888636.36
+   },
+   "notes": [
+    "Đang trong thời gian thử việc: hưởng 85% mức lương hợp đồng (tối thiểu 85% theo Điều 26 BLLĐ 2019).",
+    "Phần tiền làm thêm cao hơn lương giờ bình thường (579.545đ) được miễn thuế TNCN.",
+    "Thu nhập sau giảm trừ chưa đến ngưỡng chịu thuế nên thuế TNCN = 0đ."
+   ]
+  }
+ }
+}

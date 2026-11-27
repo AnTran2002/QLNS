@@ -1,5 +1,7 @@
-/** Khớp ENUM `users.status` trong QLNS-Database.sql */
-export const EMPLOYEE_STATUSES = ["Đang làm việc", "Thử việc", "Nghỉ phép"];
+/**
+ * Nhãn hiển thị cố định của giao diện. Danh mục nghiệp vụ (trạng thái, phòng ban, chi nhánh, tham số lương…)
+ * KHÔNG khai báo ở đây — đọc từ CSDL qua useMeta() (?action=meta).
+ */
 
 /** Khớp ENUM `users.role` */
 export const ROLES = { ADMIN: "Quản trị viên", EMPLOYEE: "Nhân viên" };
@@ -9,17 +11,6 @@ export const PERIOD_STATUS = {
   DRAFT: { label: "Nháp", tone: "amber" },
   LOCKED: { label: "Đã khoá", tone: "ink" },
   PAID: { label: "Đã chi trả", tone: "success" },
-};
-
-/** Phòng ban gợi ý (cột `users.department` là varchar tự do, mặc định 'Kỹ thuật') */
-export const DEPARTMENT_SUGGESTIONS = ["Nhân sự", "Kỹ thuật", "Thiết kế", "Kinh doanh", "Kế toán", "Marketing", "Vận hành"];
-
-/** Hằng số tính lương — khớp Back-End/services/PayrollEngine.php */
-export const PAYROLL_RULES = {
-  insuranceRate: 0.105, // BHXH + BHYT + BHTN phần người lao động
-  personalDeduction: 11_000_000,
-  dependentDeduction: 4_400_000,
-  otRate: 1.5,
 };
 
 /** Lịch làm việc — khoá theo `work_schedule` của API employee/dashboard */

@@ -1,7 +1,9 @@
-import { EMPLOYEE_STATUSES } from "@/lib/constants";
-
-/** Gom nhân viên theo cột users.department */
-export function groupByDepartment(employees = []) {
+/**
+ * Gom nhân viên theo cột users.department.
+ * `statuses` lấy từ ENUM users.status (useMeta); bỏ trống → dùng các trạng thái có trong dữ liệu.
+ */
+export function groupByDepartment(employees = [], statuses) {
+  const statusList = statuses?.length ? statuses : [...new Set(employees.map((e) => e.status).filter(Boolean))];
   const map = new Map();
   for (const e of employees) {
     const key = e.department || "Chưa phân phòng";
@@ -13,7 +15,7 @@ export function groupByDepartment(employees = []) {
       name,
       members,
       payroll: members.reduce((s, m) => s + m.base_salary + m.allowance, 0),
-      byStatus: Object.fromEntries(EMPLOYEE_STATUSES.map((s) => [s, members.filter((m) => m.status === s).length])),
+      byStatus: Object.fromEntries(statusList.map((s) => [s, members.filter((m) => m.status === s).length])),
     }))
     .sort((a, b) => b.members.length - a.members.length || a.name.localeCompare(b.name, "vi"));
 }

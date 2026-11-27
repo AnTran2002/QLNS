@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { EmptyState, ErrorState, FormError, LoadingState, PageHeader, PersonAvatar, SearchField, StatTile } from "@/components/app/kit";
 import { Count, Money, MoneyShort, Reveal, RevealGroup, SPRING } from "@/components/app/motion";
 import { api } from "@/lib/api";
-import { PAYROLL_RULES } from "@/lib/constants";
+import { useMeta } from "@/hooks/use-meta";
 import { formatDate, formatMoney, formatPeriod } from "@/lib/format";
 
 const FIELDS = [
@@ -69,8 +69,9 @@ function SalaryAdjustmentForm({ contract, onOpenChange }) {
     mutation.mutate();
   };
 
-  const insurance = Number(form.insurance_salary || 0) * PAYROLL_RULES.insuranceRate;
-  const deduction = PAYROLL_RULES.personalDeduction + Number(form.dependents_count || 0) * PAYROLL_RULES.dependentDeduction;
+  const rules = useMeta().payroll;
+  const insurance = Number(form.insurance_salary || 0) * (rules?.insurance_rate ?? 0);
+  const deduction = (rules?.personal_deduction ?? 0) + Number(form.dependents_count || 0) * (rules?.dependent_deduction ?? 0);
 
   return (
     <form onSubmit={submit} noValidate className="grid gap-5">
@@ -167,6 +168,8 @@ export default function ContractsPage() {
   const { data: contracts = [], isPending, error, refetch } = useQuery({ queryKey: ["contracts"], queryFn: api.contracts });
   const [query, setQuery] = useState("");
   const [adjusting, setAdjusting] = useState(null);
+  const rules = useMeta().payroll;
+  const insuranceRate = rules?.insurance_rate ?? 0;
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -177,8 +180,8 @@ export default function ContractsPage() {
   const totals = useMemo(() => ({
     base: contracts.reduce((s, c) => s + c.base_salary, 0),
     allowance: contracts.reduce((s, c) => s + c.allowance, 0),
-    insurance: contracts.reduce((s, c) => s + c.insurance_salary * PAYROLL_RULES.insuranceRate, 0),
-  }), [contracts]);
+    insurance: contracts.reduce((s, c) => s + c.insurance_salary * insuranceRate, 0),
+  }), [contracts, insuranceRate]);
 
   return (
     <div className="space-y-10">
@@ -193,7 +196,7 @@ export default function ContractsPage() {
           <StatTile label="Số hợp đồng" value={<Count value={contracts.length} />} icon={FileSignature} hint="Đang hiệu lực" />
           <StatTile label="Tổng lương cơ bản" value={<MoneyShort value={totals.base} />} icon={Wallet} hint="Mỗi tháng" />
           <StatTile label="Tổng phụ cấp" value={<MoneyShort value={totals.allowance} />} icon={Users} hint="Mỗi tháng" />
-          <StatTile label="BHXH người lao động" value={<MoneyShort value={totals.insurance} />} icon={ShieldCheck} hint="10,5% lương đóng BHXH" />
+          <StatTile label="BHXH người lao động" value={<MoneyShort value={totals.insurance} />} icon={ShieldCheck} hint={`${(insuranceRate * 100).toLocaleString("vi-VN", { maximumFractionDigits: 2 })}% lương đóng BHXH`} />
         </RevealGroup>
       </div>
 

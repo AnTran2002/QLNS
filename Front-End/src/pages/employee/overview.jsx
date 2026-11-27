@@ -4,6 +4,7 @@ import { ArrowRight, CalendarCheck, CalendarDays, Clock, FileText, Sparkles, Use
 import { Button } from "@/components/animate-ui/components/buttons/button";
 import { KpiCard, TrendBadge } from "@/components/admin/kpi-card";
 import { EarningsChart } from "@/components/employee/earnings-chart";
+import { PayrollEstimateCard } from "@/components/employee/payroll-estimate";
 import { ErrorState, LoadingState, PeriodStatusBadge, PersonAvatar } from "@/components/app/kit";
 import { Reveal } from "@/components/app/motion";
 import { PayoutBar } from "@/components/app/payslip";
@@ -227,6 +228,12 @@ export default function EmployeeOverview() {
           />
         </Reveal>
       </section>
+
+      {contract && (
+        <Reveal delay={100} offset={14}>
+          <PayrollEstimateCard month={attendanceMonth} />
+        </Reveal>
+      )}
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3 *:min-w-0">
         <Reveal delay={120} offset={14} className="h-full lg:col-span-2">

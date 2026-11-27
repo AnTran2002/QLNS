@@ -62,6 +62,19 @@ match ($action) {
     // Kiểm tra backend + database
     '/'                  => (new HomeController)->index(),
 
+    // Danh mục dùng chung (công khai)
+    'meta'               => (new MetaController)->index(),
+
+    // Tuyển dụng — công khai cho ứng viên
+    'recruitment/apply'           => (new RecruitmentController)->apply(),
+    'recruitment/offer'           => (new RecruitmentController)->offer(),
+    'recruitment/offer/template'  => (new RecruitmentController)->offerTemplate(),
+    'recruitment/offer/upload'    => (new RecruitmentController)->offerUpload(),
+    // Tuyển dụng — quản trị
+    'recruitment/applications'    => (new RecruitmentController)->applications(),
+    'recruitment/review'          => (new RecruitmentController)->review(),
+    'recruitment/mark-emailed'    => (new RecruitmentController)->markEmailed(),
+
     // Xác thực
     'login'              => (new AuthController)->login(),
     'me'                 => (new AuthController)->me(),
@@ -73,9 +86,22 @@ match ($action) {
     'contracts/update'   => (new ContractController)->update($_GET['id'] ?? null),
     'contracts/adjustments' => (new ContractController)->adjustments(),
 
+    // Hồ sơ hợp đồng: mẫu .docx, tải lên + đọc + kiểm tra pháp lý, duyệt → tạo tài khoản
+    'contracts/template'            => (new ContractDocumentController)->template(),
+    'contracts/documents'           => (new ContractDocumentController)->index(),
+    'contracts/documents/show'      => (new ContractDocumentController)->show(),
+    'contracts/documents/upload'    => (new ContractDocumentController)->upload(),
+    'contracts/documents/scan'      => (new ContractDocumentController)->attachScan(),
+    'contracts/documents/file'      => (new ContractDocumentController)->file(),
+    'contracts/documents/approve'   => (new ContractDocumentController)->approve(),
+    'contracts/documents/reject'    => (new ContractDocumentController)->reject(),
+
     // Nhân viên (EMPLOYEE)
     'employee/dashboard' => (new EmployeeController)->dashboard(),
     'employee/attendance' => (new EmployeeController)->attendance(),
+    'employee/payroll-estimate' => (new EmployeeController)->payrollEstimate(),
+    'tutorial/complete'  => (new EmployeeController)->completeTutorial(),
+    'tutorial/reset'     => (new EmployeeController)->resetTutorial(),
 
     // Nghỉ phép (migration 005)
     'employee/leave'        => ($_SERVER['REQUEST_METHOD'] === 'POST' ? (new LeaveController)->store() : (new LeaveController)->mine()),

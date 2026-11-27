@@ -1,4 +1,4 @@
-# QLNS — Quản lý nhân sự
+# PeopleOS (QLNS) — Quản lý nhân sự
 
 Ứng dụng quản lý nhân sự & tiền lương tiếng Việt: **React (Vite) + PHP + MySQL**.
 README này ghi lại **những gì đã làm, dùng công cụ gì, và thông tin lấy từ đâu**.
@@ -7,12 +7,12 @@ README này ghi lại **những gì đã làm, dùng công cụ gì, và thông 
 QLNS/
 ├── Front-End/          React 19 + Vite 8 + Tailwind v4 + shadcn/ui + Animate UI
 ├── Back-End/           PHP 8 thuần (router ?action=…, PDO), không framework
-│   ├── controllers/    Auth · Employee · Contract · Payroll · Profile · Leave · Home
-│   ├── models/         User · Contract · SalaryAdjustment · Payroll · AttendanceRecord · LeaveRequest
-│   ├── services/       PayrollEngine · PayrollPeriodPolicy · ContractSalaryAdjustmentPolicy · LeavePolicy · Attendance · Payslip · Xlsx…
-│   └── database/       migrations/001…007, seed_passwords.php
+│   ├── controllers/    Auth · Employee · Contract · ContractDocument · Recruitment · Meta · Payroll · Profile · Leave · Home
+│   ├── models/         User · Contract · ContractDocument · JobApplication · Branch · SalaryAdjustment · Payroll · AttendanceRecord · LeaveRequest
+│   ├── services/       PayrollEngine · PayrollConfig · PayrollInputs · Contract{Schema,Template,Reader,Validator,Intake} · PayrollPeriodPolicy · ContractSalaryAdjustmentPolicy · LeavePolicy · Attendance · Payslip · Xlsx…
+│   └── database/       migrations/001…009, seed_passwords.php, backfill_payroll_breakdown.php
 ├── test-backend.php    Kiểm thử PHP thuần (nghỉ phép, kỳ lương và tính lương/thuế), không cần CSDL
-├── QLNS-Database.sql   Dump đầy đủ database `qlns` (đã gồm migration 004–007 + lương T1–T10/2026)
+├── QLNS-Database.sql   Dump đầy đủ database `qlns` (đã gồm migration 001–009, 12 tài khoản, chấm công, lương T1–T11/2026)
 ├── HUONG_DAN_KET_NOI_API.md   Hướng dẫn chi tiết kết nối API
 └── TAI_KHOAN_DANG_NHAP.md     Tài khoản mẫu
 ```
@@ -88,6 +88,25 @@ Kết quả lần chạy gần nhất: **Back-End 60/60** (bao gồm các biên 
 - `package-lock.json` tạo trên macOS thiếu binary native cho Windows (rolldown, lightningcss, tailwind oxide) → đã đưa mọi lock file vào `.gitignore`; mỗi máy tự `npm install`.
 - `.gitignore` còn bỏ qua cache Vite, `coverage/`, tệp rác của Windows/macOS (`Thumbs.db`, `desktop.ini`, `._*`, `.DS_Store`) và các tệp bí mật (`env.php`, `.env`).
 
+### 1.7 Tuyển dụng, hồ sơ hợp đồng, lương tạm tính, hướng dẫn lần đầu
+
+Mọi danh mục (chi nhánh, phòng ban, trình độ, loại hợp đồng, lương tối thiểu vùng, biểu thuế, ngày lễ) lấy từ API `?action=meta` — Front-End không giữ dữ liệu cứng.
+
+- **Tuyển dụng** — trang công khai `/tuyen-dung`: ứng viên điền thông tin, chọn chi nhánh, đồng ý điều khoản (NĐ 13/2023 về dữ liệu cá nhân) rồi chờ duyệt. Quản trị `/admin/tuyen-dung`: duyệt (nhập lương, phụ cấp, ngày bắt đầu, loại HĐ, thử việc) hoặc từ chối kèm lý do. Duyệt sinh link `/hop-dong/<token>` (hạn 14 ngày), gửi qua **EmailJS** hoặc sao chép gửi thủ công.
+- **Hồ sơ hợp đồng** — `/hop-dong/<token>` (ứng viên) và `/admin/ho-so-hop-dong` (HR): tải mẫu `.docx` điền sẵn thông tin, nộp lại `.docx` + bản scan có chữ ký. Hệ thống đọc file, lưu dữ liệu vào MySQL, **cảnh báo ô còn thiếu** và **từ chối nội dung trái luật** (lương dưới tối thiểu vùng, thử việc quá hạn/lương thử việc < 85%, giờ làm > 48h/tuần, phép năm < 12 ngày…, kèm điều luật). Tài khoản nhân viên **chỉ được tạo khi HR duyệt hợp đồng** đủ thông tin và có bản scan.
+- **Lương tạm tính** — thẻ trên trang Tổng quan của nhân viên (`?action=employee/payroll-estimate`): lương đến hôm nay theo ngày công đã chấm + dự kiến cuối tháng, bảo hiểm từng loại, thuế TNCN theo bậc; nút "Xem cách tính" mở công thức chi tiết. Phiếu lương kỳ đã tính có bảng chi tiết (OT theo hệ số, BHXH/BHYT/BHTN, giảm trừ, thuế từng bậc, phần công ty đóng).
+- **Hướng dẫn lần đầu** — nhân viên đăng nhập lần đầu được dẫn qua 7 bước; xem lại trong menu tài khoản → "Xem lại hướng dẫn".
+
+**Cấu hình EmailJS** (không bắt buộc — thiếu cấu hình thì HR sao chép link gửi tay): tạo service + template trên emailjs.com, rồi điền vào `Front-End/.env`:
+
+```
+VITE_EMAILJS_SERVICE_ID=...
+VITE_EMAILJS_TEMPLATE_ID=...
+VITE_EMAILJS_PUBLIC_KEY=...
+```
+
+Biến dùng trong template: `{{to_email}}` (đặt làm "To Email"), `{{to_name}}`, `{{position}}`, `{{branch}}`, `{{start_date}}`, `{{base_salary}}`, `{{contract_link}}`, `{{expires_at}}`, `{{company}}`.
+
 ---
 
 ## 2. Cách chạy
@@ -105,6 +124,8 @@ mysql -u root -p qlns < Back-End/database/seed_additional_demo_data.sql
 #    Tính lại thuế TNCN các kỳ từ 2026 trở đi (chạy sau khi đã thêm dữ liệu mẫu):
 mysql -u root -p qlns < Back-End/database/migrations/007_recalculate_pit_2026.sql
 mysql -u root -p qlns < Back-End/database/migrations/008_payroll_change_audit.sql
+mysql -u root -p qlns < Back-End/database/migrations/009_recruitment_contracts_payroll_detail.sql
+php Back-End/database/backfill_payroll_breakdown.php   # ghi chi tiết phiếu lương cho các kỳ cũ
 
 # 2. Back-End
 cp Back-End/configs/env.example.php Back-End/configs/env.php   # sửa thông tin kết nối

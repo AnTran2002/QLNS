@@ -12,7 +12,7 @@ export function PayslipDialog({ item, user, onOpenChange }) {
   const published = isPublished(item?.period_status);
   return (
     <Dialog open={Boolean(item)} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92svh] overflow-y-auto sm:max-w-lg">
+      <DialogContent className="max-h-[92svh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader className="sr-only">
           <DialogTitle>Phiếu lương điện tử</DialogTitle>
           <DialogDescription>Chi tiết thu nhập và khấu trừ</DialogDescription>

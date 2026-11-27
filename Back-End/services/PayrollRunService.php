@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/PayrollEngine.php';
+require_once __DIR__ . '/PayrollInputs.php';
 require_once __DIR__ . '/PayrollChangePolicy.php';
 require_once __DIR__ . '/../models/AttendanceRecordModel.php';
 
@@ -56,7 +57,7 @@ class PayrollRunService
             if (!$attendanceModel->tableExists()) {
                 throw new PayrollRunException(409, 'Chưa có bảng chấm công theo ngày — hãy chạy migration 004_avatar_daily_attendance.sql');
             }
-            $workedDaysByUser = $attendanceModel->workedDaysByUserForMonth($period['month_year']);
+            $inputs = new PayrollInputs($period['month_year']);
 
             $missingAttendance = [];
             $missingContracts = [];
@@ -104,7 +105,7 @@ class PayrollRunService
                 'net_salary' => 0.0,
             ];
             foreach ($rows as $row) {
-                $actualDays = $workedDaysByUser[(int) $row['user_id']] ?? 0;
+                $actualDays = $inputs->actualDays((int) $row['user_id']);
                 $otHours = (float) $row['ot_hours'];
                 if (!is_finite($actualDays) || $actualDays < 0 || $actualDays > $daysInMonth) {
                     throw new PayrollRunException(422, 'Ngày công không hợp lệ trong dữ liệu kỳ lương', [
@@ -117,17 +118,7 @@ class PayrollRunService
                     ]);
                 }
 
-                $calculation = PayrollEngine::calculateNetSalary(
-                    (float) $row['base_salary'],
-                    (float) $row['allowance'],
-                    $actualDays,
-                    $standardDays,
-                    $otHours,
-                    1.5,
-                    (int) $row['dependents_count'],
-                    (float) $row['insurance_salary'],
-                    (int) substr($period['month_year'], 0, 4)
-                );
+                $calculation = $inputs->calculate($row, $standardDays, $otHours);
 
                 $this->payrollModel->updateCalculation(
                     $periodId,

@@ -22,7 +22,7 @@ import {
 import { Meter } from "@/components/ui/meter";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { api } from "@/lib/api";
-import { EMPLOYEE_STATUSES } from "@/lib/constants";
+import { useMeta } from "@/hooks/use-meta";
 import { formatMoney, formatMoneyShort, formatNumber, formatPeriod } from "@/lib/format";
 import { groupByDepartment } from "@/lib/hr";
 
@@ -38,7 +38,8 @@ const STATUS_COLORS = {
   "Thử việc": "var(--chart-2)",
   "Nghỉ phép": "var(--chart-3)",
 };
-const STATUS_CHART = Object.fromEntries(EMPLOYEE_STATUSES.map((s) => [s, { label: s, color: STATUS_COLORS[s] }]));
+const STATUS_FALLBACK_COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"];
+const statusColor = (s, i) => STATUS_COLORS[s] ?? STATUS_FALLBACK_COLORS[i % STATUS_FALLBACK_COLORS.length];
 const DEPT_CHART = { payroll: { label: "Quỹ lương / tháng", color: "var(--chart-1)" } };
 const STRUCTURE = [
   { key: "net", label: "Thực nhận", color: "var(--chart-1)" },
@@ -108,10 +109,13 @@ function PeriodChart({ periods }) {
 }
 
 function StatusDonut({ employees }) {
-  const data = EMPLOYEE_STATUSES.map((s) => ({
+  const { employeeStatuses } = useMeta();
+  const statuses = employeeStatuses.length ? employeeStatuses : [...new Set(employees.map((e) => e.status).filter(Boolean))];
+  const STATUS_CHART = Object.fromEntries(statuses.map((s, i) => [s, { label: s, color: statusColor(s, i) }]));
+  const data = statuses.map((s, i) => ({
     status: s,
     value: employees.filter((e) => e.status === s).length,
-    fill: STATUS_COLORS[s],
+    fill: statusColor(s, i),
   }));
   const total = employees.length;
 

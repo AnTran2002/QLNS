@@ -4,7 +4,9 @@ import { AvatarEditor } from "@/components/employee/avatar-editor";
 import { Reveal } from "@/components/app/motion";
 import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEmployeeDashboard } from "@/hooks/use-employee-dashboard";
-import { PAYROLL_RULES, ROLES } from "@/lib/constants";
+import { useAuth } from "@/hooks/use-auth";
+import { useMeta } from "@/hooks/use-meta";
+import { ROLES } from "@/lib/constants";
 import { formatDate, formatMoney, formatNumber, tenureLabel } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -53,14 +55,22 @@ function IncomeStructure({ base, allowance }) {
 
 export default function EmployeeProfile() {
   const { data, isPending, error, refetch } = useEmployeeDashboard();
+  const { user: authUser } = useAuth();
+  const { payroll: rules, contractTypes } = useMeta();
   if (error) return <ErrorState error={error} onRetry={refetch} />;
   if (isPending) return <LoadingState rows={4} />;
 
-  const { user_info: user, contract } = data;
-  const insurance = contract ? contract.insurance_salary * PAYROLL_RULES.insuranceRate : 0;
-  const familyDeduction = contract
-    ? PAYROLL_RULES.personalDeduction + (contract.dependents_count || 0) * PAYROLL_RULES.dependentDeduction
+  const { contract } = data;
+  // Hồ sơ đầy đủ (CCCD, ngày sinh, MST…) lấy từ phiên `me`; dashboard chỉ trả phần tóm tắt.
+  const user = { ...(authUser ?? {}), ...data.user_info };
+  const insuranceRate = rules?.insurance_rate ?? 0;
+  const insurance = contract ? contract.insurance_salary * insuranceRate : 0;
+  const familyDeduction = contract && rules
+    ? rules.personal_deduction + (contract.dependents_count || 0) * rules.dependent_deduction
     : 0;
+  const probationEnd = contract?.probation_days > 0 && contract.start_date
+    ? new Date(new Date(`${contract.start_date}T00:00:00`).getTime() + contract.probation_days * 86400000).toISOString().slice(0, 10)
+    : null;
 
   return (
     <div className="space-y-6">
@@ -125,7 +135,17 @@ export default function EmployeeProfile() {
                     {user.email}
                   </a>
                 </Field>
+                <Field label="Điện thoại" mono>{user.phone || null}</Field>
+                <Field label="Ngày sinh">{user.date_of_birth ? formatDate(user.date_of_birth) : null}</Field>
+                <Field label="Giới tính">{user.gender || null}</Field>
+                <Field label="Số CCCD" mono>{user.national_id || null}</Field>
+                <Field label="Ngày cấp · Nơi cấp">
+                  {user.national_id_issued_date ? `${formatDate(user.national_id_issued_date)} · ${user.national_id_issued_place ?? ""}` : null}
+                </Field>
+                <Field label="Địa chỉ thường trú">{user.address || null}</Field>
+                <Field label="Mã số thuế cá nhân" mono>{user.tax_code || null}</Field>
                 <Field label="Vai trò">{ROLES[user.role] ?? user.role}</Field>
+                <Field label="Chi nhánh">{user.branch_name || null}</Field>
                 <Field label="Phòng ban">{user.department}</Field>
                 <Field label="Chức danh">{user.position || null}</Field>
                 <Field label="Trạng thái">{user.status}</Field>
@@ -138,12 +158,16 @@ export default function EmployeeProfile() {
           <Card className="h-full gap-4">
             <CardHeader>
               <CardTitle>Hợp đồng lao động</CardTitle>
-              <CardDescription>{contract ? `Ký ngày ${formatDate(contract.created_at)}` : "Chưa có hợp đồng"}</CardDescription>
+              <CardDescription>
+                {contract
+                  ? `${contractTypes[contract.contract_type] ?? "Hợp đồng lao động"} · ký ngày ${formatDate(contract.signed_date ?? contract.created_at)}`
+                  : "Chưa có hợp đồng"}
+              </CardDescription>
               {contract && (
                 <CardAction>
                   <span className="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-[12px]">
                     <FileSignature className="size-3.5 text-muted-foreground" aria-hidden="true" />
-                    HĐ-{String(contract.id).padStart(3, "0")}
+                    {contract.contract_number || `HĐ-${String(contract.id).padStart(3, "0")}`}
                   </span>
                 </CardAction>
               )}
@@ -158,12 +182,43 @@ export default function EmployeeProfile() {
                     <Field label="Lương đóng BHXH">{formatMoney(contract.insurance_salary)}</Field>
                     <Field label="Người phụ thuộc">{contract.dependents_count} người</Field>
                   </dl>
+                  {contract.start_date && (
+                    <dl className="grid divide-y divide-border/70 rounded-lg border px-3.5 xl:grid-cols-2 xl:gap-x-8 xl:divide-y-0">
+                      <Field label="Hiệu lực từ">{formatDate(contract.start_date)}</Field>
+                      <Field label="Đến ngày">{contract.end_date ? formatDate(contract.end_date) : "Không xác định thời hạn"}</Field>
+                      <Field label="Thử việc">
+                        {contract.probation_days > 0
+                          ? `${contract.probation_days} ngày · hưởng ${formatNumber(contract.probation_salary_rate * 100)}% lương${probationEnd ? ` · đến ${formatDate(probationEnd)}` : ""}`
+                          : "Không thử việc"}
+                      </Field>
+                      <Field label="Vị trí công việc">{contract.job_title || user.position}</Field>
+                      <Field label="Thời giờ làm việc">
+                        {contract.working_hours_per_day ? `${formatNumber(contract.working_hours_per_day)} giờ/ngày · ${contract.working_days_per_week} ngày/tuần` : null}
+                      </Field>
+                      <Field label="Nghỉ phép năm">{contract.annual_leave_days ? `${contract.annual_leave_days} ngày/năm` : null}</Field>
+                      <Field label="Hình thức trả lương">{contract.payment_method || null}</Field>
+                      <Field label="Ngày trả lương">{contract.pay_day ? `Ngày ${contract.pay_day} hằng tháng` : null}</Field>
+                    </dl>
+                  )}
+                  {contract.commitments && (
+                    <div className="rounded-lg border bg-muted/30 p-3.5">
+                      <p className="text-[12px] font-medium text-muted-foreground">Cam kết & điều khoản riêng</p>
+                      <ul className="mt-2 space-y-1.5 text-[13px] text-foreground/90">
+                        {contract.commitments.split("\n").filter(Boolean).map((line) => (
+                          <li key={line} className="flex gap-2">
+                            <span className="mt-[7px] size-1 shrink-0 rounded-full bg-muted-foreground" aria-hidden="true" />
+                            <span className="min-w-0 break-words">{line}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="rounded-lg border bg-muted/40 p-3.5">
                       <p className="text-[12px] text-muted-foreground">BHXH · BHYT · BHTN trích hằng tháng</p>
                       <p className="mt-1 text-[17px] font-semibold tabular-nums">{formatMoney(insurance)}</p>
                       <p className="text-[11.5px] text-muted-foreground">
-                        {formatNumber(PAYROLL_RULES.insuranceRate * 100)}% × lương đóng bảo hiểm
+                        {formatNumber(insuranceRate * 100)}% × lương đóng bảo hiểm
                       </p>
                     </div>
                     <div className="rounded-lg border bg-muted/40 p-3.5">

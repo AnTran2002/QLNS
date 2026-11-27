@@ -13,7 +13,7 @@ import {
 import { Reveal } from "@/components/app/motion";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { useEmployeeDashboard } from "@/hooks/use-employee-dashboard";
-import { EMPLOYEE_STATUSES } from "@/lib/constants";
+import { useMeta } from "@/hooks/use-meta";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -26,6 +26,7 @@ const fold = (s) =>
 
 export default function EmployeeTeam() {
   const { data, isPending, error, refetch } = useEmployeeDashboard();
+  const { employeeStatuses } = useMeta();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const team = useMemo(() => data?.team_members ?? [], [data]);
@@ -47,7 +48,7 @@ export default function EmployeeTeam() {
   const me = data.user_info;
   const statusOptions = [
     { value: "all", label: "Tất cả", count: team.length },
-    ...EMPLOYEE_STATUSES.map((s) => ({
+    ...employeeStatuses.map((s) => ({
       value: s,
       label: s,
       count: team.filter((m) => m.status === s).length,

@@ -7,14 +7,15 @@ import { AvatarGroup, AvatarGroupTooltip } from "@/components/animate-ui/compone
 import { EmptyState, ErrorState, LoadingState, PageHeader, PersonAvatar } from "@/components/app/kit";
 import { Count, MoneyShort, Reveal, SPRING } from "@/components/app/motion";
 import { api } from "@/lib/api";
-import { EMPLOYEE_STATUSES } from "@/lib/constants";
+import { useMeta } from "@/hooks/use-meta";
 import { groupByDepartment } from "@/lib/hr";
 
 const STATUS_BAR = { "Đang làm việc": "bg-success", "Thử việc": "bg-warning", "Nghỉ phép": "bg-muted-foreground/50" };
 
 export default function DepartmentsPage() {
   const { data: employees = [], isPending, error, refetch } = useQuery({ queryKey: ["employees"], queryFn: api.employees });
-  const groups = useMemo(() => groupByDepartment(employees), [employees]);
+  const { employeeStatuses } = useMeta();
+  const groups = useMemo(() => groupByDepartment(employees, employeeStatuses), [employees, employeeStatuses]);
 
   return (
     <div className="space-y-10">
@@ -54,7 +55,7 @@ export default function DepartmentsPage() {
 
                 <div className="space-y-2.5">
                   <div className="flex h-2 gap-0.5 overflow-hidden rounded-full bg-muted" aria-hidden="true">
-                    {EMPLOYEE_STATUSES.map((s, i) => (
+                    {employeeStatuses.map((s, i) => (
                       <motion.span
                         key={s}
                         className={STATUS_BAR[s]}
@@ -66,7 +67,7 @@ export default function DepartmentsPage() {
                     ))}
                   </div>
                   <ul className="flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-muted-foreground">
-                    {EMPLOYEE_STATUSES.map((s) => (
+                    {employeeStatuses.map((s) => (
                       <li key={s} className="flex items-center gap-1.5">
                         <span className={`size-1.5 rounded-full ${STATUS_BAR[s]}`} aria-hidden="true" />
                         <span className="tabular text-foreground">{g.byStatus[s]}</span> {s.toLowerCase()}
