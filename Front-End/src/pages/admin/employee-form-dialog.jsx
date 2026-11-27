@@ -69,7 +69,8 @@ function validate(f, isEdit) {
     if (v.length > max) return `${label} tối đa ${max} ký tự`;
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email.trim())) return "Email không hợp lệ";
-  for (const [key, label] of [["base_salary", "Lương cơ bản"], ["insurance_salary", "Lương đóng BHXH"], ["allowance", "Phụ cấp"]]) {
+  if (String(f.allowance ?? "").trim() === "") return "Phụ cấp lương cố định bắt buộc nhập (nhập 0 nếu không có)";
+  for (const [key, label] of [["base_salary", "Lương cơ bản"], ["insurance_salary", "Lương đóng BHXH"], ["allowance", "Phụ cấp lương cố định"]]) {
     const n = Number(f[key] || 0);
     if (!Number.isFinite(n) || n < 0) return `${label} phải là số không âm`;
   }
@@ -169,8 +170,12 @@ function EmployeeForm({ employee, employees, onDone }) {
           <Field label="Lương đóng BHXH (₫)" htmlFor="insurance_salary" hint={money("insurance_salary")}>
             <Input id="insurance_salary" type="number" min="0" step="100000" inputMode="numeric" value={form.insurance_salary} onChange={set("insurance_salary")} className="tabular" />
           </Field>
-          <Field label="Phụ cấp cố định (₫)" htmlFor="allowance" hint={money("allowance")}>
-            <Input id="allowance" type="number" min="0" step="100000" inputMode="numeric" value={form.allowance} onChange={set("allowance")} className="tabular" />
+          <Field
+            label="Phụ cấp lương cố định (₫/tháng)"
+            htmlFor="allowance"
+            hint="Theo mức cố định ghi trong hợp đồng; nhập 0 nếu không có. Không nhập khoản chi trả biến động theo kỳ."
+          >
+            <Input id="allowance" type="number" min="0" step="100000" inputMode="numeric" required value={form.allowance} onChange={set("allowance")} className="tabular" />
           </Field>
           <Field label="Số người phụ thuộc" htmlFor="dependents_count">
             <Input id="dependents_count" type="number" min="0" max="99" step="1" value={form.dependents_count} onChange={set("dependents_count")} className="tabular" />

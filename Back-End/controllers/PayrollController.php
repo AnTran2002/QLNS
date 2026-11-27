@@ -75,9 +75,18 @@ class PayrollController
                 return json_response(409, null, 'Chưa có bảng chấm công theo ngày — hãy chạy migration 004_avatar_daily_attendance.sql');
             }
             $workedDaysByUser = $attendanceModel->workedDaysByUserForMonth($period['month_year']);
+            $inputs = new PayrollInputs($period['month_year']);
+            $standardDays = (int) $period['standard_days'];
             $items = $model->getAttendanceRows($periodId);
             foreach ($items as &$item) {
-                $item['actual_days'] = $workedDaysByUser[(int) $item['user_id']] ?? 0;
+                $userId = (int) $item['user_id'];
+                $item['actual_days'] = $workedDaysByUser[$userId] ?? 0;
+                if ($item['payroll_item_id'] !== null && $item['base_salary'] !== null) {
+                    $calculation = $inputs->calculate($item, $standardDays, (float) $item['ot_hours']);
+                    foreach (['gross_salary', 'social_insurance', 'tax_deduction', 'personal_tax', 'net_salary'] as $field) {
+                        $item[$field] = $calculation[$field];
+                    }
+                }
             }
             unset($item);
         } else {

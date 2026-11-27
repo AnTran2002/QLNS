@@ -73,7 +73,7 @@ final class ContractSchema
 
             // Tiền lương
             'base_salary' => ['Mức lương chính (VNĐ/tháng)', 'salary', true, 'money', 'Không thấp hơn lương tối thiểu vùng'],
-            'allowance' => ['Phụ cấp cố định (VNĐ/tháng)', 'salary', false, 'money', 'Ăn trưa, đi lại…'],
+            'allowance' => ['Phụ cấp lương cố định (VNĐ/tháng)', 'salary', true, 'money', 'Theo mức cố định ghi trong hợp đồng; nhập 0 nếu không có'],
             'insurance_salary' => ['Lương đóng BHXH (VNĐ/tháng)', 'salary', true, 'money', 'Không thấp hơn mức lương chính'],
             'payment_method' => ['Hình thức trả lương', 'salary', true, 'enum', 'Chuyển khoản / Tiền mặt'],
             'pay_day' => ['Ngày trả lương hằng tháng', 'salary', true, 'int', '1–31'],

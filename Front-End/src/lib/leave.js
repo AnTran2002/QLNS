@@ -1,10 +1,31 @@
 /* Nghỉ phép — khớp Back-End/services/LeavePolicy.php (Back-End là nơi kiểm tra cuối cùng). */
 
 export const LEAVE_TYPES = {
-  ANNUAL: { label: "Phép năm", hint: "Trừ vào quỹ 12 ngày/năm (Điều 113 BLLĐ 2019)" },
-  SICK: { label: "Nghỉ ốm", hint: "BHXH chi trả, không trừ phép năm" },
-  UNPAID: { label: "Nghỉ không lương", hint: "Không trừ phép năm, không tính lương những ngày nghỉ" },
-  OTHER: { label: "Việc riêng có lương", hint: "Kết hôn, tang… theo Điều 115 BLLĐ 2019" },
+  ANNUAL: {
+    label: "Nghỉ hằng năm (phép năm)",
+    hint: "Theo Điều 113–114 Bộ luật Lao động 2019; dùng quỹ phép năm của nhân viên.",
+    reasonPlaceholder: "VD: Đăng ký nghỉ phép năm theo kế hoạch",
+  },
+  SICK: {
+    label: "Nghỉ ốm đau (BHXH)",
+    hint: "Chế độ ốm đau theo Luật BHXH 2024; cần đủ điều kiện và hồ sơ y tế. Đơn này chỉ ghi nhận ngày nghỉ, không tự xác nhận quyền lợi BHXH.",
+    reasonPlaceholder: "Nêu thời gian điều trị; hồ sơ chế độ BHXH bổ sung với nhân sự",
+  },
+  UNPAID: {
+    label: "Nghỉ không hưởng lương",
+    hint: "Khoản 2 Điều 115 Bộ luật Lao động 2019: 1 ngày khi ông/bà, anh/chị/em ruột qua đời hoặc cha/mẹ đẻ/nuôi, anh/chị/em ruột kết hôn; trường hợp khác cần thỏa thuận.",
+    reasonPlaceholder: "Nêu lý do và thỏa thuận nghỉ không hưởng lương",
+  },
+  OTHER: {
+    label: "Nghỉ việc riêng hưởng lương",
+    hint: "Khoản 1 Điều 115 Bộ luật Lao động 2019: bản thân kết hôn (3 ngày), con kết hôn (1 ngày), cha/mẹ đẻ hoặc nuôi, vợ/chồng, con đẻ hoặc nuôi qua đời (3 ngày). Ghi rõ sự kiện để quản trị đối chiếu trước khi duyệt.",
+    reasonPlaceholder: "Nêu rõ sự kiện theo Điều 115: kết hôn, con kết hôn hoặc thân nhân qua đời",
+    events: {
+      SELF_MARRIAGE: "Người lao động kết hôn (tối đa 3 ngày)",
+      CHILD_MARRIAGE: "Con kết hôn (tối đa 1 ngày)",
+      FAMILY_DEATH: "Cha/mẹ đẻ hoặc nuôi, vợ/chồng hoặc con đẻ hoặc nuôi qua đời (tối đa 3 ngày)",
+    },
+  },
 };
 
 export const LEAVE_STATUS = {

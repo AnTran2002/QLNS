@@ -90,7 +90,11 @@ export default function LeaveRequestsPage() {
 
   return (
     <div className="space-y-10">
-      <PageHeader eyebrow="Nhân sự" title="Nghỉ phép" description="Duyệt đơn nghỉ của nhân viên. Đơn được duyệt tự ghi vào lịch chấm công tháng." />
+      <PageHeader
+        eyebrow="Nhân sự"
+        title="Nghỉ phép"
+        description="Đơn được duyệt tự ghi vào lịch chấm công. Đối chiếu căn cứ trước khi duyệt: nghỉ việc riêng hưởng lương giới hạn theo Điều 115 Bộ luật Lao động; nghỉ ốm đau cần kiểm tra hồ sơ theo Luật BHXH."
+      />
 
       {data?.available === false ? (
         <EmptyState

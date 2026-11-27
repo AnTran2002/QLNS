@@ -48,6 +48,11 @@ class LeaveController
             return json_response(422, null, $error);
         }
 
+        if ($input['type'] === 'OTHER') {
+            $event = LeavePolicy::PERSONAL_PAID_EVENTS[$input['personal_event']];
+            $input['reason'] = $event['label'] . ' — ' . trim($input['reason']);
+        }
+
         $userId = (int) $_SESSION['user_id'];
         if ($model->hasOverlap($userId, $input['start_date'], $input['end_date'])) {
             return json_response(409, null, 'Khoảng ngày này trùng với một đơn khác đang chờ duyệt hoặc đã duyệt');

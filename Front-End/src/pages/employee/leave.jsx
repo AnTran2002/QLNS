@@ -35,7 +35,7 @@ const days = (n) => `${formatNumber(n)} ngày`;
 function LeaveForm({ balance, onDone }) {
   const queryClient = useQueryClient();
   const today = todayKey();
-  const [form, setForm] = useState({ type: "ANNUAL", start_date: today, end_date: today, reason: "" });
+  const [form, setForm] = useState({ type: "ANNUAL", personal_event: "", start_date: today, end_date: today, reason: "" });
   const [error, setError] = useState("");
   const set = (key) => (v) => setForm((f) => ({ ...f, [key]: v?.target ? v.target.value : v }));
 
@@ -59,17 +59,18 @@ function LeaveForm({ balance, onDone }) {
     if (form.start_date < today) return setError("Ngày bắt đầu không được ở quá khứ");
     if (count === 0) return setError("Khoảng thời gian đã chọn không có ngày làm việc nào (T2–T6)");
     if (after !== null && after < 0) return setError(`Vượt quỹ phép năm: còn ${days(balance.remaining)}, đơn này cần ${days(count)}`);
+    if (form.type === "OTHER" && !form.personal_event) return setError("Hãy chọn sự kiện nghỉ việc riêng theo Điều 115");
     if (form.reason.trim().length < 3) return setError("Hãy ghi lý do (ít nhất 3 ký tự)");
     setError("");
     mutation.mutate();
   };
 
   return (
-    <form onSubmit={submit} noValidate className="grid gap-5">
-      <div className="space-y-2">
+    <form onSubmit={submit} noValidate className="grid min-w-0 gap-5">
+      <div className="min-w-0 space-y-2">
         <Label htmlFor="leave-type">Loại nghỉ</Label>
         <Select value={form.type} onValueChange={set("type")}>
-          <SelectTrigger id="leave-type" className="w-full">
+          <SelectTrigger id="leave-type" className="w-full min-w-0 max-w-full">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -80,29 +81,45 @@ function LeaveForm({ balance, onDone }) {
             ))}
           </SelectContent>
         </Select>
-        <p className="text-[12.5px] text-muted-foreground">{LEAVE_TYPES[form.type].hint}</p>
+        <p className="min-w-0 break-words text-[12.5px] text-muted-foreground">{LEAVE_TYPES[form.type].hint}</p>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
+      {form.type === "OTHER" && (
+        <div className="min-w-0 space-y-2">
+          <Label htmlFor="leave-personal-event">Sự kiện theo Điều 115</Label>
+          <Select value={form.personal_event} onValueChange={set("personal_event")}>
+            <SelectTrigger id="leave-personal-event" className="w-full min-w-0 max-w-full">
+              <SelectValue placeholder="Chọn sự kiện nghỉ việc riêng hưởng lương" />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(LEAVE_TYPES.OTHER.events).map(([key, label]) => (
+                <SelectItem key={key} value={key}>{label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+      <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+        <div className="min-w-0 space-y-2">
           <Label htmlFor="leave-start">Từ ngày</Label>
           <Input id="leave-start" type="date" min={today} value={form.start_date} onChange={set("start_date")} />
         </div>
-        <div className="space-y-2">
+        <div className="min-w-0 space-y-2">
           <Label htmlFor="leave-end">Đến ngày</Label>
           <Input id="leave-end" type="date" min={form.start_date} value={form.end_date} onChange={set("end_date")} />
         </div>
       </div>
-      <div className="space-y-2">
+      <div className="min-w-0 space-y-2">
         <Label htmlFor="leave-reason">Lý do</Label>
         <Textarea
           id="leave-reason"
+          className="min-w-0"
           maxLength={500}
           value={form.reason}
           onChange={set("reason")}
-          placeholder="VD: Về quê giải quyết việc gia đình"
+          placeholder={LEAVE_TYPES[form.type].reasonPlaceholder}
         />
       </div>
-      <div className="tile grid grid-cols-2 gap-4 p-5" aria-live="polite">
+      <div className="tile grid min-w-0 grid-cols-2 gap-4 p-5" aria-live="polite">
         <div>
           <p className="text-[13px] text-tile-muted">Ngày làm việc nghỉ</p>
           <p className="mt-1 text-[20px] font-semibold tabular-nums">{days(count)}</p>
@@ -256,7 +273,7 @@ export default function EmployeeLeavePage() {
       )}
 
       <Dialog open={creating} onOpenChange={setCreating}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="min-w-0 overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Tạo đơn nghỉ</DialogTitle>
             <DialogDescription>Ngày bắt đầu phải từ hôm nay trở đi. Chỉ tính ngày làm việc T2–T6; đơn sẽ được gửi tới quản trị để duyệt.</DialogDescription>

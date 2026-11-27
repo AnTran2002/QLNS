@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS `leave_requests` (
   `id` int NOT NULL AUTO_INCREMENT,
   `user_id` int NOT NULL,
   `type` enum('ANNUAL','SICK','UNPAID','OTHER') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'ANNUAL'
-    COMMENT 'ANNUAL phép năm · SICK nghỉ ốm (BHXH chi trả) · UNPAID không lương · OTHER việc riêng có lương',
+    COMMENT 'ANNUAL nghỉ hằng năm · SICK nghỉ ốm đau theo Luật BHXH · UNPAID nghỉ không lương · OTHER việc riêng hưởng lương theo Điều 115 BLLĐ 2019',
   `start_date` date NOT NULL,
   `end_date` date NOT NULL,
   `days` decimal(4,1) NOT NULL COMMENT 'Số ngày làm việc (T2–T6) trong khoảng',

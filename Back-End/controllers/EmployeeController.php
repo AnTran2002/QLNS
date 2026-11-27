@@ -261,7 +261,6 @@ class EmployeeController
             return json_response(404, null, 'Chưa có hợp đồng để tính lương');
         }
 
-        $inputs = new PayrollInputs($month);
         $period = null;
         foreach ($payrollModel->getAllPeriods() as $p) {
             if ($p['month_year'] === $month) {
@@ -269,8 +268,15 @@ class EmployeeController
                 break;
             }
         }
+
+        $inputs = new PayrollInputs($month);
         $standardDays = $period ? (int) $period['standard_days'] : $inputs->standardDays();
-        $otHours      = $inputs->otHours($userId);
+        $periodItem = $period && $period['status'] === 'DRAFT'
+            ? $payrollModel->getByPeriodAndUser((int) $period['id'], $userId)
+            : null;
+        $otHours = $periodItem
+            ? (float) $periodItem['ot_hours']
+            : $inputs->otHours($userId);
         $toDate       = $inputs->calculate($row, $standardDays, $otHours);
         $remaining    = $inputs->remainingWorkdays();
         $projection   = $inputs->calculate($row, $standardDays, $otHours, $remaining);
@@ -440,7 +446,11 @@ class EmployeeController
 
         if ($includeContract) {
             foreach (['base_salary', 'insurance_salary', 'allowance'] as $key) {
-                $value = $input[$key] ?? 0;
+                $value = $input[$key] ?? null;
+                if ($key === 'allowance' && (!is_scalar($value) || trim((string) $value) === '')) {
+                    return [null, 'Phụ cấp lương cố định là bắt buộc; nhập 0 nếu không có'];
+                }
+                $value = $value ?? 0;
                 if (!is_numeric($value) || (float) $value < 0 || (float) $value > 9999999999) {
                     return [null, "Trường {$key} phải là số không âm"];
                 }

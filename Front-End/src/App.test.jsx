@@ -122,7 +122,7 @@ const ATT_ROW = {
 };
 
 describe("Chấm công & OT", () => {
-  it("ngày công chỉ đọc, sửa OT trên Grid → lưu gửi đúng entries", async () => {
+  it("mở form điều chỉnh OT, yêu cầu lý do và lưu đúng dữ liệu", async () => {
     api.me.mockResolvedValue({ user: ADMIN });
     const period = { id: 2, month_year: "2026-11", standard_days: 22, status: "DRAFT" };
     api.payrollAttendance.mockResolvedValue({ period, items: [{ ...ATT_ROW, actual_days: 13 }] });
@@ -136,12 +136,17 @@ describe("Chấm công & OT", () => {
     const days = await screen.findByLabelText("Ngày công của Trần Thị Bình");
     expect(days.tagName).not.toBe("INPUT");
     expect(days).toHaveTextContent("13");
-    await user.type(screen.getByLabelText("Giờ OT của Trần Thị Bình"), "4");
-    expect(screen.getByText(/thay đổi chưa lưu/)).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /Lưu thay đổi/ }));
+    await user.click(screen.getByRole("button", { name: "Điều chỉnh OT của Trần Thị Bình" }));
+    expect(await screen.findByText(/NV002 · Tháng 11\/2026/)).toBeInTheDocument();
+    expect(screen.getByText("Nội dung cần thay đổi · Giờ OT")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Xác nhận thay đổi" }));
     expect(api.saveAttendance).not.toHaveBeenCalled();
-    await user.type(screen.getByLabelText("Lý do thay đổi lương của Trần Thị Bình"), "Điều chỉnh OT theo xác nhận quản lý");
-    await user.click(screen.getByRole("button", { name: /Lưu thay đổi/ }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Lý do cần cụ thể");
+    const ot = screen.getByLabelText("Giờ OT điều chỉnh");
+    await user.clear(ot);
+    await user.type(ot, "4");
+    await user.type(screen.getByLabelText("Lý do thay đổi"), "Điều chỉnh OT theo xác nhận quản lý");
+    await user.click(screen.getByRole("button", { name: "Xác nhận thay đổi" }));
     await waitFor(() => expect(api.saveAttendance).toHaveBeenCalledWith(2, [{
       user_id: 2,
       ot_hours: 4,
@@ -246,6 +251,16 @@ describe("Cổng nhân viên", () => {
 });
 
 describe("Nghỉ phép", () => {
+  it("hiển thị căn cứ pháp lý và hướng dẫn phép năm trong form", async () => {
+    api.me.mockResolvedValue({ user: EMPLOYEE });
+    renderApp("/nhan-vien/nghi-phep");
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Tạo đơn nghỉ" }));
+    expect(await screen.findByText(/Điều 113–114 Bộ luật Lao động 2019/)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("VD: Đăng ký nghỉ phép năm theo kế hoạch")).toBeInTheDocument();
+  });
+
   it("nhân viên thấy quỹ phép và đơn của mình", async () => {
     api.me.mockResolvedValue({ user: EMPLOYEE });
     renderApp("/nhan-vien/nghi-phep");
@@ -314,6 +329,30 @@ describe("Nghỉ phép", () => {
 });
 
 describe("Điều chỉnh lương", () => {
+  it("yêu cầu phụ cấp cố định khi tạo hợp đồng và chấp nhận giá trị 0", async () => {
+    api.me.mockResolvedValue({ user: ADMIN });
+    api.createEmployee.mockResolvedValue({ id: 3 });
+    renderApp("/admin/nhan-vien?moi=1");
+
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText("Họ và tên"), "Nguyễn Thị Mai");
+    await user.type(screen.getByLabelText("Email"), "mai@x.vn");
+    await user.type(screen.getByLabelText("Phòng ban"), "Kế toán");
+    await user.type(screen.getByLabelText("Chức danh"), "Kế toán viên");
+
+    const allowance = screen.getByLabelText("Phụ cấp lương cố định (₫/tháng)");
+    expect(allowance).toBeRequired();
+    await user.click(screen.getByRole("button", { name: "Thêm nhân viên" }));
+    expect(await screen.findByText("Phụ cấp lương cố định bắt buộc nhập (nhập 0 nếu không có)")).toBeInTheDocument();
+    expect(api.createEmployee).not.toHaveBeenCalled();
+
+    await user.type(allowance, "0");
+    await user.click(screen.getByRole("button", { name: "Thêm nhân viên" }));
+    await waitFor(() => expect(api.createEmployee).toHaveBeenCalledWith(
+      expect.objectContaining({ allowance: "0" }),
+    ));
+  });
+
   it("bắt buộc lý do và gửi điều chỉnh qua luồng riêng", async () => {
     const nextMonthDate = new Date();
     nextMonthDate.setDate(1);

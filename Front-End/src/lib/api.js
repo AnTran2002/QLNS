@@ -135,7 +135,7 @@ function employeePayload(e, includeContract = true) {
   if (includeContract) {
     payload.base_salary = Number(e.base_salary) || 0;
     payload.insurance_salary = Number(e.insurance_salary) || 0;
-    payload.allowance = Number(e.allowance) || 0;
+    payload.allowance = e.allowance;
     payload.dependents_count = Number(e.dependents_count) || 0;
   }
   if (e.password) payload.password = e.password;
@@ -168,8 +168,11 @@ export const api = {
   // ---- Nghỉ phép (LeaveController, migration 005) ----
   /** { available, balance: { year, quota, used, pending, remaining }, requests } */
   myLeave: () => callApi("employee/leave"),
-  createLeave: ({ type, start_date, end_date, reason }) =>
-    callApi("employee/leave", { method: "POST", data: { type, start_date, end_date, reason } }),
+  createLeave: ({ type, personal_event, start_date, end_date, reason }) =>
+    callApi("employee/leave", {
+      method: "POST",
+      data: { type, ...(personal_event ? { personal_event } : {}), start_date, end_date, reason },
+    }),
   cancelLeave: (id) => callApi("employee/leave/cancel", { method: "POST", params: { id } }),
   leaveRequests: (status) => callApi("leave/requests", { params: status ? { status } : undefined }),
   /** decision: "APPROVED" | "REJECTED" (từ chối bắt buộc có ghi chú). */

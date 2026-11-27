@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AnimatePresence, motion } from "motion/react";
 import {
   CalendarCheck2,
   CalendarPlus,
@@ -13,8 +12,6 @@ import {
   Loader2,
   Lock,
   Pencil,
-  RotateCcw,
-  Save,
   Sigma,
   Wallet,
 } from "lucide-react";
@@ -24,10 +21,12 @@ import { ErrorState, LoadingState, PeriodStatusBadge, PersonAvatar, SearchField,
 import { Reveal } from "@/components/app/motion";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/animate-ui/components/radix/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/animate-ui/components/radix/dialog";
 import { api } from "@/lib/api";
 import { formatMoney, formatMoneyShort, formatNumber, formatPeriod } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -40,7 +39,6 @@ import { CreatePeriodDialog, daysInMonthOf, ImportDialog } from "./attendance-di
  *   <<extend>> Import file Excel công (.xlsx)       → ImportDialog
  */
 
-const FIELDS = ["ot_hours"];
 const toInput = (v) => (v === null || v === undefined ? "" : String(v));
 const parseNum = (s) => Number(String(s).trim().replace(",", "."));
 
@@ -105,45 +103,9 @@ function MiniStat({ icon: Icon, label, value, hint }) {
 /* Grid nhập liệu                                                      */
 /* ------------------------------------------------------------------ */
 
-function CellInput({ row, field, value, error, dirty, disabled, rowIndex, onChange, onNavigate, suffix }) {
-  return (
-    <div className="relative ml-auto w-23">
-      <input
-        data-cell={`${rowIndex}:${field}`}
-        inputMode="decimal"
-        value={value}
-        disabled={disabled}
-        placeholder={disabled ? "—" : "0"}
-        onChange={(e) => onChange(row.user_id, field, e.target.value.replace(/[^\d.,]/g, ""))}
-        onFocus={(e) => e.target.select()}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === "ArrowDown") {
-            e.preventDefault();
-            onNavigate(rowIndex + 1, field);
-          } else if (e.key === "ArrowUp") {
-            e.preventDefault();
-            onNavigate(rowIndex - 1, field);
-          }
-        }}
-        aria-label={`${field === "actual_days" ? "Ngày công" : "Giờ OT"} của ${row.full_name}`}
-        aria-invalid={Boolean(error) || undefined}
-        title={error || undefined}
-        className={cn(
-          "h-8 w-full rounded-lg border bg-background pr-8 pl-2.5 text-right text-[13.5px] tabular-nums outline-none transition-[border-color,box-shadow,background-color]",
-          "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/15 disabled:cursor-not-allowed disabled:bg-muted/50 disabled:text-muted-foreground",
-          dirty ? "border-primary/50 bg-primary/4" : "border-input",
-          error && "border-destructive bg-destructive/5 focus-visible:ring-destructive/15",
-        )}
-      />
-      <span className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-[11px] text-muted-foreground">{suffix}</span>
-    </div>
-  );
-}
-
-function RowState({ row, dirty, error }) {
+function RowState({ row, error }) {
   if (error) return <Badge variant="destructive">Lỗi</Badge>;
   if (row.base_salary === null) return <Badge variant="outline" className="text-muted-foreground">Thiếu HĐ</Badge>;
-  if (dirty) return <Badge className="bg-primary/12 text-primary"><Pencil /> Đã sửa</Badge>;
   if (row.payroll_item_id) return <Badge variant="success"><Check /> Đã nhập</Badge>;
   return <Badge variant="warning"><CircleDashed /> Chưa nhập</Badge>;
 }
@@ -215,58 +177,18 @@ function PayrollHistoryDialog({ period, row, onClose }) {
   );
 }
 
-function AttendanceGrid({ period, rows, onDirtyChange }) {
+function AttendanceGrid({ period, rows }) {
   const queryClient = useQueryClient();
   const editable = period.status === "DRAFT";
   const maxOt = daysInMonthOf(period.month_year) * 24;
 
-  const [drafts, setDrafts] = useState({});
   const [serverErrors, setServerErrors] = useState({});
   const [query, setQuery] = useState("");
   const [department, setDepartment] = useState("all");
   const [filter, setFilter] = useState("all");
   const [historyRow, setHistoryRow] = useState(null);
-
-  const original = useCallback(
-    (row, field) => (row.payroll_item_id ? toInput(row[field]) : ""),
-    [],
-  );
-  const valueOf = useCallback(
-    (row, field) => drafts[row.user_id]?.[field] ?? original(row, field),
-    [drafts, original],
-  );
-  const isDirty = useCallback(
-    (row) => FIELDS.some((f) => drafts[row.user_id]?.[f] !== undefined && drafts[row.user_id][f] !== original(row, f)),
-    [drafts, original],
-  );
-
-  const validate = useCallback(
-    (row) => {
-      if (!isDirty(row)) return null;
-      const ot = valueOf(row, "ot_hours");
-      const o = ot === "" ? 0 : parseNum(ot);
-      if (!Number.isFinite(o) || o < 0) return "Giờ OT phải là số không âm";
-      if (o > maxOt) return `Giờ OT tối đa ${maxOt}`;
-      const reason = String(drafts[row.user_id]?.reason ?? "").trim();
-      if (reason.length < 10 || reason.length > 500) return "Lý do cần cụ thể, từ 10 đến 500 ký tự";
-      return null;
-    },
-    [isDirty, valueOf, maxOt, drafts],
-  );
-
-  const dirtyRows = useMemo(() => rows.filter(isDirty), [rows, isDirty]);
-  const invalid = useMemo(() => dirtyRows.filter((r) => validate(r)), [dirtyRows, validate]);
-
-  useEffect(() => onDirtyChange?.(dirtyRows.length), [dirtyRows.length, onDirtyChange]);
-  useEffect(() => {
-    if (!dirtyRows.length) return undefined;
-    const warn = (e) => {
-      e.preventDefault();
-      e.returnValue = "";
-    };
-    window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
-  }, [dirtyRows.length]);
+  const [adjustment, setAdjustment] = useState(null);
+  const [adjustmentError, setAdjustmentError] = useState("");
 
   const departments = useMemo(() => [...new Set(rows.map((r) => r.department).filter(Boolean))].sort((a, b) => a.localeCompare(b, "vi")), [rows]);
   const counts = useMemo(
@@ -274,9 +196,8 @@ function AttendanceGrid({ period, rows, onDirtyChange }) {
       all: rows.length,
       pending: rows.filter((r) => !r.payroll_item_id && r.base_salary !== null).length,
       done: rows.filter((r) => r.payroll_item_id).length,
-      dirty: dirtyRows.length,
     }),
-    [rows, dirtyRows.length],
+    [rows],
   );
 
   const visible = useMemo(() => {
@@ -285,31 +206,10 @@ function AttendanceGrid({ period, rows, onDirtyChange }) {
       if (department !== "all" && r.department !== department) return false;
       if (filter === "pending" && (r.payroll_item_id || r.base_salary === null)) return false;
       if (filter === "done" && !r.payroll_item_id) return false;
-      if (filter === "dirty" && !isDirty(r)) return false;
       if (!q) return true;
       return [r.full_name, r.employee_code, r.department].some((v) => String(v ?? "").toLowerCase().includes(q));
     });
-  }, [rows, query, department, filter, isDirty]);
-
-  const change = useCallback((userId, field, value) => {
-    setDrafts((d) => ({ ...d, [userId]: { ...d[userId], [field]: value } }));
-    setServerErrors((e) => {
-      if (!e[userId]) return e;
-      const next = { ...e };
-      delete next[userId];
-      return next;
-    });
-  }, []);
-
-  const navigate = useCallback((rowIndex, field) => {
-    const el = document.querySelector(`[data-cell="${rowIndex}:${field}"]`);
-    if (el && !el.disabled) el.focus();
-  }, []);
-
-  const reset = () => {
-    setDrafts({});
-    setServerErrors({});
-  };
+  }, [rows, query, department, filter]);
 
   const mutation = useMutation({
     mutationFn: (entries) => api.saveAttendance(period.id, entries),
@@ -319,37 +219,48 @@ function AttendanceGrid({ period, rows, onDirtyChange }) {
         items: data?.items ?? old?.items ?? [],
       }));
       queryClient.invalidateQueries({ queryKey: ["payroll", "periods"] });
-      setDrafts({});
-      setServerErrors({});
+      setServerErrors((errors) => {
+        const next = { ...errors };
+        entries.forEach(({ user_id }) => delete next[user_id]);
+        return next;
+      });
+      setAdjustment(null);
+      setAdjustmentError("");
       toast.success(`Đã lưu và tính lương cho ${data?.updated_count ?? entries.length} nhân viên`);
     },
     onError: (err, entries) => {
       const d = err.details ?? {};
       const ids = new Set(d.user_ids ?? []);
       if (Number.isInteger(d.entry_index) && entries[d.entry_index]) ids.add(entries[d.entry_index].user_id);
+      if (ids.size === 0) entries.forEach(({ user_id }) => ids.add(user_id));
       setServerErrors(Object.fromEntries([...ids].map((id) => [id, err.message])));
       toast.error(err.message);
     },
   });
 
-  const save = () => {
-    if (invalid.length) {
-      toast.error(`Còn ${invalid.length} dòng chưa hợp lệ — kiểm tra các ô viền đỏ`);
-      const firstInvalid = invalid[0];
-      if (validate(firstInvalid) === "Lý do cần cụ thể, từ 10 đến 500 ký tự") {
-        document.querySelector(`[data-reason="${firstInvalid.user_id}"]`)?.focus();
-      } else {
-        navigate(visible.findIndex((row) => row.user_id === firstInvalid.user_id), "ot_hours");
-      }
+  const openAdjustment = (row) => {
+    setAdjustment({ row, ot_hours: toInput(row.ot_hours ?? 0), reason: "" });
+    setAdjustmentError("");
+  };
+
+  const confirmAdjustment = (event) => {
+    event.preventDefault();
+    if (!adjustment) return;
+    const ot = adjustment.ot_hours.trim() === "" ? 0 : parseNum(adjustment.ot_hours);
+    const reason = adjustment.reason.trim();
+    if (!Number.isFinite(ot) || ot < 0) {
+      setAdjustmentError("Giờ OT phải là số không âm.");
       return;
     }
-    mutation.mutate(
-      dirtyRows.map((r) => ({
-        user_id: r.user_id,
-        ot_hours: valueOf(r, "ot_hours") === "" ? 0 : parseNum(valueOf(r, "ot_hours")),
-        reason: drafts[r.user_id]?.reason ?? "",
-      })),
-    );
+    if (ot > maxOt) {
+      setAdjustmentError(`Giờ OT tối đa ${maxOt}.`);
+      return;
+    }
+    if (reason.length < 10 || reason.length > 500) {
+      setAdjustmentError("Lý do cần cụ thể, từ 10 đến 500 ký tự.");
+      return;
+    }
+    mutation.mutate([{ user_id: adjustment.row.user_id, ot_hours: ot, reason }]);
   };
 
   return (
@@ -358,7 +269,7 @@ function AttendanceGrid({ period, rows, onDirtyChange }) {
         <CardTitle>Lưới ngày công & OT</CardTitle>
         <CardDescription>
           {editable
-            ? `Ngày công lấy từ chấm công theo ngày · chỉ nhập OT trên lưới · tối đa ${maxOt} giờ OT`
+            ? `Ngày công lấy từ chấm công theo ngày · điều chỉnh OT theo từng nhân viên · tối đa ${maxOt} giờ OT`
             : "Kỳ lương đã chốt — chỉ xem, không thể chỉnh sửa"}
         </CardDescription>
       </CardHeader>
@@ -387,7 +298,6 @@ function AttendanceGrid({ period, rows, onDirtyChange }) {
             { value: "all", label: "Tất cả", count: counts.all },
             { value: "pending", label: "Chưa nhập", count: counts.pending },
             { value: "done", label: "Đã nhập", count: counts.done },
-            ...(editable ? [{ value: "dirty", label: "Đã sửa", count: counts.dirty }] : []),
           ]}
         />
       </div>
@@ -400,10 +310,10 @@ function AttendanceGrid({ period, rows, onDirtyChange }) {
               <TableHead className="text-right max-md:hidden">Lương CB</TableHead>
               <TableHead className="text-right">Ngày công</TableHead>
               <TableHead className="text-right">Giờ OT</TableHead>
-              <TableHead className="min-w-55">Lý do thay đổi</TableHead>
               <TableHead className="text-right max-lg:hidden">Gross</TableHead>
               <TableHead className="text-right">Net</TableHead>
               <TableHead className="pr-4 sm:pr-5">Trạng thái</TableHead>
+              <TableHead className="pr-4 sm:pr-5">Thao tác</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -414,12 +324,11 @@ function AttendanceGrid({ period, rows, onDirtyChange }) {
                 </TableCell>
               </TableRow>
             )}
-            {visible.map((r, i) => {
-              const dirty = isDirty(r);
-              const error = serverErrors[r.user_id] || validate(r);
+            {visible.map((r) => {
+              const error = serverErrors[r.user_id];
               const disabled = !editable || r.base_salary === null;
               return (
-                <TableRow key={r.user_id} className={cn(dirty && "bg-primary/2.5", error && "bg-destructive/3")}>
+                <TableRow key={r.user_id} className={cn(error && "bg-destructive/3")}>
                   <TableCell className="pl-4 sm:pl-5">
                     <div className="flex min-w-45 items-center gap-2.5">
                       <PersonAvatar name={r.full_name} seed={r.employee_code} src={r.avatar} size="xs" />
@@ -437,43 +346,14 @@ function AttendanceGrid({ period, rows, onDirtyChange }) {
                   <TableCell className="text-right text-[13px] tabular-nums">
                     <span aria-label={`Ngày công của ${r.full_name}`}>{formatNumber(r.actual_days)}</span>
                   </TableCell>
-                  {FIELDS.map((f) => (
-                    <TableCell key={f} className="py-1.5">
-                      <CellInput
-                        row={r}
-                        field={f}
-                        rowIndex={i}
-                        value={valueOf(r, f)}
-                        dirty={drafts[r.user_id]?.[f] !== undefined && drafts[r.user_id][f] !== original(r, f)}
-                        error={error}
-                        disabled={disabled}
-                        onChange={change}
-                        onNavigate={navigate}
-                        suffix="giờ"
-                      />
-                    </TableCell>
-                  ))}
-                  <TableCell className="py-1.5">
-                    <Textarea
-                      data-reason={r.user_id}
-                      value={drafts[r.user_id]?.reason ?? ""}
-                      onChange={(e) => change(r.user_id, "reason", e.target.value)}
-                      disabled={disabled}
-                      maxLength={500}
-                      rows={2}
-                      aria-label={`Lý do thay đổi lương của ${r.full_name}`}
-                      aria-invalid={Boolean(error) || undefined}
-                      placeholder="Ghi rõ lý do (10–500 ký tự)"
-                      className="min-h-16 min-w-52.5 resize-y text-[12px]"
-                    />
+                  <TableCell className="text-right text-[13px] tabular-nums">
+                    {r.payroll_item_id ? formatNumber(r.ot_hours) : "—"}
                   </TableCell>
                   <TableCell className="text-right text-[13px] tabular-nums max-lg:hidden">
-                    {dirty ? <span className="text-muted-foreground">—</span> : r.payroll_item_id ? formatMoney(r.gross_salary) : "—"}
+                    {r.payroll_item_id ? formatMoney(r.gross_salary) : "—"}
                   </TableCell>
                   <TableCell className="text-right text-[13px] font-medium tabular-nums">
-                    {dirty ? (
-                      <span className="text-[12px] font-normal text-muted-foreground">tính khi lưu</span>
-                    ) : r.payroll_item_id ? (
+                    {r.payroll_item_id ? (
                       formatMoney(r.net_salary)
                     ) : (
                       <span className="text-muted-foreground">—</span>
@@ -481,7 +361,7 @@ function AttendanceGrid({ period, rows, onDirtyChange }) {
                   </TableCell>
                   <TableCell className="pr-4 sm:pr-5" title={error || undefined}>
                     <div className="flex items-center gap-1">
-                      <RowState row={r} dirty={dirty} error={error} />
+                      <RowState row={r} error={error} />
                       {r.payroll_item_id && (
                         <Button
                           variant="ghost"
@@ -494,6 +374,18 @@ function AttendanceGrid({ period, rows, onDirtyChange }) {
                       )}
                     </div>
                   </TableCell>
+                  <TableCell className="pr-4 sm:pr-5">
+                    {editable && r.base_salary !== null && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openAdjustment(r)}
+                        aria-label={`Điều chỉnh OT của ${r.full_name}`}
+                      >
+                        <Pencil /> Điều chỉnh
+                      </Button>
+                    )}
+                  </TableCell>
                 </TableRow>
               );
             })}
@@ -501,33 +393,123 @@ function AttendanceGrid({ period, rows, onDirtyChange }) {
         </Table>
       </CardContent>
 
-      {/* Thanh lưu nổi — chỉ hiện khi có thay đổi */}
-      <AnimatePresence>
-        {dirtyRows.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 16 }}
-            transition={{ type: "spring", stiffness: 380, damping: 32 }}
-            className="sticky bottom-4 z-20 mx-3 mb-3 flex flex-wrap items-center gap-3 rounded-2xl border border-border/80 bg-card/90 px-4 py-2.5 shadow-popover backdrop-blur-xl"
-          >
-            <span className="flex items-center gap-2 text-[13px]">
-              <span className="size-2 rounded-full bg-primary" aria-hidden="true" />
-              <b className="font-semibold tabular-nums">{dirtyRows.length}</b> thay đổi chưa lưu
-              {invalid.length > 0 && <span className="text-destructive">· {invalid.length} dòng lỗi</span>}
-            </span>
-            <div className="ml-auto flex gap-2">
-              <Button variant="ghost" size="sm" onClick={reset} disabled={mutation.isPending}>
-                <RotateCcw /> Hoàn tác
-              </Button>
-              <Button size="sm" onClick={save} disabled={mutation.isPending}>
-                {mutation.isPending ? <Loader2 className="animate-spin" /> : <Save />}
-                Lưu thay đổi ({dirtyRows.length})
-              </Button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <Dialog
+        open={Boolean(adjustment)}
+        onOpenChange={(open) => {
+          if (!open && !mutation.isPending) {
+            setAdjustment(null);
+            setAdjustmentError("");
+          }
+        }}
+      >
+        <DialogContent className="max-h-[92svh] overflow-y-auto sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Điều chỉnh OT và lương</DialogTitle>
+            <DialogDescription>
+              {adjustment && `${adjustment.row.full_name} · ${adjustment.row.employee_code} · ${formatPeriod(period.month_year)}`}
+            </DialogDescription>
+          </DialogHeader>
+          {adjustment && (
+            <form onSubmit={confirmAdjustment} className="grid gap-5">
+              <section className="grid grid-cols-2 gap-3 rounded-xl border border-border/70 bg-muted/30 p-4 text-[13px]">
+                <div>
+                  <p className="text-[12px] text-muted-foreground">Phòng ban</p>
+                  <p className="font-medium">{adjustment.row.department || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-[12px] text-muted-foreground">Lương cơ bản</p>
+                  <p className="font-medium tabular-nums">{formatMoney(adjustment.row.base_salary)}</p>
+                </div>
+                <div>
+                  <p className="text-[12px] text-muted-foreground">Ngày công</p>
+                  <p className="font-medium tabular-nums">{formatNumber(adjustment.row.actual_days)}</p>
+                </div>
+                <div>
+                  <p className="text-[12px] text-muted-foreground">Gross hiện tại</p>
+                  <p className="font-medium tabular-nums">
+                    {adjustment.row.payroll_item_id ? formatMoney(adjustment.row.gross_salary) : "Chưa tính"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[12px] text-muted-foreground">Net hiện tại</p>
+                  <p className="font-medium tabular-nums">
+                    {adjustment.row.payroll_item_id ? formatMoney(adjustment.row.net_salary) : "Chưa tính"}
+                  </p>
+                </div>
+              </section>
+
+              <div className="space-y-2">
+                <Label htmlFor="adjustment-ot">Nội dung cần thay đổi · Giờ OT</Label>
+                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                  <div className="space-y-1">
+                    <span className="text-[11px] text-muted-foreground">Hiện tại</span>
+                    <div className="flex h-10 items-center rounded-lg border border-border bg-muted/40 px-3 text-[14px] tabular-nums">
+                      {formatNumber(adjustment.row.ot_hours ?? 0)} giờ
+                    </div>
+                  </div>
+                  <span className="pt-5 text-muted-foreground" aria-hidden="true">→</span>
+                  <div className="space-y-1">
+                    <Label htmlFor="adjustment-ot" className="text-[11px]">Điều chỉnh thành</Label>
+                    <div className="relative">
+                      <Input
+                        id="adjustment-ot"
+                        inputMode="decimal"
+                        value={adjustment.ot_hours}
+                        onChange={(e) => {
+                          setAdjustment({ ...adjustment, ot_hours: e.target.value.replace(/[^\d.,]/g, "") });
+                          setAdjustmentError("");
+                        }}
+                        aria-label="Giờ OT điều chỉnh"
+                        aria-invalid={adjustmentError.startsWith("Giờ OT") || undefined}
+                        className="pr-12 text-right tabular-nums"
+                        autoFocus
+                      />
+                      <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-[11px] text-muted-foreground">giờ</span>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-[11px] text-muted-foreground">Tối đa {maxOt} giờ trong kỳ lương này.</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="adjustment-reason">Lý do thay đổi</Label>
+                <Textarea
+                  id="adjustment-reason"
+                  value={adjustment.reason}
+                  onChange={(e) => {
+                    setAdjustment({ ...adjustment, reason: e.target.value });
+                    setAdjustmentError("");
+                  }}
+                  maxLength={500}
+                  rows={4}
+                  placeholder="Ghi rõ lý do thay đổi (10–500 ký tự)"
+                  aria-invalid={adjustmentError.startsWith("Lý do") || undefined}
+                />
+                <p className="text-right text-[11px] text-muted-foreground">{adjustment.reason.length}/500</p>
+              </div>
+
+              {adjustmentError && <p role="alert" className="text-[13px] text-destructive">{adjustmentError}</p>}
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setAdjustment(null);
+                    setAdjustmentError("");
+                  }}
+                  disabled={mutation.isPending}
+                >
+                  Huỷ
+                </Button>
+                <Button type="submit" disabled={mutation.isPending}>
+                  {mutation.isPending ? <Loader2 className="animate-spin" /> : <Check />}
+                  {mutation.isPending ? "Đang lưu…" : "Xác nhận thay đổi"}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
       {historyRow && (
         <PayrollHistoryDialog period={period} row={historyRow} onClose={() => setHistoryRow(null)} />
       )}
@@ -541,7 +523,6 @@ export default function AttendancePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [createOpen, setCreateOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
-  const [dirtyCount, setDirtyCount] = useState(0);
 
   const periodsQuery = useQuery({ queryKey: ["payroll", "periods"], queryFn: api.payrollPeriods });
   const periods = useMemo(() => periodsQuery.data ?? [], [periodsQuery.data]);
@@ -572,7 +553,6 @@ export default function AttendancePage() {
 
   const selectPeriod = (id) => {
     if (String(id) === String(period?.id)) return;
-    if (dirtyCount > 0 && !window.confirm(`Có ${dirtyCount} thay đổi chưa lưu. Chuyển kỳ sẽ bỏ các thay đổi này?`)) return;
     setSearchParams({ ky: String(id) });
   };
 
@@ -596,8 +576,8 @@ export default function AttendancePage() {
             <Button
               size="sm"
               onClick={() => setImportOpen(true)}
-              disabled={!period || !editable || dirtyCount > 0}
-              title={dirtyCount > 0 ? "Lưu hoặc hoàn tác thay đổi trên lưới trước khi import" : !editable ? "Chỉ import được cho kỳ Nháp" : undefined}
+              disabled={!period || !editable}
+              title={!editable ? "Chỉ import được cho kỳ Nháp" : undefined}
             >
               <FileSpreadsheet /> Import Excel
             </Button>
@@ -692,7 +672,7 @@ export default function AttendancePage() {
             ) : attendanceQuery.error ? (
               <ErrorState error={attendanceQuery.error} onRetry={() => attendanceQuery.refetch()} />
             ) : (
-              <AttendanceGrid key={period.id} period={livePeriod} rows={rows} onDirtyChange={setDirtyCount} />
+              <AttendanceGrid key={period.id} period={livePeriod} rows={rows} />
             )}
           </Reveal>
         </>

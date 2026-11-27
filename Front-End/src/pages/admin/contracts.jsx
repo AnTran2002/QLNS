@@ -18,7 +18,7 @@ import { formatDate, formatMoney, formatPeriod } from "@/lib/format";
 const FIELDS = [
   ["base_salary", "Lương cơ bản (₫)", "100000"],
   ["insurance_salary", "Lương đóng BHXH (₫)", "100000"],
-  ["allowance", "Phụ cấp cố định (₫)", "100000"],
+  ["allowance", "Phụ cấp lương cố định (₫/tháng)", "100000"],
   ["dependents_count", "Số người phụ thuộc", "1"],
 ];
 
@@ -57,6 +57,9 @@ function SalaryAdjustmentForm({ contract, onOpenChange }) {
     if (historyPending || historyError) return setError("Không thể tải lịch sử điều chỉnh; hãy thử lại trước khi ghi nhận.");
     if (alreadyScheduled) return setError("Hợp đồng đã có điều chỉnh cho tháng kế tiếp.");
     for (const [key, label] of FIELDS) {
+      if (key === "allowance" && (form[key] === "" || form[key] == null)) {
+        return setError("Phụ cấp lương cố định bắt buộc nhập (nhập 0 nếu không có)");
+      }
       const n = Number(form[key]);
       if (!Number.isFinite(n) || n < 0) return setError(`${label} phải là số không âm`);
     }
@@ -78,6 +81,7 @@ function SalaryAdjustmentForm({ contract, onOpenChange }) {
       <p className="rounded-xl border border-border/70 bg-muted/50 px-4 py-3 text-[13px] text-muted-foreground">
         Mức lương mới có hiệu lực từ tháng kế tiếp: <b className="font-medium text-foreground">{formatPeriod(effectiveMonth)}</b>.
         Mỗi hợp đồng chỉ tạo một điều chỉnh cho tháng hiệu lực này.
+        Phụ cấp được ghi nhận theo mức cố định hằng tháng trong hợp đồng, không thay đổi riêng theo từng kỳ lương.
       </p>
       <div className="grid gap-4 sm:grid-cols-2">
         {FIELDS.map(([key, label, step]) => (
@@ -88,6 +92,7 @@ function SalaryAdjustmentForm({ contract, onOpenChange }) {
               type="number"
               min="0"
               step={step}
+              required={key === "allowance"}
               value={form[key]}
               onChange={(e) => {
                 setError("");

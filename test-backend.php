@@ -12,6 +12,7 @@ require $services . 'PayrollEngine.php';
 require $services . 'PayrollPeriodPolicy.php';
 require $services . 'PayrollChangePolicy.php';
 require $services . 'ContractSalaryAdjustmentPolicy.php';
+require __DIR__ . '/Back-End/controllers/EmployeeController.php';
 
 $passed = 0;
 $failed = [];
@@ -66,6 +67,20 @@ check('chỉ cuối tuần', LeavePolicy::validate(['start_date' => '2026-12-05'
 check('quá 30 ngày làm việc (05/01 → 20/02)', LeavePolicy::validate(['start_date' => '2026-01-05', 'end_date' => '2026-02-20'] + $ok, '2026-01-01')[0], 'Mỗi đơn tối đa 30 ngày làm việc');
 check('lý do quá ngắn', LeavePolicy::validate(['reason' => ' a '] + $ok, $today)[0], 'Lý do cần từ 3 đến 500 ký tự');
 check('lý do tiếng Việt 3 ký tự (mb_strlen)', LeavePolicy::validate(['reason' => 'Ốm!'] + $ok, $today)[0], null);
+$paidPersonalLeave = [
+    'type' => 'OTHER',
+    'personal_event' => 'SELF_MARRIAGE',
+    'start_date' => '2026-12-07',
+    'end_date' => '2026-12-09',
+    'reason' => 'Đăng ký nghỉ do kết hôn',
+];
+check('nghỉ việc riêng hưởng lương cần chọn sự kiện Điều 115', LeavePolicy::validate(array_diff_key($paidPersonalLeave, ['personal_event' => true]), $today)[0], 'Chọn sự kiện nghỉ việc riêng hưởng lương theo Điều 115 Bộ luật Lao động');
+check('chấp nhận sự kiện kết hôn trong giới hạn 3 ngày', LeavePolicy::validate($paidPersonalLeave, $today)[0], null);
+check(
+    'giới hạn nghỉ khi con kết hôn còn 1 ngày',
+    LeavePolicy::validate(array_merge($paidPersonalLeave, ['personal_event' => 'CHILD_MARRIAGE']), $today)[0],
+    'Sự kiện này không được vượt quá 1 ngày nghỉ theo Điều 115 Bộ luật Lao động'
+);
 
 echo "\nQuy tắc kỳ lương và điều chỉnh lương\n";
 $periodToday = new DateTimeImmutable('2026-11-22');
@@ -85,6 +100,26 @@ check('phải có thay đổi mới tạo điều chỉnh', ContractSalaryAdjust
 check('điều chỉnh có thay đổi so với hiện tại', ContractSalaryAdjustmentPolicy::hasChanges($salaryInput, array_merge($salaryInput, ['base_salary' => '21000000'])), true);
 check('chặn sửa lương qua form hồ sơ', ContractSalaryAdjustmentPolicy::containsCompensationFields(['base_salary' => 21000000]), true);
 check('cho phép cập nhật hồ sơ không có lương', ContractSalaryAdjustmentPolicy::containsCompensationFields(['full_name' => 'Nguyễn Văn An']), false);
+$employeeController = new EmployeeController();
+$employeeValidation = new ReflectionMethod(EmployeeController::class, 'validate');
+$employeeValidation->setAccessible(true);
+$employeeInput = [
+    'employee_code' => 'NV003',
+    'full_name' => 'Nguyễn Thị Mai',
+    'email' => 'mai@example.vn',
+    'department' => 'Kế toán',
+    'position' => 'Kế toán viên',
+    'status' => 'Đang làm việc',
+    'joined_at' => '2026-01-01',
+    'base_salary' => '10000000',
+    'insurance_salary' => '10000000',
+    'dependents_count' => '0',
+];
+check('bắt buộc nhập phụ cấp khi tạo hợp đồng', $employeeValidation->invoke($employeeController, $employeeInput, true)[1], 'Phụ cấp lương cố định là bắt buộc; nhập 0 nếu không có');
+$employeeInput['allowance'] = '0';
+[$validatedEmployee, $employeeError] = $employeeValidation->invoke($employeeController, $employeeInput, true);
+check('chấp nhận phụ cấp cố định bằng 0', $employeeError, null);
+check('giữ phụ cấp bằng 0 sau chuẩn hóa', $validatedEmployee['allowance'], 0.0);
 
 echo "\nPayrollEngine::calculateNetSalary\n";
 // Kỳ 2026: 20tr lương + 2tr phụ cấp, BH 10,5% trên 20tr, không người phụ thuộc
@@ -116,6 +151,21 @@ check('thu nhập dưới giảm trừ → thuế 0', $r['personal_tax'], 0.0);
 $r = PayrollEngine::calculateNetSalary(18_500_000, 2_500_000, 22, 22, 8, 1.5, 1, 15_000_000);
 check('mẫu NV002 tháng 10 dùng giảm trừ và biểu thuế 2026', $r['personal_tax'], 0.0);
 check('mẫu NV002 tháng 10 net theo quy tắc 2026', near($r['net_salary'], 20_686_363.64), true);
+
+$r = PayrollEngine::calculateDetailed([
+    'base_salary' => 18_500_000,
+    'allowance' => 2_500_000,
+    'insurance_salary' => 15_000_000,
+    'dependents' => 1,
+    'standard_days' => 22,
+    'actual_days' => 13,
+    'paid_leave_days' => 2,
+    'ot_hours' => 6,
+    'tax_year' => 2026,
+]);
+check('NV002 tính lại Gross theo 13 công, 2 ngày phép và OT 6 giờ', near($r['gross_salary'], 16_059_659.09), true);
+check('NV002 tính lại Net cùng dữ liệu đầu vào', near($r['net_salary'], 14_484_659.09), true);
+
 $r = PayrollEngine::calculateNetSalary(20_000_000, 0, 22, 22, 8, 1.5, 0, 0, 2026);
 check('phần OT cao hơn lương giờ bình thường được miễn thuế', $r['tax_exempt_overtime'], 454_545.45);
 check('OT miễn thuế không bị cộng vào thu nhập tính thuế', $r['taxable_income'], 5_409_090.91);

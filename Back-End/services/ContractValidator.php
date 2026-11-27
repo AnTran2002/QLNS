@@ -388,7 +388,6 @@ class ContractValidator extends BaseModel
     private function fillDefaults(): void
     {
         $d = &$this->data;
-        $d['allowance'] ??= 0.0;
         $d['dependents_count'] ??= 0;
         $d['probation_days'] ??= 0;
         $d['probation_salary_rate'] = $d['probation_days'] > 0 ? ($d['probation_salary_rate'] ?? 1.0) : 1.0;
