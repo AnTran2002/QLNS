@@ -255,6 +255,16 @@ export const api = {
 
   // ---- Lương tạm tính theo tiến trình chấm công ----
   payrollEstimate: (month) => callApi("employee/payroll-estimate", { params: month ? { month } : undefined }),
+  notifications: (unreadOnly = false) =>
+    callApi("employee/notifications", { params: unreadOnly ? { unread: 1 } : undefined }).then((d) => ({
+      notifications: toNumberList(d?.notifications),
+      unread_count: Number(d?.unread_count ?? 0),
+    })),
+  markNotificationRead: (id = null) =>
+    callApi("employee/notifications", {
+      method: "POST",
+      data: id === null ? {} : { id },
+    }),
 
   // ---- Hướng dẫn lần đầu đăng nhập ----
   completeTutorial: () => callApi("tutorial/complete", { method: "POST" }),

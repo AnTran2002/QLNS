@@ -301,6 +301,7 @@ class PayrollModel extends BaseModel {
         $stmt = $this->db->prepare(
             "UPDATE payroll_items
              SET actual_days = :actual_days,
+             ot_hours = :ot_hours,
                  gross_salary = :gross_salary,
                  social_insurance = :social_insurance,
                  tax_deduction = :tax_deduction,
@@ -313,6 +314,7 @@ class PayrollModel extends BaseModel {
             'period_id' => $periodId,
             'user_id' => $userId,
             'actual_days' => $calculation['actual_days'],
+            'ot_hours' => (float) ($calculation['ot_hours'] ?? $previous['ot_hours']),
             'gross_salary' => $calculation['gross_salary'],
             'social_insurance' => $calculation['social_insurance'],
             'tax_deduction' => $calculation['tax_deduction'],

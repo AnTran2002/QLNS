@@ -7,7 +7,6 @@ import { Button } from "@/components/animate-ui/components/buttons/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/animate-ui/components/radix/dialog";
 import { Progress } from "@/components/animate-ui/components/radix/progress";
 import { AutoHeight } from "@/components/animate-ui/primitives/effects/auto-height";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -20,7 +19,6 @@ import { formatMoney, formatNumber, formatPeriod } from "@/lib/format";
 
 function CalculateForm({ employee, period, item, onClose }) {
   const queryClient = useQueryClient();
-  const [otHours, setOtHours] = useState(item?.ot_hours ?? 0);
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
@@ -29,6 +27,7 @@ function CalculateForm({ employee, period, item, onClose }) {
     queryFn: () => api.payrollAttendance(period.id),
   });
   const actualDays = attendanceQuery.data?.items?.find((row) => row.user_id === employee.id)?.actual_days ?? item?.actual_days ?? 0;
+  const otHours = attendanceQuery.data?.items?.find((row) => row.user_id === employee.id)?.ot_hours ?? 0;
 
   const mutation = useMutation({
     mutationFn: () => api.calculatePayroll({ user_id: employee.id, period_id: period.id, ot_hours: otHours, reason: reason.trim() }),
@@ -87,8 +86,8 @@ function CalculateForm({ employee, period, item, onClose }) {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="ot_hours">Giờ làm thêm (OT)</Label>
-                <Input id="ot_hours" type="number" min="0" step="0.5" value={otHours} onChange={(e) => setOtHours(e.target.value)} className="tabular" />
-                <p className="text-[12px] text-muted-foreground">Hệ số OT 1,5</p>
+                <p id="ot_hours" className="rounded-lg border border-input bg-muted/50 px-3 py-2 text-right tabular-nums">{formatNumber(otHours)} giờ</p>
+                <p className="text-[12px] text-muted-foreground">Tự tính từ chấm công · hệ số OT 1,5</p>
               </div>
             </div>
             <dl className="grid grid-cols-2 gap-4 rounded-2xl bg-muted p-4 text-[14px]">

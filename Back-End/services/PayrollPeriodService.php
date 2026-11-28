@@ -120,6 +120,17 @@ class PayrollPeriodService
 
             $lockedPeriod = $this->payrollModel->getPeriodById($periodId);
             $items = $this->payrollModel->getItemsByPeriod($periodId);
+            $notificationModel = new NotificationModel();
+            foreach ($items as $item) {
+                $notificationModel->createForUser(
+                    (int) $item['user_id'],
+                    'PAYROLL_PUBLISHED',
+                    'Phiếu lương đã được phát hành',
+                    "Phiếu lương tháng {$period['month_year']} đã được phát hành. Bạn có thể xem và tải phiếu lương.",
+                    '/nhan-vien/phieu-luong'
+                );
+            }
+
             $this->payrollModel->commit();
         } catch (Throwable $e) {
             $this->payrollModel->rollBack();

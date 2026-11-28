@@ -78,13 +78,20 @@ class AttendanceService
             $calculations = [];
             foreach ($normalizedEntries as $entry) {
                 $employee = $payrollInputs[$entry['user_id']];
+                $attendanceModel->replaceMonthlyOtHours(
+                    $entry['user_id'],
+                    $period['month_year'],
+                    $entry['ot_hours']
+                );
+                $inputs = new PayrollInputs($period['month_year']);
                 $actualDays = $inputs->actualDays($entry['user_id']);
-                $calculation = $inputs->calculate(array_merge($employee, ['user_id' => $entry['user_id']]), $standardDays, $entry['ot_hours']);
+                $otHours = $inputs->otHours($entry['user_id']);
+                $calculation = $inputs->calculate(array_merge($employee, ['user_id' => $entry['user_id']]), $standardDays, $otHours);
                 $calculations[$entry['user_id']] = $calculation;
 
                 $this->payrollModel->saveOrUpdate($periodId, $entry['user_id'], [
                     'actual_days' => $actualDays,
-                    'ot_hours' => $entry['ot_hours'],
+                    'ot_hours' => $otHours,
                     'gross_salary' => $calculation['gross_salary'],
                     'social_insurance' => $calculation['social_insurance'],
                     'tax_deduction' => $calculation['tax_deduction'],
@@ -92,6 +99,14 @@ class AttendanceService
                     'net_salary' => $calculation['net_salary'],
                     'breakdown' => $calculation['breakdown'],
                 ], $entry['reason'], $changedBy);
+
+                (new NotificationModel())->createForUser(
+                    $entry['user_id'],
+                    'OT_ADJUSTMENT',
+                    'Giờ OT đã được điều chỉnh',
+                    "Admin đã điều chỉnh giờ OT tháng {$period['month_year']} thành " . number_format($otHours, 1, ',', '.') . " giờ. Lý do: {$entry['reason']}",
+                    '/nhan-vien/cham-cong'
+                );
             }
 
             $items = $this->payrollModel->getAttendanceRows($periodId);

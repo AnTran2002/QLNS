@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-route
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MotionConfig } from "motion/react";
 import {
+  Bell,
   Building2,
   CalendarCheck,
   ClipboardList,
@@ -38,6 +39,7 @@ const EmployeeProfile = lazy(() => import("@/pages/employee/profile"));
 const EmployeePayslips = lazy(() => import("@/pages/employee/payslips"));
 const EmployeeAttendance = lazy(() => import("@/pages/employee/attendance"));
 const EmployeeTeam = lazy(() => import("@/pages/employee/team"));
+const EmployeeNotifications = lazy(() => import("@/pages/employee/notifications"));
 const EmployeeLeave = lazy(() => import("@/pages/employee/leave"));
 const ContractDocumentsPage = lazy(() => import("@/pages/admin/contract-documents"));
 
@@ -80,6 +82,7 @@ const EMPLOYEE_NAV = [
       { to: "/nhan-vien/cham-cong", label: "Chấm công", icon: CalendarCheck },
       { to: "/nhan-vien/nghi-phep", label: "Nghỉ phép", icon: Plane },
       { to: "/nhan-vien/dong-nghiep", label: "Đồng nghiệp", icon: UsersRound },
+      { to: "/nhan-vien/thong-bao", label: "Thông báo", icon: Bell },
     ],
   },
 ];
@@ -151,6 +154,7 @@ export function AppRoutes() {
         <Route path="cham-cong" element={<EmployeeAttendance />} />
         <Route path="nghi-phep" element={<EmployeeLeave />} />
         <Route path="dong-nghiep" element={<EmployeeTeam />} />
+        <Route path="thong-bao" element={<EmployeeNotifications />} />
       </Route>
 
       <Route path="*" element={<RootRedirect />} />

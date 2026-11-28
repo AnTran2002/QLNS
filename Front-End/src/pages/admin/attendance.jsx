@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import {
   CalendarCheck2,
   CalendarPlus,
@@ -9,13 +10,11 @@ import {
   Clock,
   FileSpreadsheet,
   History,
-  Loader2,
   Lock,
   Pencil,
   Sigma,
   Wallet,
 } from "lucide-react";
-import { toast } from "sonner";
 import { Button } from "@/components/animate-ui/components/buttons/button";
 import { ErrorState, LoadingState, PeriodStatusBadge, PersonAvatar, SearchField, Segmented } from "@/components/app/kit";
 import { Reveal } from "@/components/app/motion";
@@ -32,15 +31,15 @@ import { formatMoney, formatMoneyShort, formatNumber, formatPeriod } from "@/lib
 import { cn } from "@/lib/utils";
 import { CreatePeriodDialog, daysInMonthOf, ImportDialog } from "./attendance-dialogs";
 
+const toInput = (v) => (v === null || v === undefined ? "" : String(v));
+const parseNum = (s) => Number(String(s).trim().replace(",", "."));
+
 /*
  * Chấm công & OT (Admin / Kế toán C&B)
  *   <<use>>    Tạo Kỳ lương mới (Tháng/Năm)         → CreatePeriodDialog
- *   <<use>>    Chấm công theo ngày + nhập OT        → AttendanceGrid
+ *   <<use>>    Chấm công theo ngày, OT tự động      → AttendanceGrid
  *   <<extend>> Import file Excel công (.xlsx)       → ImportDialog
  */
-
-const toInput = (v) => (v === null || v === undefined ? "" : String(v));
-const parseNum = (s) => Number(String(s).trim().replace(",", "."));
 
 /* ------------------------------------------------------------------ */
 
@@ -181,12 +180,11 @@ function AttendanceGrid({ period, rows }) {
   const queryClient = useQueryClient();
   const editable = period.status === "DRAFT";
   const maxOt = daysInMonthOf(period.month_year) * 24;
-
-  const [serverErrors, setServerErrors] = useState({});
   const [query, setQuery] = useState("");
   const [department, setDepartment] = useState("all");
   const [filter, setFilter] = useState("all");
   const [historyRow, setHistoryRow] = useState(null);
+  const [serverErrors, setServerErrors] = useState({});
   const [adjustment, setAdjustment] = useState(null);
   const [adjustmentError, setAdjustmentError] = useState("");
 
@@ -219,6 +217,7 @@ function AttendanceGrid({ period, rows }) {
         items: data?.items ?? old?.items ?? [],
       }));
       queryClient.invalidateQueries({ queryKey: ["payroll", "periods"] });
+      queryClient.invalidateQueries({ queryKey: ["employee", "attendance"] });
       setServerErrors((errors) => {
         const next = { ...errors };
         entries.forEach(({ user_id }) => delete next[user_id]);
@@ -269,7 +268,7 @@ function AttendanceGrid({ period, rows }) {
         <CardTitle>Lưới ngày công & OT</CardTitle>
         <CardDescription>
           {editable
-            ? `Ngày công lấy từ chấm công theo ngày · điều chỉnh OT theo từng nhân viên · tối đa ${maxOt} giờ OT`
+            ? "Ngày công và giờ OT lấy trực tiếp từ chấm công theo ngày"
             : "Kỳ lương đã chốt — chỉ xem, không thể chỉnh sửa"}
         </CardDescription>
       </CardHeader>
@@ -326,7 +325,6 @@ function AttendanceGrid({ period, rows }) {
             )}
             {visible.map((r) => {
               const error = serverErrors[r.user_id];
-              const disabled = !editable || r.base_salary === null;
               return (
                 <TableRow key={r.user_id} className={cn(error && "bg-destructive/3")}>
                   <TableCell className="pl-4 sm:pl-5">
@@ -347,7 +345,7 @@ function AttendanceGrid({ period, rows }) {
                     <span aria-label={`Ngày công của ${r.full_name}`}>{formatNumber(r.actual_days)}</span>
                   </TableCell>
                   <TableCell className="text-right text-[13px] tabular-nums">
-                    {r.payroll_item_id ? formatNumber(r.ot_hours) : "—"}
+                    {formatNumber(r.ot_hours)}
                   </TableCell>
                   <TableCell className="text-right text-[13px] tabular-nums max-lg:hidden">
                     {r.payroll_item_id ? formatMoney(r.gross_salary) : "—"}
@@ -359,9 +357,9 @@ function AttendanceGrid({ period, rows }) {
                       <span className="text-muted-foreground">—</span>
                     )}
                   </TableCell>
-                  <TableCell className="pr-4 sm:pr-5" title={error || undefined}>
+                  <TableCell className="pr-4 sm:pr-5">
                     <div className="flex items-center gap-1">
-                      <RowState row={r} error={error} />
+                      <RowState row={r} />
                       {r.payroll_item_id && (
                         <Button
                           variant="ghost"
@@ -412,65 +410,27 @@ function AttendanceGrid({ period, rows }) {
           {adjustment && (
             <form onSubmit={confirmAdjustment} className="grid gap-5">
               <section className="grid grid-cols-2 gap-3 rounded-xl border border-border/70 bg-muted/30 p-4 text-[13px]">
-                <div>
-                  <p className="text-[12px] text-muted-foreground">Phòng ban</p>
-                  <p className="font-medium">{adjustment.row.department || "—"}</p>
-                </div>
-                <div>
-                  <p className="text-[12px] text-muted-foreground">Lương cơ bản</p>
-                  <p className="font-medium tabular-nums">{formatMoney(adjustment.row.base_salary)}</p>
-                </div>
-                <div>
-                  <p className="text-[12px] text-muted-foreground">Ngày công</p>
-                  <p className="font-medium tabular-nums">{formatNumber(adjustment.row.actual_days)}</p>
-                </div>
-                <div>
-                  <p className="text-[12px] text-muted-foreground">Gross hiện tại</p>
-                  <p className="font-medium tabular-nums">
-                    {adjustment.row.payroll_item_id ? formatMoney(adjustment.row.gross_salary) : "Chưa tính"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[12px] text-muted-foreground">Net hiện tại</p>
-                  <p className="font-medium tabular-nums">
-                    {adjustment.row.payroll_item_id ? formatMoney(adjustment.row.net_salary) : "Chưa tính"}
-                  </p>
-                </div>
+                <div><p className="text-[12px] text-muted-foreground">Ngày công</p><p className="font-medium tabular-nums">{formatNumber(adjustment.row.actual_days)}</p></div>
+                <div><p className="text-[12px] text-muted-foreground">Lương cơ bản</p><p className="font-medium tabular-nums">{formatMoney(adjustment.row.base_salary)}</p></div>
+                <div><p className="text-[12px] text-muted-foreground">OT hiện tại</p><p className="font-medium tabular-nums">{formatNumber(adjustment.row.ot_hours ?? 0)} giờ</p></div>
+                <div><p className="text-[12px] text-muted-foreground">Nguồn dữ liệu</p><p className="font-medium">Chấm công theo ngày</p></div>
               </section>
-
               <div className="space-y-2">
-                <Label htmlFor="adjustment-ot">Nội dung cần thay đổi · Giờ OT</Label>
-                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-                  <div className="space-y-1">
-                    <span className="text-[11px] text-muted-foreground">Hiện tại</span>
-                    <div className="flex h-10 items-center rounded-lg border border-border bg-muted/40 px-3 text-[14px] tabular-nums">
-                      {formatNumber(adjustment.row.ot_hours ?? 0)} giờ
-                    </div>
-                  </div>
-                  <span className="pt-5 text-muted-foreground" aria-hidden="true">→</span>
-                  <div className="space-y-1">
-                    <Label htmlFor="adjustment-ot" className="text-[11px]">Điều chỉnh thành</Label>
-                    <div className="relative">
-                      <Input
-                        id="adjustment-ot"
-                        inputMode="decimal"
-                        value={adjustment.ot_hours}
-                        onChange={(e) => {
-                          setAdjustment({ ...adjustment, ot_hours: e.target.value.replace(/[^\d.,]/g, "") });
-                          setAdjustmentError("");
-                        }}
-                        aria-label="Giờ OT điều chỉnh"
-                        aria-invalid={adjustmentError.startsWith("Giờ OT") || undefined}
-                        className="pr-12 text-right tabular-nums"
-                        autoFocus
-                      />
-                      <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-[11px] text-muted-foreground">giờ</span>
-                    </div>
-                  </div>
-                </div>
+                <Label htmlFor="adjustment-ot">Giờ OT điều chỉnh</Label>
+                <Input
+                  id="adjustment-ot"
+                  inputMode="decimal"
+                  value={adjustment.ot_hours}
+                  onChange={(e) => {
+                    setAdjustment({ ...adjustment, ot_hours: e.target.value.replace(/[^\d.,]/g, "") });
+                    setAdjustmentError("");
+                  }}
+                  aria-invalid={adjustmentError.startsWith("Giờ OT") || undefined}
+                  className="text-right tabular-nums"
+                  autoFocus
+                />
                 <p className="text-[11px] text-muted-foreground">Tối đa {maxOt} giờ trong kỳ lương này.</p>
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="adjustment-reason">Lý do thay đổi</Label>
                 <Textarea
@@ -485,24 +445,11 @@ function AttendanceGrid({ period, rows }) {
                   placeholder="Ghi rõ lý do thay đổi (10–500 ký tự)"
                   aria-invalid={adjustmentError.startsWith("Lý do") || undefined}
                 />
-                <p className="text-right text-[11px] text-muted-foreground">{adjustment.reason.length}/500</p>
               </div>
-
               {adjustmentError && <p role="alert" className="text-[13px] text-destructive">{adjustmentError}</p>}
               <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setAdjustment(null);
-                    setAdjustmentError("");
-                  }}
-                  disabled={mutation.isPending}
-                >
-                  Huỷ
-                </Button>
+                <Button type="button" variant="outline" onClick={() => setAdjustment(null)} disabled={mutation.isPending}>Huỷ</Button>
                 <Button type="submit" disabled={mutation.isPending}>
-                  {mutation.isPending ? <Loader2 className="animate-spin" /> : <Check />}
                   {mutation.isPending ? "Đang lưu…" : "Xác nhận thay đổi"}
                 </Button>
               </DialogFooter>
@@ -510,6 +457,7 @@ function AttendanceGrid({ period, rows }) {
           )}
         </DialogContent>
       </Dialog>
+
       {historyRow && (
         <PayrollHistoryDialog period={period} row={historyRow} onClose={() => setHistoryRow(null)} />
       )}

@@ -45,7 +45,7 @@ $employees = [
         'bank_account_number' => '000000000002',
         'attendance' => [
             '2026-10' => ['actual_days' => 22, 'ot_hours' => 8],
-            '2026-11' => ['actual_days' => 21, 'ot_hours' => 6],
+            '2026-11' => ['actual_days' => 21, 'ot_hours' => 4.5],
         ],
     ],
     'NV003' => [

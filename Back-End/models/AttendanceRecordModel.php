@@ -28,6 +28,56 @@ class AttendanceRecordModel extends BaseModel
         return $stmt->fetchAll();
     }
 
+    /** Ghi lại tổng OT tháng bằng cách phân bổ vào các ngày đi làm đã chấm công. */
+    public function replaceMonthlyOtHours(int $userId, string $month, float $otHours): void
+    {
+        $start = new DateTimeImmutable($month . '-01');
+        $end = $start->modify('+1 month');
+
+        $stmt = $this->db->prepare(
+            "SELECT id
+             FROM {$this->table}
+             WHERE user_id = :user_id
+               AND work_date >= :start_date
+               AND work_date < :end_date
+               AND status IN ('PRESENT', 'LATE', 'REMOTE')
+             ORDER BY work_date ASC"
+        );
+        $stmt->execute([
+            'user_id' => $userId,
+            'start_date' => $start->format('Y-m-d'),
+            'end_date' => $end->format('Y-m-d'),
+        ]);
+        $eligibleIds = array_map(fn ($row) => (int) $row['id'], $stmt->fetchAll());
+        if ($otHours > 0 && $eligibleIds === []) {
+            throw new AttendanceException(422, 'Không có ngày chấm công để ghi giờ OT');
+        }
+
+        $clear = $this->db->prepare(
+            "UPDATE {$this->table}
+             SET ot_hours = 0
+             WHERE user_id = :user_id
+               AND work_date >= :start_date
+               AND work_date < :end_date"
+        );
+        $clear->execute([
+            'user_id' => $userId,
+            'start_date' => $start->format('Y-m-d'),
+            'end_date' => $end->format('Y-m-d'),
+        ]);
+
+        $update = $this->db->prepare("UPDATE {$this->table} SET ot_hours = :ot_hours WHERE id = :id");
+        $remaining = round($otHours, 2);
+        foreach ($eligibleIds as $id) {
+            if ($remaining <= 0) {
+                break;
+            }
+            $hours = min(0.5, $remaining);
+            $update->execute(['ot_hours' => $hours, 'id' => $id]);
+            $remaining = round($remaining - $hours, 2);
+        }
+    }
+
     /** Số ngày đã đi làm đến hôm nay theo user trong tháng, bỏ qua nghỉ phép và vắng mặt. */
     public function workedDaysByUserForMonth(string $month): array
     {

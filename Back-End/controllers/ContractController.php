@@ -120,6 +120,16 @@ class ContractController
             if ($adjustment === null) {
                 return json_response(404, null, 'Không tìm thấy hợp đồng');
             }
+            $contract = $this->contractModel->findByIdWithUser((int) $contractId);
+            if ($contract && !empty($contract['user_id'])) {
+                (new NotificationModel())->createForUser(
+                    (int) $contract['user_id'],
+                    'SALARY_ADJUSTMENT',
+                    'Thông tin lương đã được điều chỉnh',
+                    "Hợp đồng lương sẽ áp dụng điều chỉnh mới từ tháng {$adjustment['effective_month']}.",
+                    '/nhan-vien/ho-so'
+                );
+            }
 
             return json_response(201, $adjustment, 'Đã ghi nhận điều chỉnh lương');
         } catch (DomainException $e) {

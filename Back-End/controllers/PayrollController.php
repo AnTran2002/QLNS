@@ -81,6 +81,7 @@ class PayrollController
             foreach ($items as &$item) {
                 $userId = (int) $item['user_id'];
                 $item['actual_days'] = $workedDaysByUser[$userId] ?? 0;
+                $item['ot_hours'] = $inputs->otHours($userId);
                 if ($item['payroll_item_id'] !== null && $item['base_salary'] !== null) {
                     $calculation = $inputs->calculate($item, $standardDays, (float) $item['ot_hours']);
                     foreach (['gross_salary', 'social_insurance', 'tax_deduction', 'personal_tax', 'net_salary'] as $field) {

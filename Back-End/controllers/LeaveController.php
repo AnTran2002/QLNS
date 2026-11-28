@@ -152,6 +152,15 @@ class LeaveController
                 );
             }
             $model->commit();
+            (new NotificationModel())->createForUser(
+                (int) $request['user_id'],
+                'LEAVE_REVIEW',
+                $decision === 'APPROVED' ? 'Đơn nghỉ phép đã được duyệt' : 'Đơn nghỉ phép đã bị từ chối',
+                $decision === 'APPROVED'
+                    ? "Đơn nghỉ từ {$request['start_date']} đến {$request['end_date']} đã được duyệt."
+                    : "Đơn nghỉ từ {$request['start_date']} đến {$request['end_date']} đã bị từ chối." . ($note !== '' ? " Ghi chú: {$note}" : ''),
+                '/nhan-vien/nghi-phep'
+            );
         } catch (Throwable $e) {
             $model->rollBack();
             throw $e;

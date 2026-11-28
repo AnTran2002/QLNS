@@ -90,6 +90,9 @@ match ($action) {
     'employee/dashboard' => (new EmployeeController)->dashboard(),
     'employee/attendance' => (new EmployeeController)->attendance(),
     'employee/payroll-estimate' => (new EmployeeController)->payrollEstimate(),
+    'employee/notifications' => ($_SERVER['REQUEST_METHOD'] === 'POST'
+        ? (new NotificationController)->read()
+        : (new NotificationController)->mine()),
     'tutorial/complete'  => (new EmployeeController)->completeTutorial(),
     'tutorial/reset'     => (new EmployeeController)->resetTutorial(),
 
